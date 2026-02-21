@@ -73,6 +73,7 @@ public:
 
   Q_SLOT void nominal_frequency (Frequency rx, Frequency tx);
   Q_SIGNAL void tracking_update () const;
+  Q_SIGNAL void window_closed ();
 
 protected:
   void hideEvent (QHideEvent *) override;

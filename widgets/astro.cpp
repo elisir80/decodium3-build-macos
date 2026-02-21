@@ -63,7 +63,9 @@ Astro::~Astro ()
 void Astro::closeEvent (QCloseEvent * e)
 {
   write_settings ();
-  e->ignore ();                 // do not allow closure by the window system
+  hide ();
+  Q_EMIT window_closed ();
+  e->ignore ();
 }
 
 void Astro::read_settings ()

@@ -5060,16 +5060,32 @@ void MainWindow::on_actionWide_Waterfall_triggered()      //Display Waterfalls
   m_wideGraph->showNormal();
   m_wideGraph->raise ();
   m_wideGraph->activateWindow ();
+  if (!m_monitoring && !m_diskData)
+    {
+      showStatusMessage (tr ("Waterfall is empty until Monitor is active or a WAV file is opened."));
+    }
 }
 
 void MainWindow::on_actionEcho_Graph_triggered()
 {
   m_echoGraph->showNormal();
+  m_echoGraph->raise ();
+  m_echoGraph->activateWindow ();
+  if (m_mode != "Echo")
+    {
+      showStatusMessage (tr ("Echo Graph updates only in Echo mode."));
+    }
 }
 
 void MainWindow::on_actionFast_Graph_triggered()
 {
   m_fastGraph->showNormal();
+  m_fastGraph->raise ();
+  m_fastGraph->activateWindow ();
+  if (m_mode != "MSK144" && !m_bFast9)
+    {
+      showStatusMessage (tr ("Fast Graph updates only in MSK144/Fast mode."));
+    }
 }
 
 void MainWindow::on_actionSolve_FreqCal_triggered()
@@ -5211,6 +5227,12 @@ void MainWindow::on_actionAstronomical_data_toggled (bool checked)
           setXIT (ui->TxFreqSpinBox->value ());
           displayDialFrequency ();
         });
+      connect (m_astroWidget.data (), &Astro::window_closed, this, [this] {
+          if (ui->actionAstronomical_data->isChecked ())
+            {
+              ui->actionAstronomical_data->setChecked (false);
+            }
+        }, Qt::QueuedConnection);
       m_astroWidget->showNormal();
       m_astroWidget->raise ();
       m_astroWidget->activateWindow ();
