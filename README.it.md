@@ -25,6 +25,14 @@ cmake --build build -j8
 open build/ft2.app
 ```
 
+## Automazione Release
+
+Usa lo script locale di release:
+
+```bash
+scripts/release-macos.sh v1.0.1 --publish --repo elisir80/decodium3-build-macos
+```
+
 ## Memoria condivisa su macOS
 
 Se compaiono errori legati ai limiti della memoria condivisa, controlla:
