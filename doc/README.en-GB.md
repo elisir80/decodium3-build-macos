@@ -55,6 +55,13 @@ Release packages include a `.pkg` installer that applies shared-memory
 sysctl settings automatically to avoid startup failures on systems where
 `kern.sysv.shmmax` is too low by default.
 
+### If installer launch is blocked by Gatekeeper
+
+Use `System Settings` -> `Privacy & Security` -> `Open Anyway` for the blocked
+pkg, then confirm with password/Touch ID.
+
+You can also right-click the pkg in Finder and choose `Open`.
+
 ## User-facing Fork Attribution
 
 Fork attribution is shown in:

@@ -38,6 +38,30 @@ The release process now also generates a macOS installer package (`.pkg`) that:
 - installs and loads `com.ft2.jtdx.sysctl.plist` in `/Library/LaunchDaemons`;
 - applies shared-memory sysctl values required by FT2 (`shmmax`/`shmall`).
 
+## If macOS blocks the PKG
+
+If Gatekeeper blocks the installer (`cannot be opened because Apple cannot
+check it for malicious software`), use:
+
+1. Open `System Settings` -> `Privacy & Security`.
+2. Scroll to the Security section and find the message about the blocked pkg.
+3. Click `Open Anyway`.
+4. Confirm with your password/Touch ID.
+5. Re-open the pkg installer.
+
+Alternative method:
+
+1. In Finder, right-click the `.pkg` file.
+2. Click `Open`.
+3. Confirm `Open` in the warning dialog.
+
+Terminal fallback (advanced users only):
+
+```bash
+xattr -dr com.apple.quarantine /path/to/decodium3-ft2-v1.0.3-macos-arm64.pkg
+open /path/to/decodium3-ft2-v1.0.3-macos-arm64.pkg
+```
+
 ## Shared Memory on macOS
 
 If you see errors about shared memory size limits, check:

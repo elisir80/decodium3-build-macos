@@ -55,6 +55,13 @@ Le release includono un installer `.pkg` che applica automaticamente i
 parametri sysctl della memoria condivisa, per evitare errori di avvio
 quando `kern.sysv.shmmax` risulta troppo basso di default.
 
+### Se l'avvio dell'installer viene bloccato da Gatekeeper
+
+Usa `Impostazioni di Sistema` -> `Privacy e sicurezza` -> `Apri comunque`
+per il pkg bloccato, poi conferma con password/Touch ID.
+
+In alternativa fai click destro sul pkg in Finder e scegli `Apri`.
+
 ## Attribuzione Fork lato UI
 
 L'attribuzione del fork e' visibile in:

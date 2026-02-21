@@ -39,6 +39,30 @@ La procedura di release ora genera anche un pacchetto installer macOS (`.pkg`) c
 - installa e carica `com.ft2.jtdx.sysctl.plist` in `/Library/LaunchDaemons`;
 - applica i valori sysctl della memoria condivisa richiesti da FT2 (`shmmax`/`shmall`).
 
+## Se macOS blocca il PKG
+
+Se Gatekeeper blocca l'installer (`non puo' essere aperto perche' Apple non puo'
+verificarlo`), fai cosi':
+
+1. Apri `Impostazioni di Sistema` -> `Privacy e sicurezza`.
+2. Scorri nella sezione Sicurezza e trova il messaggio relativo al pkg bloccato.
+3. Clicca `Apri comunque`.
+4. Conferma con password/Touch ID.
+5. Riapri il file pkg.
+
+Metodo alternativo:
+
+1. In Finder, fai click destro sul file `.pkg`.
+2. Clicca `Apri`.
+3. Conferma `Apri` nel messaggio di avviso.
+
+Fallback da terminale (solo utenti esperti):
+
+```bash
+xattr -dr com.apple.quarantine /percorso/decodium3-ft2-v1.0.3-macos-arm64.pkg
+open /percorso/decodium3-ft2-v1.0.3-macos-arm64.pkg
+```
+
 ## Memoria condivisa su macOS
 
 Se compaiono errori legati ai limiti della memoria condivisa, controlla:
