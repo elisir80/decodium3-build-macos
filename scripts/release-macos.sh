@@ -5,6 +5,7 @@ usage() {
   cat <<'EOF'
 Usage:
   scripts/release-macos.sh <version> [--publish] [--repo owner/repo]
+                                 [--compat-macos 15.0] [--skip-compat-check]
 
 Examples:
   scripts/release-macos.sh v1.0.3
@@ -13,14 +14,15 @@ Examples:
 What it does:
   1) Builds the project in ./build
   2) Generates macOS DMG via CPack (DragNDrop)
-  3) Creates a macOS installer PKG that installs ft2.app and configures
+  3) Verifies bundle compatibility (absolute deps + minos threshold)
+  4) Creates a macOS installer PKG that installs ft2.app and configures
      shared-memory sysctl values for FT2/JTDX coexistence
-  4) Creates versioned assets:
+  5) Creates versioned assets:
        decodium3-ft2-<version>-macos-<arch>.dmg
        decodium3-ft2-<version>-macos-<arch>.zip
        decodium3-ft2-<version>-macos-<arch>.pkg
        decodium3-ft2-<version>-sha256.txt
-  5) Optionally creates/updates the GitHub release when --publish is used
+  6) Optionally creates/updates the GitHub release when --publish is used
 EOF
 }
 
@@ -39,6 +41,50 @@ fi
 
 PUBLISH=0
 REPO="elisir80/decodium3-build-macos"
+COMPAT_MACOS="15.0"
+SKIP_COMPAT_CHECK=0
+
+version_gt() {
+  local lhs="$1"
+  local rhs="$2"
+  [[ "$(printf '%s\n%s\n' "$lhs" "$rhs" | sort -V | tail -n1)" == "$lhs" && "$lhs" != "$rhs" ]]
+}
+
+check_bundle_compatibility() {
+  local app_bundle="$1"
+  local compat_macos="$2"
+  local has_absolute_deps=0
+  local has_bad_minos=0
+
+  while IFS= read -r file_path; do
+    if ! file "$file_path" | grep -q "Mach-O"; then
+      continue
+    fi
+
+    while IFS= read -r dep_path; do
+      case "$dep_path" in
+        /opt/*|/usr/local/*|/Users/*)
+          echo "error: absolute runtime dependency in bundle:"
+          echo "  ${file_path} -> ${dep_path}"
+          has_absolute_deps=1
+          ;;
+      esac
+    done < <(otool -L "$file_path" | awk 'NR>1 {print $1}')
+
+    local minos
+    minos="$(otool -l "$file_path" | awk '/LC_BUILD_VERSION/{s=1} s && $1=="minos"{print $2; exit}')"
+    if [[ -n "$minos" ]] && version_gt "$minos" "$compat_macos"; then
+      echo "error: incompatible min deployment target:"
+      echo "  ${file_path} -> minos ${minos} (required <= ${compat_macos})"
+      has_bad_minos=1
+    fi
+  done < <(find "$app_bundle" -type f)
+
+  if [[ "$has_absolute_deps" -ne 0 || "$has_bad_minos" -ne 0 ]]; then
+    return 1
+  fi
+  return 0
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -53,6 +99,18 @@ while [[ $# -gt 0 ]]; do
       fi
       REPO="$2"
       shift 2
+      ;;
+    --compat-macos)
+      if [[ $# -lt 2 ]]; then
+        echo "error: --compat-macos requires a value"
+        exit 1
+      fi
+      COMPAT_MACOS="$2"
+      shift 2
+      ;;
+    --skip-compat-check)
+      SKIP_COMPAT_CHECK=1
+      shift
       ;;
     *)
       echo "error: unknown argument: $1"
@@ -81,10 +139,10 @@ fi
 
 JOBS="$(sysctl -n hw.ncpu 2>/dev/null || echo 8)"
 
-echo "[1/5] Building project..."
+echo "[1/6] Building project..."
 cmake --build "$BUILD_DIR" -j"$JOBS"
 
-echo "[2/5] Generating DMG with CPack..."
+echo "[2/6] Generating DMG with CPack..."
 (
   cd "$BUILD_DIR"
   cpack -G DragNDrop
@@ -94,6 +152,23 @@ LATEST_DMG="$(cd "$BUILD_DIR" && ls -t *-Darwin.dmg 2>/dev/null | head -n1 || tr
 if [[ -z "$LATEST_DMG" ]]; then
   echo "error: no DMG produced by CPack"
   exit 1
+fi
+STAGED_APP="$(cd "$BUILD_DIR" && ls -td _CPack_Packages/Darwin/DragNDrop/*/ft2.app 2>/dev/null | head -n1 || true)"
+if [[ -z "$STAGED_APP" ]]; then
+  echo "error: unable to locate staged ft2.app from CPack output"
+  exit 1
+fi
+
+if [[ "$SKIP_COMPAT_CHECK" -eq 0 ]]; then
+  echo "[3/6] Checking bundle compatibility target macOS ${COMPAT_MACOS}..."
+  if ! check_bundle_compatibility "${BUILD_DIR}/${STAGED_APP}" "$COMPAT_MACOS"; then
+    echo
+    echo "Bundle compatibility check failed."
+    echo "Use --skip-compat-check to override (not recommended for release)."
+    exit 1
+  fi
+else
+  echo "[3/6] Skipping compatibility checks (--skip-compat-check)."
 fi
 
 DMG_OUT="${PREFIX}-${VERSION}-macos-${ARCH_LABEL}.dmg"
@@ -113,10 +188,10 @@ if [[ ! -f "$PKG_SYSCTL_PLIST" ]]; then
   exit 1
 fi
 
-echo "[3/5] Building macOS installer package..."
+echo "[4/6] Building macOS installer package..."
 rm -rf "$PKG_ROOT" "$PKG_SCRIPTS_DIR"
 mkdir -p "${PKG_ROOT}/Applications" "$PKG_SCRIPTS_DIR"
-/usr/bin/ditto "${BUILD_DIR}/${APP_NAME}" "${PKG_ROOT}/Applications/${APP_NAME}"
+/usr/bin/ditto "${BUILD_DIR}/${STAGED_APP}" "${PKG_ROOT}/Applications/${APP_NAME}"
 cp -f "$PKG_POSTINSTALL" "${PKG_SCRIPTS_DIR}/postinstall"
 cp -f "$PKG_SYSCTL_PLIST" "${PKG_SCRIPTS_DIR}/${PKG_SYSCTL_PLIST##*/}"
 chmod 755 "${PKG_SCRIPTS_DIR}/postinstall"
@@ -129,11 +204,11 @@ pkgbuild \
   --scripts "$PKG_SCRIPTS_DIR" \
   "${BUILD_DIR}/${PKG_OUT}"
 
-echo "[4/5] Creating release assets..."
+echo "[5/6] Creating release assets..."
 cp -f "${BUILD_DIR}/${LATEST_DMG}" "${BUILD_DIR}/${DMG_OUT}"
 (
+  /usr/bin/ditto -c -k --sequesterRsrc --keepParent "${BUILD_DIR}/${STAGED_APP}" "${BUILD_DIR}/${ZIP_OUT}"
   cd "$BUILD_DIR"
-  /usr/bin/zip -qry "$ZIP_OUT" "$APP_NAME"
   shasum -a 256 "$DMG_OUT" "$ZIP_OUT" "$PKG_OUT" > "$SHA_OUT"
 )
 
@@ -180,7 +255,7 @@ Asset:
 - \`${SHA_OUT}\`
 EOF
 
-  echo "[5/5] Publishing release to ${REPO}..."
+  echo "[6/6] Publishing release to ${REPO}..."
   if gh release view "$VERSION" --repo "$REPO" >/dev/null 2>&1; then
     gh release upload "$VERSION" \
       "${BUILD_DIR}/${DMG_OUT}" \

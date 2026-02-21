@@ -147,8 +147,9 @@ attach a debugger which will then receive the console output inside its console.
 #
 
 if (APPLE)
-  set (CMAKE_INSTALL_BINDIR ${CMAKE_PROJECT_NAME}.app/Contents/MacOS)
-  set (CMAKE_INSTALL_DATAROOTDIR ${CMAKE_PROJECT_NAME}.app/Contents/Resources)
+  # Keep install layout aligned with the actual app bundle target name.
+  set (CMAKE_INSTALL_BINDIR ft2.app/Contents/MacOS)
+  set (CMAKE_INSTALL_DATAROOTDIR ft2.app/Contents/Resources)
 endif ()
 
 include (GNUInstallDirs)
@@ -162,8 +163,14 @@ elseif (APPLE)
   set (QT_CONF_DESTINATION ${CMAKE_INSTALL_DATAROOTDIR})
 endif ()
 
-set (WSJT_PLUGIN_DESTINATION ${PLUGIN_DESTINATION} CACHE PATH "Path for plugins")
-set (WSJT_QT_CONF_DESTINATION ${QT_CONF_DESTINATION} CACHE PATH "Path for the qt.conf file")
+if (APPLE)
+  # Prevent stale cache values (e.g. wsjtx.app/...) from breaking bundle fixup.
+  set (WSJT_PLUGIN_DESTINATION ${PLUGIN_DESTINATION} CACHE PATH "Path for plugins" FORCE)
+  set (WSJT_QT_CONF_DESTINATION ${QT_CONF_DESTINATION} CACHE PATH "Path for the qt.conf file" FORCE)
+else ()
+  set (WSJT_PLUGIN_DESTINATION ${PLUGIN_DESTINATION} CACHE PATH "Path for plugins")
+  set (WSJT_QT_CONF_DESTINATION ${QT_CONF_DESTINATION} CACHE PATH "Path for the qt.conf file")
+endif ()
 
 if (WSJT_FOX_OTP)
   set (wsjt_fox_CXXSRCS
@@ -1616,7 +1623,7 @@ set_target_properties (ft2 PROPERTIES
   MACOSX_BUNDLE_SHORT_VERSION_STRING "v${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}"
   MACOSX_BUNDLE_LONG_VERSION_STRING "Version ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}${SCS_VERSION_STR}"
   MACOSX_BUNDLE_BUNDLE_NAME "${PROJECT_BUNDLE_NAME}"
-  MACOSX_BUNDLE_BUNDLE_EXECUTABLE_NAME "${PROJECT_NAME}"
+  MACOSX_BUNDLE_BUNDLE_EXECUTABLE_NAME "ft2"
   MACOSX_BUNDLE_COPYRIGHT "${PROJECT_COPYRIGHT}"
   MACOSX_BUNDLE_GUI_IDENTIFIER "org.k1jt.wsjtx"
   )

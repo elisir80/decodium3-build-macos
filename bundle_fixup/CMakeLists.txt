@@ -16,12 +16,16 @@ if (APPLE OR WIN32)
     )
 
   # if a system Qt is used (e.g. installed in /usr/lib/), it will not be included in the installation
-  set (fixup_exe "\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/${CMAKE_PROJECT_NAME}${CMAKE_EXECUTABLE_SUFFIX}")
+  set (fixup_exe "\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/ft2${CMAKE_EXECUTABLE_SUFFIX}")
 
   #get_filename_component (hamlib_lib_dir ${Hamlib_LIBRARIES} PATH)
 
   if (APPLE)
     list (APPEND fixup_library_dirs "/opt/homebrew/lib")
+    list (APPEND fixup_library_dirs "/opt/homebrew/opt/fftw/lib")
+    list (APPEND fixup_library_dirs "/opt/homebrew/opt/boost/lib")
+    list (APPEND fixup_library_dirs "/opt/homebrew/opt/libusb/lib")
+    list (APPEND fixup_library_dirs "/opt/homebrew/opt/gcc/lib/gcc/current")
     # install required Qt plugins
     install (
       DIRECTORY
@@ -147,8 +151,7 @@ if (APPLE OR WIN32)
         set (gp_tool ${gp_tool})
         # canonicalize path in install context
         get_filename_component (the_exe ${fixup_exe} REALPATH)
-        # fixup_bundle (\"\${the_exe}\" \"\${QTPLUGINS}\" \"${fixup_library_dirs}\")"
+        fixup_bundle (\"\${the_exe}\" \"\${QTPLUGINS}\" \"${fixup_library_dirs}\")"
     #COMPONENT runtime
     )
 endif (APPLE OR WIN32)
-
