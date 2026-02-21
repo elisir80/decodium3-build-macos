@@ -37,6 +37,7 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QDebug>
+#include <QFileInfo>
 #include <QtConcurrent/QtConcurrentRun>
 #include <QProgressDialog>
 #include <QHostInfo>
@@ -332,6 +333,44 @@ namespace
     auto const& time = now.time ();
     auto second = time.second ();
     return now.msecsTo (now.addSecs (second > 30 ? 60 - second : -second)) - time.msec ();
+  }
+
+  QString helper_executable_path (QString const& app_dir, QString const& executable)
+  {
+    auto const is_launchable = [] (QString const& path)
+    {
+      QFileInfo const fi {path};
+      return fi.exists () && fi.isFile () && fi.isExecutable ();
+    };
+
+    QStringList candidates;
+    candidates << QDir {app_dir}.absoluteFilePath (executable);
+#if defined (Q_OS_DARWIN)
+    // Development-tree fallback: <build>/ft2.app/Contents/MacOS -> <build>/
+    QDir build_dir {app_dir};
+    if (build_dir.cdUp () && build_dir.cdUp () && build_dir.cdUp ())
+      {
+        candidates << build_dir.absoluteFilePath (executable);
+      }
+#endif
+
+    auto const from_path = QStandardPaths::findExecutable (executable);
+    if (!from_path.isEmpty ())
+      {
+        candidates << from_path;
+      }
+
+    for (auto const& candidate : candidates)
+      {
+        auto const native = QDir::toNativeSeparators (candidate);
+        if (is_launchable (native))
+          {
+            return native;
+          }
+      }
+
+    // Return default in-bundle path to keep existing error reporting semantics.
+    return QDir::toNativeSeparators (QDir {app_dir}.absoluteFilePath (executable));
   }
 }
 
@@ -1308,8 +1347,10 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
 
   to_jt9(0,0,0);     //initialize IPC variables
 
+  auto jt9_shm_key = mem_jt9->key ();
+
   QStringList jt9_args {
-    "-s", QApplication::applicationName () // shared memory key,
+    "-s", jt9_shm_key // shared memory key,
                                            // includes rig
 #ifdef NDEBUG
       , "-w", "1"               //FFTW patience - release
@@ -1331,8 +1372,8 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   QProcessEnvironment new_env {m_env};
   new_env.insert ("OMP_STACKSIZE", "10M");
   proc_jt9.setProcessEnvironment (new_env);
-  proc_jt9.start(QDir::toNativeSeparators (m_appDir) + QDir::separator () +
-          "jt9", jt9_args, QIODevice::ReadWrite | QIODevice::Unbuffered);
+  auto const jt9_executable = helper_executable_path (m_appDir, "jt9");
+  proc_jt9.start (jt9_executable, jt9_args, QIODevice::ReadWrite | QIODevice::Unbuffered);
 
   auto fname {QDir::toNativeSeparators(m_config.writeable_data_dir ().absoluteFilePath ("wsjtx_wisdom.dat"))};
   fftwf_import_wisdom_from_filename (fname.toLocal8Bit ());
@@ -2762,7 +2803,8 @@ void MainWindow::dataSink(qint64 frames)
 
 void MainWindow::startP1()
 {
-  p1.start (QDir::toNativeSeparators (QDir {QApplication::applicationDirPath ()}.absoluteFilePath ("wsprd")), m_cmndP1);
+  auto const wsprd_executable = helper_executable_path (m_appDir, "wsprd");
+  p1.start (wsprd_executable, m_cmndP1);
 }
 
 QString MainWindow::save_wave_file (QString const& name, short const * data, int samples,
@@ -13571,7 +13613,7 @@ void MainWindow::pskSetLocal ()
   if (rig_information.contains("OmniRig")) rig_information = "N/A (OmniRig)";
   if (rig_information == "FLRig") rig_information = "N/A (FLRig)";
   if (rig_information.contains("TCI Cli")) rig_information = "N/A (TCI)";
-  m_psk_Reporter.setLocalStation(m_config.my_callsign (), m_config.my_grid (), antenna_description, rig_information);
+  m_psk_Reporter.setLocalStation(m_config.my_callsign (), m_config.my_grid (), antenna_description, rig_information, "WSJT-X 3.0");
 }
 
 void MainWindow::transmitDisplay (bool transmitting)
@@ -18863,4 +18905,3 @@ void MainWindow::onNtpSyncStatusChanged(bool synced, QString const& statusText)
   }
   ntp_status_label.setToolTip(statusText);
 }
-

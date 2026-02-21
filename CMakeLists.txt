@@ -10,7 +10,7 @@ if (APPLE)
   #
   # otool -l <binary> | grep -A3 LC_VERSION_MIN_MACOSX
   #
-  set (CMAKE_OSX_DEPLOYMENT_TARGET 10.12
+  set (CMAKE_OSX_DEPLOYMENT_TARGET 11.0
     CACHE STRING "Earliest version of macOS supported
 
 Earliest version we can support with Qt 5.12, C++11 & libc++ is 10.12.
@@ -1596,7 +1596,7 @@ generate_version_info (wsjtx_VERSION_RESOURCES
   ICON ${WSJTX_ICON_FILE}
   )
 
-add_executable (wsjtx MACOSX_BUNDLE
+add_executable (ft2 MACOSX_BUNDLE
   ${wsjtx_CXXSRCS}
   ${wsjtx_GENUISRCS}
   ${WSJTX_ICON_FILE}
@@ -1605,10 +1605,10 @@ add_executable (wsjtx MACOSX_BUNDLE
   )
 
 if (WSJT_CREATE_WINMAIN)
-  set_target_properties (wsjtx PROPERTIES WIN32_EXECUTABLE ON)
+  set_target_properties (ft2 PROPERTIES WIN32_EXECUTABLE ON)
 endif (WSJT_CREATE_WINMAIN)
 
-set_target_properties (wsjtx PROPERTIES
+set_target_properties (ft2 PROPERTIES
   MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Darwin/Info.plist.in"
   MACOSX_BUNDLE_INFO_STRING "${PROJECT_DESCRIPTION}"
   MACOSX_BUNDLE_ICON_FILE "${WSJTX_ICON_FILE}"
@@ -1621,27 +1621,41 @@ set_target_properties (wsjtx PROPERTIES
   MACOSX_BUNDLE_GUI_IDENTIFIER "org.k1jt.wsjtx"
   )
 
-target_include_directories (wsjtx PRIVATE ${FFTW3_INCLUDE_DIRS})
+target_include_directories (ft2 PRIVATE ${FFTW3_INCLUDE_DIRS})
 if ((NOT ${OPENMP_FOUND}) OR APPLE)
-  target_link_libraries (wsjtx wsjt_fort)
+  target_link_libraries (ft2 wsjt_fort)
 else ()
-  target_link_libraries (wsjtx wsjt_fort_omp)
+  target_link_libraries (ft2 wsjt_fort_omp)
   if (OpenMP_C_FLAGS)
-    set_target_properties (wsjtx PROPERTIES
+    set_target_properties (ft2 PROPERTIES
       COMPILE_FLAGS "${OpenMP_C_FLAGS}"
       LINK_FLAGS "${OpenMP_C_FLAGS}"
       )
   endif ()
-  set_target_properties (wsjtx PROPERTIES
+  set_target_properties (ft2 PROPERTIES
     Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/fortran_modules_omp
     )
   if (WIN32)
-    set_target_properties (wsjtx PROPERTIES
+    set_target_properties (ft2 PROPERTIES
       LINK_FLAGS -Wl,--stack,0x1000000,--heap,0x20000000
       )
   endif ()
 endif ()
-target_link_libraries (wsjtx Qt5::SerialPort wsjt_cxx wsjt_qt wsjt_qtmm ${FFTW3_LIBRARIES} ${LIBM_LIBRARIES})
+target_link_libraries (ft2 Qt5::SerialPort wsjt_cxx wsjt_qt wsjt_qtmm ${FFTW3_LIBRARIES} ${LIBM_LIBRARIES})
+
+if (APPLE)
+  # Keep helper decoders beside ft2 when running directly from build tree.
+  add_dependencies (ft2 jt9 wsprd)
+  add_custom_command (TARGET ft2 POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    $<TARGET_FILE:jt9>
+    $<TARGET_FILE_DIR:ft2>/jt9
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    $<TARGET_FILE:wsprd>
+    $<TARGET_FILE_DIR:ft2>/wsprd
+    VERBATIM
+    )
+endif ()
 
 # make a library for WSJT-X UDP servers
 # add_library (wsjtx_udp SHARED ${UDP_library_CXXSRCS})
@@ -1719,7 +1733,7 @@ endif (UNIX)
 #
 # installation
 #
-install (TARGETS wsjtx
+install (TARGETS ft2
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime
   BUNDLE DESTINATION . COMPONENT runtime
   )
@@ -1839,6 +1853,8 @@ if (APPLE)
     install (FILES
         Darwin/ReadMe.txt
         Darwin/com.wsjtx.sysctl.plist
+        Darwin/com.ft2.jtdx.sysctl.plist
+        Darwin/ReadMe_FT2_JTDX.txt
         DESTINATION .
         #COMPONENT runtime
     )

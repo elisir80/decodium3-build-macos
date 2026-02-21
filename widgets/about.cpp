@@ -19,6 +19,7 @@ CAboutDlg::CAboutDlg(QWidget *parent) :
 
   ui->labelTxt->setText(
     "<h2>" + versionStr + "</h2>"
+    "<p><b>Fork by Salvatore Raccampo 9H1SR</b></p>"
     "<p><b>Mod by IU8LMC</b> - <a href=\"https://www.qrz.com/db/IU8LMC\">qrz.com/db/IU8LMC</a></p>"
     "<p>Decodium 3 FT2 implements a number of digital modes designed for "
     "weak-signal Amateur Radio communication.</p>"
