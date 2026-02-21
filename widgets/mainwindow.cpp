@@ -1531,11 +1531,6 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   splashTimer.setSingleShot (true);
   splashTimer.start (20 * 1000);
 
-  if(QCoreApplication::applicationVersion().contains("-devel") or
-     QCoreApplication::applicationVersion().contains("-rc")) {
-    QTimer::singleShot (0, this, SLOT (not_GA_warning_message ()));
-  }
-
   m_bMyCallStd=stdCall(m_config.my_callsign ()); //ft8md
   m_bHisCallStd=stdCall(m_hisCall); //ft8md
 
@@ -1604,15 +1599,7 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
 
 void MainWindow::not_GA_warning_message ()
 {
-  if(m_config.my_callsign()=="IU8LMC") return;    //IU8LMC mod
-  MessageBox::critical_message (this,
-                                "This is a pre-release version of Decodium 3 FT2 " + version (false) + " made\n"
-                                "available for testing purposes.  By design it will\n"
-                                "be nonfunctional after April 30, 2026.");
-  auto now = QDateTime::currentDateTimeUtc ();
-  if (now >= QDateTime {{2026, 4, 30}, {23, 59, 59, 999}, Qt::UTC}) {
-    Q_EMIT finished ();
-  }
+  // Pre-release warning and time-lock intentionally disabled for this fork.
 }
 
 void MainWindow::handle_leavingSettings ()
