@@ -5058,6 +5058,8 @@ void MainWindow::on_actionLocal_User_Guide_triggered()
 void MainWindow::on_actionWide_Waterfall_triggered()      //Display Waterfalls
 {
   m_wideGraph->showNormal();
+  m_wideGraph->raise ();
+  m_wideGraph->activateWindow ();
 }
 
 void MainWindow::on_actionEcho_Graph_triggered()

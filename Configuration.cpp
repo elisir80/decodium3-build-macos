@@ -1737,12 +1737,38 @@ namespace
 #else
   char const * app_root = "/../";
 #endif
+
+#if defined (Q_OS_MAC)
+  QString mac_bundle_resources_path ()
+  {
+    return QDir::cleanPath (QDir {QApplication::applicationDirPath ()}.absoluteFilePath ("../Resources"));
+  }
+#endif
+
   QString doc_path ()
   {
 #if CMAKE_BUILD
+#if defined (Q_OS_MAC)
+    auto const resources = mac_bundle_resources_path ();
+    auto const bundled_doc = QDir::cleanPath (resources + "/doc/wsjtx");
+    if (QDir {bundled_doc}.exists ())
+      {
+        return bundled_doc;
+      }
+    auto const bundled_doc_root = QDir::cleanPath (resources + "/doc");
+    if (QDir {bundled_doc_root}.exists ())
+      {
+        return bundled_doc_root;
+      }
+#endif
     if (QDir::isRelativePath (CMAKE_INSTALL_DOCDIR))
       {
-	return QApplication::applicationDirPath () + app_root + CMAKE_INSTALL_DOCDIR;
+        auto const candidate = QDir::cleanPath (QApplication::applicationDirPath () + app_root + CMAKE_INSTALL_DOCDIR);
+        if (QDir {candidate}.exists ())
+          {
+            return candidate;
+          }
+        return candidate;
       }
     return CMAKE_INSTALL_DOCDIR;
 #else
@@ -1753,9 +1779,31 @@ namespace
   QString data_path ()
   {
 #if CMAKE_BUILD
+#if defined (Q_OS_MAC)
+    auto const resources = mac_bundle_resources_path ();
+    auto const bundled_data = QDir::cleanPath (resources + "/wsjtx");
+    if (QDir {bundled_data}.exists ())
+      {
+        return bundled_data;
+      }
+    if (QDir {resources}.exists ())
+      {
+        return resources;
+      }
+#endif
     if (QDir::isRelativePath (CMAKE_INSTALL_DATADIR))
       {
-	return QApplication::applicationDirPath () + app_root + CMAKE_INSTALL_DATADIR + QChar {'/'} + CMAKE_PROJECT_NAME;
+        auto const data_root = QDir::cleanPath (QApplication::applicationDirPath () + app_root + CMAKE_INSTALL_DATADIR);
+        auto const candidate = QDir::cleanPath (data_root + QChar {'/'} + CMAKE_PROJECT_NAME);
+        if (QDir {candidate}.exists ())
+          {
+            return candidate;
+          }
+        if (QDir {data_root}.exists ())
+          {
+            return data_root;
+          }
+        return candidate;
       }
     return CMAKE_INSTALL_DATADIR;
 #else
@@ -5728,4 +5776,3 @@ ENUM_QDATASTREAM_OPS_IMPL (Configuration, Type2MsgGen);
 
 ENUM_CONVERSION_OPS_IMPL (Configuration, DataMode);
 ENUM_CONVERSION_OPS_IMPL (Configuration, Type2MsgGen);
-

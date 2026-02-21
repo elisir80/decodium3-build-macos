@@ -9,6 +9,7 @@
 #include <QDateTime>
 #include <QTimeZone>
 #include <QDir>
+#include <QFileInfo>
 #include <QCloseEvent>
 #include <QDebug>
 #include <math.h>
@@ -103,6 +104,7 @@ void Astro::write_settings ()
 auto Astro::astroUpdate(QDateTime const& t, QString const& mygrid, QString const& hisgrid, Frequency freq,
      bool bEchoMode, bool bTx, bool bAuto, bool no_tx_QSY, double TR_period) -> Correction
 {
+  Correction correction;
   Frequency freq_moon {freq};
   double azsun,elsun,azmoon,elmoon,azmoondx,elmoondx;
   double ramoon,decmoon,dgrd,poloffset,xnr,techo,width1,width2;
@@ -119,6 +121,23 @@ auto Astro::astroUpdate(QDateTime const& t, QString const& mygrid, QString const
   if(freq_moon < 1) freq_moon = 144000000;
   auto const& AzElFileName = QDir::toNativeSeparators (configuration_->azel_directory ().absoluteFilePath ("azel.dat"));
   auto const& jpleph = configuration_->data_dir ().absoluteFilePath ("JPLEPH");
+  QFileInfo const jpleph_file_info {jpleph};
+  if (!jpleph_file_info.exists () || !jpleph_file_info.isFile () || !jpleph_file_info.isReadable ())
+    {
+      static bool missing_jpleph_warned {false};
+      auto const path = QDir::toNativeSeparators (jpleph);
+      if (!missing_jpleph_warned)
+        {
+          missing_jpleph_warned = true;
+          MessageBox::warning_message (
+            this,
+            tr ("Astronomical Data Error"),
+            tr ("JPLEPH file not found or unreadable:\n%1\n\nAstronomical calculations are disabled.")
+              .arg (path));
+        }
+      ui_->text_label->setText (tr ("JPLEPH file not found or unreadable:\n%1").arg (path));
+      return correction;
+    }
   SettingsGroup g (settings_, "Configuration");
   bool extraazel=settings_->value("AzElExtraLines",false).toBool();
   astrosub(nyear, month, nday, uth, static_cast<double> (freq_moon),
@@ -168,7 +187,6 @@ auto Astro::astroUpdate(QDateTime const& t, QString const& mygrid, QString const
   }
   ui_->text_label->setText(message);
 
-  Correction correction;
   correction.dop=m_dop00;
   correction.width=width1;
   if(hisgrid!="" and !bAuto) {

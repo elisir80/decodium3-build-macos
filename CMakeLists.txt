@@ -1653,6 +1653,22 @@ if (APPLE)
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
     $<TARGET_FILE:wsprd>
     $<TARGET_FILE_DIR:ft2>/wsprd
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+    $<TARGET_FILE_DIR:ft2>/../Resources/wsjtx
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${PROJECT_SOURCE_DIR}/cty.dat
+    ${PROJECT_SOURCE_DIR}/cty.dat_copyright.txt
+    ${PROJECT_SOURCE_DIR}/grid.dat
+    ${PROJECT_SOURCE_DIR}/sat.dat
+    ${PROJECT_SOURCE_DIR}/contrib/Ephemeris/JPLEPH
+    ${PROJECT_SOURCE_DIR}/eclipse.txt
+    $<TARGET_FILE_DIR:ft2>/../Resources/wsjtx
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${PROJECT_SOURCE_DIR}/ALLCALL7.TXT
+    $<TARGET_FILE_DIR:ft2>/ALLCALL7.TXT
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${PROJECT_SOURCE_DIR}/sounds
+    $<TARGET_FILE_DIR:ft2>/sounds
     VERBATIM
     )
 endif ()
