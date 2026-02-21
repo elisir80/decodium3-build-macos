@@ -141,11 +141,23 @@ fi
 JOBS="$(sysctl -n hw.ncpu 2>/dev/null || echo 8)"
 
 echo "[1/7] Configuring project (macOS target ${COMPAT_MACOS})..."
+cmake_args=(
+  -DCMAKE_BUILD_TYPE=Release
+  -DCMAKE_OSX_DEPLOYMENT_TARGET="$COMPAT_MACOS"
+  -DWSJT_GENERATE_DOCS=OFF
+  -DWSJT_SKIP_MANPAGES=ON
+  -DWSJT_BUILD_UTILS=OFF
+)
+
+# Respect externally provided CMake prefix paths (e.g. qt@5 on GitHub Actions).
+if [[ -n "${CMAKE_PREFIX_PATH:-}" ]]; then
+  cmake_args+=("-DCMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}")
+fi
+
 cmake \
   -S "$ROOT_DIR" \
   -B "$BUILD_DIR" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_OSX_DEPLOYMENT_TARGET="$COMPAT_MACOS"
+  "${cmake_args[@]}"
 
 echo "[2/7] Building project..."
 cmake --build "$BUILD_DIR" -j"$JOBS"
