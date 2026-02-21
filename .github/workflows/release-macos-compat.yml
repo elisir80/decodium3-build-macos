@@ -1,0 +1,88 @@
+name: Release macOS (Sequoia+Tahoe)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. v1.0.5)"
+        required: true
+        default: "v1.0.5"
+      publish_release:
+        description: "Publish GitHub release"
+        required: true
+        default: false
+        type: boolean
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/release-macos-compat.yml"
+      - "scripts/release-macos.sh"
+      - "CMakeLists.txt"
+      - "bundle_fixup/CMakeLists.txt"
+      - "Darwin/ft2-pkg-postinstall.sh"
+      - "Darwin/com.ft2.jtdx.sysctl.plist"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 120
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select version
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="v0.0.0-ci-${GITHUB_SHA::7}"
+          fi
+          if [[ "$VERSION" != v* ]]; then
+            VERSION="v${VERSION}"
+          fi
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "Using version: ${VERSION}"
+
+      - name: Install dependencies
+        run: |
+          brew install qt@5 gcc fftw hamlib libusb boost pkg-config
+
+          GCC_PREFIX="$(brew --prefix gcc)"
+          GFORTRAN="$(ls "${GCC_PREFIX}"/bin/gfortran-* 2>/dev/null | head -1 || true)"
+          if [[ -n "${GFORTRAN}" ]]; then
+            sudo ln -sf "${GFORTRAN}" /usr/local/bin/gfortran
+          fi
+          gfortran --version
+
+          QT5_PREFIX="$(brew --prefix qt@5)"
+          echo "${QT5_PREFIX}/bin" >> "$GITHUB_PATH"
+          echo "CMAKE_PREFIX_PATH=${QT5_PREFIX}" >> "$GITHUB_ENV"
+
+      - name: Build release assets
+        if: github.event_name != 'workflow_dispatch' || github.event.inputs.publish_release != 'true'
+        run: |
+          scripts/release-macos.sh "${VERSION}" --compat-macos 15.0 --repo "${GITHUB_REPOSITORY}"
+
+      - name: Build and publish release
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          scripts/release-macos.sh "${VERSION}" --compat-macos 15.0 --publish --repo "${GITHUB_REPOSITORY}"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: decodium3-ft2-${{ env.VERSION }}-macos
+          if-no-files-found: error
+          path: |
+            build/decodium3-ft2-${{ env.VERSION }}-macos-*.dmg
+            build/decodium3-ft2-${{ env.VERSION }}-macos-*.zip
+            build/decodium3-ft2-${{ env.VERSION }}-macos-*.pkg
+            build/decodium3-ft2-${{ env.VERSION }}-sha256.txt

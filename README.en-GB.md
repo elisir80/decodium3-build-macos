@@ -32,6 +32,18 @@ Use the local release script:
 scripts/release-macos.sh v1.0.3 --publish --repo elisir80/decodium3-build-macos
 ```
 
+For one DMG that works on both macOS Sequoia (15.x) and Tahoe (26.x), build
+with:
+
+```bash
+scripts/release-macos.sh v1.0.3 --compat-macos 15.0
+```
+
+Important: if you build locally on Tahoe with Homebrew libraries compiled with
+`minos 26.0`, the compatibility check will fail by design. Use the GitHub
+workflow `Release macOS (Sequoia+Tahoe)` (runs on `macos-15`) to generate a
+cross-version DMG.
+
 The release process now also generates a macOS installer package (`.pkg`) that:
 
 - installs `ft2.app` into `/Applications`;

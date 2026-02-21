@@ -12,17 +12,18 @@ Examples:
   scripts/release-macos.sh v1.0.3 --publish --repo elisir80/decodium3-build-macos
 
 What it does:
-  1) Builds the project in ./build
-  2) Generates macOS DMG via CPack (DragNDrop)
-  3) Verifies bundle compatibility (absolute deps + minos threshold)
-  4) Creates a macOS installer PKG that installs ft2.app and configures
+  1) Configures the project in ./build
+  2) Builds the project in ./build
+  3) Generates macOS DMG via CPack (DragNDrop)
+  4) Verifies bundle compatibility (absolute deps + minos threshold)
+  5) Creates a macOS installer PKG that installs ft2.app and configures
      shared-memory sysctl values for FT2/JTDX coexistence
-  5) Creates versioned assets:
+  6) Creates versioned assets:
        decodium3-ft2-<version>-macos-<arch>.dmg
        decodium3-ft2-<version>-macos-<arch>.zip
        decodium3-ft2-<version>-macos-<arch>.pkg
        decodium3-ft2-<version>-sha256.txt
-  6) Optionally creates/updates the GitHub release when --publish is used
+  7) Optionally creates/updates the GitHub release when --publish is used
 EOF
 }
 
@@ -139,10 +140,17 @@ fi
 
 JOBS="$(sysctl -n hw.ncpu 2>/dev/null || echo 8)"
 
-echo "[1/6] Building project..."
+echo "[1/7] Configuring project (macOS target ${COMPAT_MACOS})..."
+cmake \
+  -S "$ROOT_DIR" \
+  -B "$BUILD_DIR" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET="$COMPAT_MACOS"
+
+echo "[2/7] Building project..."
 cmake --build "$BUILD_DIR" -j"$JOBS"
 
-echo "[2/6] Generating DMG with CPack..."
+echo "[3/7] Generating DMG with CPack..."
 (
   cd "$BUILD_DIR"
   cpack -G DragNDrop
@@ -160,7 +168,7 @@ if [[ -z "$STAGED_APP" ]]; then
 fi
 
 if [[ "$SKIP_COMPAT_CHECK" -eq 0 ]]; then
-  echo "[3/6] Checking bundle compatibility target macOS ${COMPAT_MACOS}..."
+  echo "[4/7] Checking bundle compatibility target macOS ${COMPAT_MACOS}..."
   if ! check_bundle_compatibility "${BUILD_DIR}/${STAGED_APP}" "$COMPAT_MACOS"; then
     echo
     echo "Bundle compatibility check failed."
@@ -168,7 +176,7 @@ if [[ "$SKIP_COMPAT_CHECK" -eq 0 ]]; then
     exit 1
   fi
 else
-  echo "[3/6] Skipping compatibility checks (--skip-compat-check)."
+  echo "[4/7] Skipping compatibility checks (--skip-compat-check)."
 fi
 
 DMG_OUT="${PREFIX}-${VERSION}-macos-${ARCH_LABEL}.dmg"
@@ -188,7 +196,7 @@ if [[ ! -f "$PKG_SYSCTL_PLIST" ]]; then
   exit 1
 fi
 
-echo "[4/6] Building macOS installer package..."
+echo "[5/7] Building macOS installer package..."
 rm -rf "$PKG_ROOT" "$PKG_SCRIPTS_DIR"
 mkdir -p "${PKG_ROOT}/Applications" "$PKG_SCRIPTS_DIR"
 /usr/bin/ditto "${BUILD_DIR}/${STAGED_APP}" "${PKG_ROOT}/Applications/${APP_NAME}"
@@ -204,7 +212,7 @@ pkgbuild \
   --scripts "$PKG_SCRIPTS_DIR" \
   "${BUILD_DIR}/${PKG_OUT}"
 
-echo "[5/6] Creating release assets..."
+echo "[6/7] Creating release assets..."
 cp -f "${BUILD_DIR}/${LATEST_DMG}" "${BUILD_DIR}/${DMG_OUT}"
 (
   /usr/bin/ditto -c -k --sequesterRsrc --keepParent "${BUILD_DIR}/${STAGED_APP}" "${BUILD_DIR}/${ZIP_OUT}"
@@ -255,7 +263,7 @@ Asset:
 - \`${SHA_OUT}\`
 EOF
 
-  echo "[6/6] Publishing release to ${REPO}..."
+  echo "[7/7] Publishing release to ${REPO}..."
   if gh release view "$VERSION" --repo "$REPO" >/dev/null 2>&1; then
     gh release upload "$VERSION" \
       "${BUILD_DIR}/${DMG_OUT}" \
