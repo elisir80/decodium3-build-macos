@@ -47,6 +47,13 @@ Reference files:
 
 - `Darwin/com.ft2.jtdx.sysctl.plist`
 - `Darwin/ReadMe_FT2_JTDX.txt`
+- `Darwin/ft2-pkg-postinstall.sh`
+
+### macOS installer package
+
+Release packages include a `.pkg` installer that applies shared-memory
+sysctl settings automatically to avoid startup failures on systems where
+`kern.sysv.shmmax` is too low by default.
 
 ## User-facing Fork Attribution
 

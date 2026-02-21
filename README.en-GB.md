@@ -29,8 +29,14 @@ open build/ft2.app
 Use the local release script:
 
 ```bash
-scripts/release-macos.sh v1.0.1 --publish --repo elisir80/decodium3-build-macos
+scripts/release-macos.sh v1.0.3 --publish --repo elisir80/decodium3-build-macos
 ```
+
+The release process now also generates a macOS installer package (`.pkg`) that:
+
+- installs `ft2.app` into `/Applications`;
+- installs and loads `com.ft2.jtdx.sysctl.plist` in `/Library/LaunchDaemons`;
+- applies shared-memory sysctl values required by FT2 (`shmmax`/`shmall`).
 
 ## Shared Memory on macOS
 
@@ -44,6 +50,7 @@ Use the provided coexistence plist when FT2 and JTDX are both installed:
 
 - `Darwin/com.ft2.jtdx.sysctl.plist`
 - `Darwin/ReadMe_FT2_JTDX.txt`
+- `Darwin/ft2-pkg-postinstall.sh`
 
 ## Documentation
 
