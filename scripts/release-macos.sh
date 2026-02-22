@@ -6,6 +6,7 @@ usage() {
 Usage:
   scripts/release-macos.sh <version> [--publish] [--repo owner/repo]
                                  [--compat-macos 15.0] [--skip-compat-check]
+                                 [--codesign-identity "-"]
 
 Examples:
   scripts/release-macos.sh v1.0.3
@@ -16,7 +17,8 @@ What it does:
   2) Builds the project in ./build
   3) Generates macOS DMG via CPack (DragNDrop)
   4) Verifies bundle compatibility (absolute deps + minos threshold)
-  5) Creates a macOS installer PKG that installs ft2.app and configures
+  5) Re-signs the app bundle (ad-hoc by default) and creates a macOS installer
+     PKG that installs ft2.app and configures
      shared-memory sysctl values for FT2/JTDX coexistence
   6) Creates versioned assets:
        decodium3-ft2-<version>-macos-<arch>.dmg
@@ -44,6 +46,7 @@ PUBLISH=0
 REPO="elisir80/decodium3-build-macos"
 COMPAT_MACOS="15.0"
 SKIP_COMPAT_CHECK=0
+CODESIGN_IDENTITY="${CODESIGN_IDENTITY:--}"
 
 version_gt() {
   local lhs="$1"
@@ -87,6 +90,36 @@ check_bundle_compatibility() {
   return 0
 }
 
+sign_app_bundle() {
+  local app_bundle="$1"
+  local sign_identity="$2"
+
+  if ! command -v codesign >/dev/null 2>&1; then
+    echo "error: codesign tool not found"
+    return 1
+  fi
+
+  echo "Signing app bundle with identity: ${sign_identity}"
+  codesign --force --deep --sign "${sign_identity}" --timestamp=none "${app_bundle}" >/dev/null
+  codesign --verify --deep --strict --verbose=2 "${app_bundle}" >/dev/null
+}
+
+create_dmg_from_staged_root() {
+  local staged_root="$1"
+  local out_dmg="$2"
+  local vol_name="$3"
+  local tmp_dmg="${out_dmg}.tmp.dmg"
+
+  rm -f "${out_dmg}" "${tmp_dmg}"
+  hdiutil create \
+    -volname "${vol_name}" \
+    -srcfolder "${staged_root}" \
+    -fs HFS+ \
+    -format UDZO \
+    "${tmp_dmg}" >/dev/null
+  mv -f "${tmp_dmg}" "${out_dmg}"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --publish)
@@ -112,6 +145,14 @@ while [[ $# -gt 0 ]]; do
     --skip-compat-check)
       SKIP_COMPAT_CHECK=1
       shift
+      ;;
+    --codesign-identity)
+      if [[ $# -lt 2 ]]; then
+        echo "error: --codesign-identity requires a value"
+        exit 1
+      fi
+      CODESIGN_IDENTITY="$2"
+      shift 2
       ;;
     *)
       echo "error: unknown argument: $1"
@@ -178,6 +219,8 @@ if [[ -z "$STAGED_APP" ]]; then
   echo "error: unable to locate staged ft2.app from CPack output"
   exit 1
 fi
+STAGED_APP_ABS="${BUILD_DIR}/${STAGED_APP}"
+STAGED_ROOT_ABS="$(dirname "${STAGED_APP_ABS}")"
 
 if [[ "$SKIP_COMPAT_CHECK" -eq 0 ]]; then
   echo "[4/7] Checking bundle compatibility target macOS ${COMPAT_MACOS}..."
@@ -208,10 +251,12 @@ if [[ ! -f "$PKG_SYSCTL_PLIST" ]]; then
   exit 1
 fi
 
-echo "[5/7] Building macOS installer package..."
+echo "[5/7] Re-signing app bundle and building macOS installer package..."
+sign_app_bundle "${STAGED_APP_ABS}" "${CODESIGN_IDENTITY}"
+
 rm -rf "$PKG_ROOT" "$PKG_SCRIPTS_DIR"
 mkdir -p "${PKG_ROOT}/Applications" "$PKG_SCRIPTS_DIR"
-/usr/bin/ditto "${BUILD_DIR}/${STAGED_APP}" "${PKG_ROOT}/Applications/${APP_NAME}"
+/usr/bin/ditto "${STAGED_APP_ABS}" "${PKG_ROOT}/Applications/${APP_NAME}"
 cp -f "$PKG_POSTINSTALL" "${PKG_SCRIPTS_DIR}/postinstall"
 cp -f "$PKG_SYSCTL_PLIST" "${PKG_SCRIPTS_DIR}/${PKG_SYSCTL_PLIST##*/}"
 chmod 755 "${PKG_SCRIPTS_DIR}/postinstall"
@@ -225,9 +270,9 @@ pkgbuild \
   "${BUILD_DIR}/${PKG_OUT}"
 
 echo "[6/7] Creating release assets..."
-cp -f "${BUILD_DIR}/${LATEST_DMG}" "${BUILD_DIR}/${DMG_OUT}"
+create_dmg_from_staged_root "${STAGED_ROOT_ABS}" "${BUILD_DIR}/${DMG_OUT}" "ft2"
 (
-  /usr/bin/ditto -c -k --sequesterRsrc --keepParent "${BUILD_DIR}/${STAGED_APP}" "${BUILD_DIR}/${ZIP_OUT}"
+  /usr/bin/ditto -c -k --sequesterRsrc --keepParent "${STAGED_APP_ABS}" "${BUILD_DIR}/${ZIP_OUT}"
   cd "$BUILD_DIR"
   shasum -a 256 "$DMG_OUT" "$ZIP_OUT" "$PKG_OUT" > "$SHA_OUT"
 )
