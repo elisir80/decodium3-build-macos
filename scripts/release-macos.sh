@@ -331,7 +331,7 @@ if [[ "$PUBLISH" -eq 1 ]]; then
 ## English (UK)
 Incremental release for the macOS fork.
 
-Refer to `CHANGELOG.md` in the repository for detailed release changes.
+Refer to \`CHANGELOG.md\` in the repository for detailed release changes.
 
 Assets:
 - \`${DMG_OUT}\`
@@ -342,7 +342,7 @@ Assets:
 ## Italiano
 Release incrementale del fork macOS.
 
-Per i dettagli delle modifiche, vedi `CHANGELOG.md` nel repository.
+Per i dettagli delle modifiche, vedi \`CHANGELOG.md\` nel repository.
 
 Asset:
 - \`${DMG_OUT}\`
