@@ -456,9 +456,23 @@ int main(int argc, char *argv[])
             }
           else
             {
-              MessageBox::critical_message (nullptr, a.translate ("main", "Sub-process error"),
-                                            a.translate ("main", "Failed to close orphaned jt9 process"));
-              throw std::runtime_error {"Sub-process error"};
+              // On some systems an old shared-memory segment may persist
+              // even after jt9 has exited. Reuse it instead of aborting.
+              LOG_WARN ("Shared memory segment already present after orphan shutdown attempts; reusing existing segment");
+              if (mem_jt9.size () < static_cast<int> (sizeof (dec_data)))
+                {
+                  auto const key = mem_jt9.nativeKey ().isEmpty () ? mem_jt9.key () : mem_jt9.nativeKey ();
+                  auto reason = "Existing segment is smaller than required: size="
+                    + QString::number (mem_jt9.size ())
+                    + " bytes, required=" + QString::number (sizeof (dec_data)) + " bytes";
+                  LOG_ERROR ("Shared memory segment size mismatch; key=" << key << ", error=" << reason);
+                  MessageBox::critical_message (nullptr, a.translate ("main", "Shared memory error"),
+                                                a.translate ("main", "Unable to create shared memory segment")
+                                                + "\n\nKey: " + key
+                                                + "\nReason: " + reason);
+                  throw std::runtime_error {("Shared memory error: " + reason).toStdString ()};
+                }
+              LOG_INFO ("shmem size: " << mem_jt9.size ());
             }
           mem_jt9.lock ();
           memset(mem_jt9.data(),0,sizeof(struct dec_data)); //Zero all decoding params in shared memory
