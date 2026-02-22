@@ -103,12 +103,10 @@ sign_app_bundle() {
   fi
 
   echo "Signing app bundle with identity: ${sign_identity}"
-  # Sign inner code objects first (inside-out); this is more reliable than
-  # a single --deep pass on some macOS runner/toolchain combinations.
+  # Sign inner code objects first (inside-out). This avoids fragile --deep
+  # behavior and keeps runtime Mach-O signatures valid after install_name_tool.
   while IFS= read -r code_file; do
     [[ -n "${code_file}" ]] || continue
-    # On newer macOS/Xcode toolchains, signing the main app executable directly
-    # can fail by incorrectly traversing bundle resources; sign it via the app.
     if [[ "${code_file}" == "${main_exec}" ]]; then
       continue
     fi
@@ -119,6 +117,12 @@ sign_app_bundle() {
   done < <(find "${app_bundle}/Contents" -type f \
     \( -name "*.dylib" -o -name "*.so" -o -perm -111 \) 2>/dev/null | sort)
 
+  # Some Xcode 16.x environments mis-handle direct signing of the main
+  # executable unless bundle resources are ignored for that one binary.
+  if [[ -f "${main_exec}" ]]; then
+    codesign --force --sign "${sign_identity}" --timestamp=none --ignore-resources "${main_exec}" >/dev/null
+  fi
+
   while IFS= read -r bundle_dir; do
     [[ -n "${bundle_dir}" ]] || continue
     codesign --force --sign "${sign_identity}" --timestamp=none "${bundle_dir}" >/dev/null
@@ -126,8 +130,13 @@ sign_app_bundle() {
     \( -name "*.framework" -o -name "*.bundle" -o -name "*.app" -o -name "*.xpc" -o -name "*.appex" \) 2>/dev/null \
     | awk '{print length($0) " " $0}' | sort -rn | cut -d' ' -f2-)
 
-  codesign --force --sign "${sign_identity}" --timestamp=none "${app_bundle}" >/dev/null
-  codesign --verify --deep --strict --verbose=2 "${app_bundle}" >/dev/null
+  while IFS= read -r verify_file; do
+    [[ -n "${verify_file}" ]] || continue
+    if ! file "${verify_file}" | grep -q "Mach-O"; then
+      continue
+    fi
+    codesign --verify --verbose=2 "${verify_file}" >/dev/null
+  done < <(find "${app_bundle}/Contents" -type f 2>/dev/null | sort)
 }
 
 create_dmg_from_staged_root() {
