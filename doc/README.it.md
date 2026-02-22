@@ -5,12 +5,24 @@
 Questo documento descrive la documentazione specifica del fork macOS.
 Non sostituisce la guida utente completa WSJT-X in `doc/user_guide/en/`.
 
-## Contenuti
+## Contesto release attuale
 
-- Note di build/runtime per macOS;
-- aspettative sulla configurazione della memoria condivisa;
-- flusso di coesistenza FT2 + JTDX;
-- comportamento di packaging rilevante per questo fork.
+- Ultima release stabile: `v1.0.6`
+- Target compatibilita': macOS Sequoia (15.x) + Tahoe (26.x)
+
+## Cambio principale runtime in v1.0.6
+
+In avvio, FT2 poteva fallire con errore fatale di sottoprocesso quando era
+presente un segmento di memoria condivisa `jt9` residuo.
+
+Il comportamento ora e':
+
+- tenta la chiusura del processo orfano come prima;
+- se il segmento resta ma e' riusabile, continua l'avvio riutilizzandolo;
+- mantiene un blocco fatale solo se la dimensione del segmento esistente e'
+  inferiore a `sizeof(dec_data)`.
+
+Questo evita uscite fatali non necessarie mantenendo i controlli di sicurezza.
 
 ## Note di Build e Runtime
 
@@ -52,8 +64,8 @@ File di riferimento:
 ### Pacchetto installer macOS
 
 Le release includono un installer `.pkg` che applica automaticamente i
-parametri sysctl della memoria condivisa, per evitare errori di avvio
-quando `kern.sysv.shmmax` risulta troppo basso di default.
+parametri sysctl della memoria condivisa, per evitare errori di avvio quando
+`kern.sysv.shmmax` risulta troppo basso di default.
 
 ### Se l'avvio dell'installer viene bloccato da Gatekeeper
 
@@ -69,8 +81,7 @@ L'attribuzione del fork e' visibile in:
 - titolo finestra principale (via `program_title()`);
 - testo della finestra About.
 
-## Documentazione Upstream
+## Changelog e documentazione upstream
 
-Per i dettagli operativi completi usa la guida utente upstream in:
-
-- `doc/user_guide/en/`
+- Changelog fork: `CHANGELOG.md`
+- Guida utente upstream: `doc/user_guide/en/`

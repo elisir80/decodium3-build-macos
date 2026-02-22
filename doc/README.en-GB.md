@@ -5,12 +5,24 @@
 This document describes repository-specific documentation for the macOS fork.
 It does not replace the full WSJT-X user guide under `doc/user_guide/en/`.
 
-## Contents
+## Current Release Context
 
-- Build/runtime notes for macOS;
-- shared-memory configuration expectations;
-- FT2 + JTDX coexistence workflow;
-- packaging behaviour relevant to this fork.
+- Latest stable release: `v1.0.6`
+- Compatibility target: macOS Sequoia (15.x) + Tahoe (26.x)
+
+## Key Runtime Change in v1.0.6
+
+At startup, FT2 previously failed with a fatal sub-process error when a
+lingering `jt9` shared-memory segment existed.
+
+Behaviour is now:
+
+- attempt orphan shutdown as before;
+- if the segment remains but is reusable, continue startup using it;
+- keep a hard failure only if the existing segment size is smaller than
+  `sizeof(dec_data)`.
+
+This avoids false-fatal startup exits while preserving memory-safety checks.
 
 ## Build and Runtime Notes
 
@@ -69,8 +81,7 @@ Fork attribution is shown in:
 - main window title (via `program_title()`);
 - About dialogue text.
 
-## Upstream Documentation
+## Changelog and Upstream Documentation
 
-For complete operational details, use upstream user guide sources in:
-
-- `doc/user_guide/en/`
+- Fork changelog: `CHANGELOG.md`
+- Upstream user guide sources: `doc/user_guide/en/`
