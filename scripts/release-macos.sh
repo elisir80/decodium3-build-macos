@@ -24,7 +24,7 @@ What it does:
        decodium3-ft2-<version>-macos-<arch>.dmg
        decodium3-ft2-<version>-macos-<arch>.zip
        decodium3-ft2-<version>-macos-<arch>.pkg
-       decodium3-ft2-<version>-sha256.txt
+       decodium3-ft2-<version>-macos-<arch>-sha256.txt
   7) Optionally creates/updates the GitHub release when --publish is used
 EOF
 }
@@ -273,7 +273,7 @@ fi
 DMG_OUT="${PREFIX}-${VERSION}-macos-${ARCH_LABEL}.dmg"
 ZIP_OUT="${PREFIX}-${VERSION}-macos-${ARCH_LABEL}.zip"
 PKG_OUT="${PREFIX}-${VERSION}-macos-${ARCH_LABEL}.pkg"
-SHA_OUT="${PREFIX}-${VERSION}-sha256.txt"
+SHA_OUT="${PREFIX}-${VERSION}-macos-${ARCH_LABEL}-sha256.txt"
 PKG_VERSION="${VERSION#v}"
 PKG_ROOT="${BUILD_DIR}/pkgroot-${VERSION}"
 PKG_SCRIPTS_DIR="${BUILD_DIR}/pkgscripts-${VERSION}"

@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-macos:
-    runs-on: macos-13        # x86_64 Intel (macos-14+ = ARM64)
+    runs-on: macos-15-intel  # x86_64 Intel
     timeout-minutes: 60
 
     steps:
