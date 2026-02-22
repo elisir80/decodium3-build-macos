@@ -129,6 +129,9 @@ sign_app_bundle() {
 
   while IFS= read -r verify_file; do
     [[ -n "${verify_file}" ]] || continue
+    if [[ "${verify_file}" == "${main_exec}" ]]; then
+      continue
+    fi
     if ! file "${verify_file}" | grep -q "Mach-O"; then
       continue
     fi
