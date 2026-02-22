@@ -100,7 +100,22 @@ sign_app_bundle() {
   fi
 
   echo "Signing app bundle with identity: ${sign_identity}"
-  codesign --force --deep --sign "${sign_identity}" --timestamp=none "${app_bundle}" >/dev/null
+  # Sign inner code objects first (inside-out); this is more reliable than
+  # a single --deep pass on some macOS runner/toolchain combinations.
+  while IFS= read -r code_file; do
+    [[ -n "${code_file}" ]] || continue
+    codesign --force --sign "${sign_identity}" --timestamp=none "${code_file}" >/dev/null
+  done < <(find "${app_bundle}/Contents" -type f \
+    \( -name "*.dylib" -o -name "*.so" -o -perm -111 \) 2>/dev/null | sort)
+
+  while IFS= read -r bundle_dir; do
+    [[ -n "${bundle_dir}" ]] || continue
+    codesign --force --sign "${sign_identity}" --timestamp=none "${bundle_dir}" >/dev/null
+  done < <(find "${app_bundle}/Contents" -type d \
+    \( -name "*.framework" -o -name "*.bundle" -o -name "*.app" -o -name "*.xpc" -o -name "*.appex" \) 2>/dev/null \
+    | awk '{print length($0) " " $0}' | sort -rn | cut -d' ' -f2-)
+
+  codesign --force --sign "${sign_identity}" --timestamp=none "${app_bundle}" >/dev/null
   codesign --verify --deep --strict --verbose=2 "${app_bundle}" >/dev/null
 }
 
