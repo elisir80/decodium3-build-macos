@@ -93,6 +93,9 @@ check_bundle_compatibility() {
 sign_app_bundle() {
   local app_bundle="$1"
   local sign_identity="$2"
+  local main_exec
+
+  main_exec="${app_bundle}/Contents/MacOS/$(basename "${app_bundle%.app}")"
 
   if ! command -v codesign >/dev/null 2>&1; then
     echo "error: codesign tool not found"
@@ -104,6 +107,14 @@ sign_app_bundle() {
   # a single --deep pass on some macOS runner/toolchain combinations.
   while IFS= read -r code_file; do
     [[ -n "${code_file}" ]] || continue
+    # On newer macOS/Xcode toolchains, signing the main app executable directly
+    # can fail by incorrectly traversing bundle resources; sign it via the app.
+    if [[ "${code_file}" == "${main_exec}" ]]; then
+      continue
+    fi
+    if ! file "${code_file}" | grep -q "Mach-O"; then
+      continue
+    fi
     codesign --force --sign "${sign_identity}" --timestamp=none "${code_file}" >/dev/null
   done < <(find "${app_bundle}/Contents" -type f \
     \( -name "*.dylib" -o -name "*.so" -o -perm -111 \) 2>/dev/null | sort)
