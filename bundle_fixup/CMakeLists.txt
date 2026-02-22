@@ -22,10 +22,18 @@ if (APPLE OR WIN32)
 
   if (APPLE)
     list (APPEND fixup_library_dirs "/opt/homebrew/lib")
+    list (APPEND fixup_library_dirs "/usr/local/lib")
     list (APPEND fixup_library_dirs "/opt/homebrew/opt/fftw/lib")
+    list (APPEND fixup_library_dirs "/usr/local/opt/fftw/lib")
     list (APPEND fixup_library_dirs "/opt/homebrew/opt/boost/lib")
+    list (APPEND fixup_library_dirs "/usr/local/opt/boost/lib")
     list (APPEND fixup_library_dirs "/opt/homebrew/opt/libusb/lib")
+    list (APPEND fixup_library_dirs "/usr/local/opt/libusb/lib")
     list (APPEND fixup_library_dirs "/opt/homebrew/opt/gcc/lib/gcc/current")
+    list (APPEND fixup_library_dirs "/usr/local/opt/gcc/lib/gcc/current")
+    # Needed by Qt imageformats plugin (qwebp) on Intel/ARM Homebrew setups.
+    list (APPEND fixup_library_dirs "/opt/homebrew/opt/webp/lib")
+    list (APPEND fixup_library_dirs "/usr/local/opt/webp/lib")
     # install required Qt plugins
     install (
       DIRECTORY
