@@ -83,6 +83,7 @@ set (PROJECT_VENDOR "IU8LMC")
 set (PROJECT_CONTACT "IU8LMC <qrz.com/db/IU8LMC>")
 set (PROJECT_COPYRIGHT "See Help | Copyright info")
 set (PROJECT_HOMEPAGE qrz.com/db/IU8LMC)
+set (FORK_RELEASE_VERSION "v1.0.7" CACHE STRING "Fork release tag shown in the UI title")
 set (PROJECT_MANUAL wsjtx-main)
 set (PROJECT_MANUAL_DIRECTORY_URL https://wsjt.sourceforge.io/wsjtx-doc/)
 set (PROJECT_SAMPLES_URL http://downloads.sourceforge.net/project/wsjt/)
@@ -1874,8 +1875,7 @@ endif (WIN32)
 #
 if (APPLE)
     install (FILES
-        Darwin/ReadMe.txt
-        Darwin/com.wsjtx.sysctl.plist
+        Darwin/ReadMe_FT2.txt
         Darwin/com.ft2.jtdx.sysctl.plist
         Darwin/ReadMe_FT2_JTDX.txt
         DESTINATION .

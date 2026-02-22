@@ -7,22 +7,17 @@ Non sostituisce la guida utente completa WSJT-X in `doc/user_guide/en/`.
 
 ## Contesto release attuale
 
-- Ultima release stabile: `v1.0.6`
+- Ultima release stabile: `v1.0.7`
 - Target compatibilita': macOS Sequoia (15.x) + Tahoe (26.x)
 
-## Cambio principale runtime in v1.0.6
+## Cambi principali in v1.0.7
 
-In avvio, FT2 poteva fallire con errore fatale di sottoprocesso quando era
-presente un segmento di memoria condivisa `jt9` residuo.
-
-Il comportamento ora e':
-
-- tenta la chiusura del processo orfano come prima;
-- se il segmento resta ma e' riusabile, continua l'avvio riutilizzandolo;
-- mantiene un blocco fatale solo se la dimensione del segmento esistente e'
-  inferiore a `sizeof(dec_data)`.
-
-Questo evita uscite fatali non necessarie mantenendo i controlli di sicurezza.
+- Il titolo finestra principale ora include attribuzione fork e versione release del fork.
+- Il sistema build include `FORK_RELEASE_VERSION`, e l'automazione release passa
+  il tag all'app per mostrarlo nel titolo.
+- I contenuti root del DMG sono stati puliti, rimuovendo file installer legacy
+  WSJT-X e aggiungendo note specifiche FT2 (`ReadMe_FT2.txt`).
+- Migliorata la visibilita' dello Skip Tx1 con tooltip espliciti e feedback in status bar.
 
 ## Note di Build e Runtime
 

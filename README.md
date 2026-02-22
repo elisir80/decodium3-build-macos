@@ -7,15 +7,14 @@ build, packaging, compatibility, and runtime fixes.
 
 Latest stable release line:
 
-- `v1.0.6` (macOS arm64)
+- `v1.0.7` (macOS arm64)
 - Compatibility target: macOS Sequoia (15.x) and Tahoe (26.x)
 
-## Highlights in v1.0.6
+## Highlights in v1.0.7
 
-- startup no longer fails with a fatal `Sub-process error` when a reusable
-  lingering `jt9` shared-memory segment exists;
-- shared-memory startup now reuses a valid segment and keeps a hard stop only
-  for invalid segment size.
+- main title now includes fork attribution and release version (`Decodium 3 v3.0.0 | Fork By Salvatore Raccampo 9H1SR v1.0.7`);
+- DMG root now includes FT2-focused notes and no longer ships legacy WSJT-X plist/readme files;
+- Skip Tx1 usability improved with tooltip and explicit status feedback.
 
 ## Language Guides
 

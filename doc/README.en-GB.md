@@ -7,22 +7,17 @@ It does not replace the full WSJT-X user guide under `doc/user_guide/en/`.
 
 ## Current Release Context
 
-- Latest stable release: `v1.0.6`
+- Latest stable release: `v1.0.7`
 - Compatibility target: macOS Sequoia (15.x) + Tahoe (26.x)
 
-## Key Runtime Change in v1.0.6
+## Key Changes in v1.0.7
 
-At startup, FT2 previously failed with a fatal sub-process error when a
-lingering `jt9` shared-memory segment existed.
-
-Behaviour is now:
-
-- attempt orphan shutdown as before;
-- if the segment remains but is reusable, continue startup using it;
-- keep a hard failure only if the existing segment size is smaller than
-  `sizeof(dec_data)`.
-
-This avoids false-fatal startup exits while preserving memory-safety checks.
+- Main window title now includes fork attribution and fork release version.
+- Build system includes `FORK_RELEASE_VERSION`, and release automation passes
+  the release tag into the app title.
+- DMG root content was cleaned to remove legacy WSJT-X installer files and to
+  ship FT2-specific notes (`ReadMe_FT2.txt`).
+- Skip Tx1 discoverability improved with explicit tooltips and status feedback.
 
 ## Build and Runtime Notes
 

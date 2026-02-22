@@ -17,10 +17,13 @@ Disable existing per-app daemons, then enable the shared FT2/JTDX daemon:
   sudo mv /Library/LaunchDaemons/com.jtdx.sysctl.plist /Library/LaunchDaemons/com.jtdx.sysctl.plist.disabled 2>/dev/null || true
   sudo mv /Library/LaunchDaemons/com.wsjtx.sysctl.plist /Library/LaunchDaemons/com.wsjtx.sysctl.plist.disabled 2>/dev/null || true
 
-  sudo cp /Volumes/WSJT-X/com.ft2.jtdx.sysctl.plist /Library/LaunchDaemons/
+  sudo cp /Volumes/ft2/com.ft2.jtdx.sysctl.plist /Library/LaunchDaemons/
   sudo chown root:wheel /Library/LaunchDaemons/com.ft2.jtdx.sysctl.plist
   sudo chmod 644 /Library/LaunchDaemons/com.ft2.jtdx.sysctl.plist
   sudo launchctl bootstrap system /Library/LaunchDaemons/com.ft2.jtdx.sysctl.plist
+
+If your mounted volume has a different name, replace `/Volumes/ft2` with the
+actual mount path.
 
 Reboot and verify
 -----------------

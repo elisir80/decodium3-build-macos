@@ -1056,6 +1056,10 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   txMsgButtonGroup->addButton(ui->txrb4,4);
   txMsgButtonGroup->addButton(ui->txrb5,5);
   txMsgButtonGroup->addButton(ui->txrb6,6);
+  auto const skip_tx1_tooltip = tr ("Double-click Tx1 to toggle Skip Tx1. When active, replies start from Tx2.");
+  ui->txrb1->setToolTip (skip_tx1_tooltip);
+  ui->txb1->setToolTip (skip_tx1_tooltip);
+  ui->tx1->setToolTip (skip_tx1_tooltip);
   set_dateTimeQSO(-1);
   connect(txMsgButtonGroup,SIGNAL(buttonClicked(int)),SLOT(set_ntx(int)));
   connect (ui->decodedTextBrowser, &DisplayText::selectCallsign, this, &MainWindow::doubleClickOnCall2);
@@ -9127,6 +9131,7 @@ bool MainWindow::elide_tx1_not_allowed () const
 void MainWindow::on_txrb1_doubleClicked ()
 {
   ui->tx1->setEnabled (elide_tx1_not_allowed () || !ui->tx1->isEnabled ());
+  showStatusMessage (ui->tx1->isEnabled () ? tr ("Tx1 enabled") : tr ("Skip Tx1 enabled"));
   if (!ui->tx1->isEnabled ()) {
     // leave time for clicks to complete before setting txrb2
     QTimer::singleShot (500, ui->txrb2, SLOT (click ()));
@@ -9208,6 +9213,7 @@ void MainWindow::on_txb1_clicked()
 void MainWindow::on_txb1_doubleClicked()
 {
   ui->tx1->setEnabled (elide_tx1_not_allowed () || !ui->tx1->isEnabled ());
+  showStatusMessage (ui->tx1->isEnabled () ? tr ("Tx1 enabled") : tr ("Skip Tx1 enabled"));
 }
 
 void MainWindow::on_txb2_clicked()

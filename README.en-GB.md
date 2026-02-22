@@ -15,16 +15,15 @@ It includes practical fixes for modern macOS build and runtime behaviour:
 ## Current Baseline
 
 - Source branch: `master`
-- Latest stable release: `v1.0.6`
+- Latest stable release: `v1.0.7`
 - Compatibility target: macOS Sequoia (15.x) + Tahoe (26.x)
 
-## What is New in v1.0.6
+## What is New in v1.0.7
 
-- Fixed a startup failure path that raised:
-  `Fatal Error / Sub-process error / Failed to close orphaned jt9 process`.
-- If a lingering `jt9` shared-memory segment is still valid, startup now reuses
-  it instead of failing immediately.
-- Safety behaviour remains strict if the existing segment size is too small.
+- Updated main window title to include fork attribution and fork release version.
+- Added `FORK_RELEASE_VERSION` build variable and release-script wiring so packaged builds show the correct fork tag in UI title.
+- Cleaned DMG root contents: removed legacy WSJT-X plist/readme and added `ReadMe_FT2.txt` plus updated FT2/JTDX coexistence notes.
+- Improved Skip Tx1 discoverability (tooltips + status-bar feedback) to speed up first reply selection.
 
 ## Quick Start (macOS)
 
@@ -39,14 +38,14 @@ open build/ft2.app
 Use the local release script:
 
 ```bash
-scripts/release-macos.sh v1.0.6 --publish --repo elisir80/decodium3-build-macos
+scripts/release-macos.sh v1.0.7 --publish --repo elisir80/decodium3-build-macos
 ```
 
 For one DMG that works on both macOS Sequoia (15.x) and Tahoe (26.x), build
 with:
 
 ```bash
-scripts/release-macos.sh v1.0.6 --compat-macos 15.0
+scripts/release-macos.sh v1.0.7 --compat-macos 15.0
 ```
 
 Important: if you build locally on Tahoe with Homebrew libraries compiled with

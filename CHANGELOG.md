@@ -2,6 +2,24 @@
 
 All notable changes for the Decodium 3 FT2 macOS fork are documented here.
 
+## v1.0.7 - 2026-02-22
+
+### English (UK)
+
+- Updated main window title format to include fork attribution and fork release version.
+- Added `FORK_RELEASE_VERSION` build parameter and wired release automation to pass the tag version to the app title.
+- Cleaned macOS DMG root contents by removing legacy WSJT-X installer files and adding FT2-specific package notes.
+- Added clearer Skip Tx1 discoverability (tooltips + status messages) to speed up reply sequencing.
+- Kept Sequoia/Tahoe compatibility release flow on `macos-15`.
+
+### Italiano
+
+- Aggiornato il formato del titolo finestra principale con attribuzione fork e versione release del fork.
+- Aggiunto il parametro build `FORK_RELEASE_VERSION` e collegata l'automazione release per passare il tag alla UI.
+- Puliti i contenuti della root DMG macOS rimuovendo file legacy WSJT-X e aggiungendo note package specifiche FT2.
+- Migliorata la visibilita' dello Skip Tx1 (tooltip + messaggi stato) per velocizzare la sequenza di risposta.
+- Mantenuto il flusso release compatibile Sequoia/Tahoe su runner `macos-15`.
+
 ## v1.0.6 - 2026-02-22
 
 ### English (UK)

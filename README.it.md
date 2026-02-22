@@ -16,17 +16,15 @@ moderni:
 ## Baseline attuale
 
 - Branch sorgente: `master`
-- Ultima release stabile: `v1.0.6`
+- Ultima release stabile: `v1.0.7`
 - Target compatibilita': macOS Sequoia (15.x) + Tahoe (26.x)
 
-## Novita' in v1.0.6
+## Novita' in v1.0.7
 
-- Corretto un percorso di avvio che poteva generare:
-  `Fatal Error / Sub-process error / Impossibile chiudere il processo jt9 orfano`.
-- Se esiste un segmento condiviso `jt9` ancora valido, l'avvio ora lo riusa
-  invece di terminare con errore immediato.
-- Rimane un blocco di sicurezza solo se la dimensione del segmento esistente e'
-  insufficiente.
+- Aggiornato il titolo finestra principale con attribuzione fork e versione release del fork.
+- Introdotta la variabile build `FORK_RELEASE_VERSION` e collegato lo script release per mostrare il tag corretto nella UI.
+- Pulita la root DMG: rimossi plist/readme legacy WSJT-X e aggiunto `ReadMe_FT2.txt` con note FT2, oltre ad aggiornamenti su coesistenza FT2/JTDX.
+- Migliorata la visibilita' dello Skip Tx1 (tooltip + messaggi nella status bar) per rendere piu' rapido l'avvio QSO.
 
 ## Avvio rapido (macOS)
 
@@ -41,14 +39,14 @@ open build/ft2.app
 Usa lo script locale di release:
 
 ```bash
-scripts/release-macos.sh v1.0.6 --publish --repo elisir80/decodium3-build-macos
+scripts/release-macos.sh v1.0.7 --publish --repo elisir80/decodium3-build-macos
 ```
 
 Per avere un solo DMG compatibile sia con macOS Sequoia (15.x) sia con Tahoe
 (26.x), esegui la build con:
 
 ```bash
-scripts/release-macos.sh v1.0.6 --compat-macos 15.0
+scripts/release-macos.sh v1.0.7 --compat-macos 15.0
 ```
 
 Importante: se compili in locale su Tahoe con librerie Homebrew compilate con

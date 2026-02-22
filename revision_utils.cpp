@@ -22,11 +22,22 @@ namespace
       }
     return revision;
   }
+
+  QString fork_release ()
+  {
+#ifdef FORK_RELEASE_VERSION
+    auto release = QString {FORK_RELEASE_VERSION}.trimmed ();
+    if (!release.isEmpty ())
+      {
+        return release;
+      }
+#endif
+    return QString {"v-dev"};
+  }
 }
 
 QString revision (QString const& scs_rev_string)
 {
-  return "100 (mod by IU8LMC, qrz.com/db/IU8LMC)";
   QString result;
   auto revision_from_scs = revision_extract_number (scs_rev_string);
 
@@ -80,6 +91,13 @@ QString version (bool include_patch)
 
 QString program_title (QString const& revision)
 {
-  QString id {"Decodium 3   v" + QCoreApplication::applicationVersion ()};
-  return id + " " + revision + " | Fork by Salvatore Raccampo 9H1SR";
+  auto title = QString {"Decodium 3 v%1 | Fork By Salvatore Raccampo 9H1SR %2"}
+    .arg (QCoreApplication::applicationVersion ())
+    .arg (fork_release ());
+  auto cleaned_revision = revision.simplified ();
+  if (!cleaned_revision.isEmpty ())
+    {
+      title += " (" + cleaned_revision + ")";
+    }
+  return title;
 }

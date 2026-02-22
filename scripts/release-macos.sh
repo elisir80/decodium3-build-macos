@@ -220,6 +220,7 @@ echo "[1/7] Configuring project (macOS target ${COMPAT_MACOS})..."
 cmake_args=(
   -DCMAKE_BUILD_TYPE=Release
   -DCMAKE_OSX_DEPLOYMENT_TARGET="$COMPAT_MACOS"
+  -DFORK_RELEASE_VERSION="$VERSION"
   -DWSJT_GENERATE_DOCS=OFF
   -DWSJT_SKIP_MANPAGES=ON
   -DWSJT_BUILD_UTILS=OFF
@@ -330,9 +331,7 @@ if [[ "$PUBLISH" -eq 1 ]]; then
 ## English (UK)
 Incremental release for the macOS fork.
 
-This release adds an installable macOS package (`.pkg`) that configures
-shared-memory sysctl values automatically (`kern.sysv.shmmax`/`shmall`)
-for reliable FT2 startup and FT2/JTDX coexistence.
+Refer to `CHANGELOG.md` in the repository for detailed release changes.
 
 Assets:
 - \`${DMG_OUT}\`
@@ -343,10 +342,7 @@ Assets:
 ## Italiano
 Release incrementale del fork macOS.
 
-Questa release aggiunge un pacchetto installabile macOS (`.pkg`) che
-configura automaticamente i valori sysctl della memoria condivisa
-(`kern.sysv.shmmax`/`shmall`) per avvio affidabile di FT2 e coesistenza
-FT2/JTDX.
+Per i dettagli delle modifiche, vedi `CHANGELOG.md` nel repository.
 
 Asset:
 - \`${DMG_OUT}\`
