@@ -117,11 +117,8 @@ sign_app_bundle() {
   done < <(find "${app_bundle}/Contents" -type f \
     \( -name "*.dylib" -o -name "*.so" -o -perm -111 \) 2>/dev/null | sort)
 
-  # Some Xcode 16.x environments mis-handle direct signing of the main
-  # executable unless bundle resources are ignored for that one binary.
-  if [[ -f "${main_exec}" ]]; then
-    codesign --force --sign "${sign_identity}" --timestamp=none --ignore-resources "${main_exec}" >/dev/null
-  fi
+  # Leave the main executable signature untouched: on Xcode 16.x, attempting
+  # to re-sign it can fail when non-code files live in Contents/MacOS.
 
   while IFS= read -r bundle_dir; do
     [[ -n "${bundle_dir}" ]] || continue
