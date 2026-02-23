@@ -7,17 +7,24 @@ It does not replace the full WSJT-X user guide under `doc/user_guide/en/`.
 
 ## Current Release Context
 
-- Latest stable release: `v1.0.7`
-- Compatibility target: macOS Sequoia (15.x) + Tahoe (26.x)
+- Latest stable release: `v1.0.9`
+- Compatibility target: macOS Sequoia (15.x), Tahoe (26.x), and Intel Sequoia (15.x)
 
-## Key Changes in v1.0.7
+## Key Changes in v1.0.9
 
-- Main window title now includes fork attribution and fork release version.
-- Build system includes `FORK_RELEASE_VERSION`, and release automation passes
-  the release tag into the app title.
-- DMG root content was cleaned to remove legacy WSJT-X installer files and to
-  ship FT2-specific notes (`ReadMe_FT2.txt`).
-- Skip Tx1 discoverability improved with explicit tooltips and status feedback.
+- Main GUI now has a third integrated panel (`Live World Map`) beside
+  Band Activity and Rx Frequency.
+- Map view uses textured earth background, geographic overlay, day/night mask,
+  and automatic viewport zoom centered on active contacts.
+- Path roles are separated by purpose:
+  `IN->ME` (incoming directed call), `ME->DX` (your outgoing call), `BAND`
+  (station seen in band but not in directed QSO with you).
+- During TX, only the current `ME->DX` path is animated; after TX, incoming
+  callers collected during TX are briefly replayed as a queue.
+- Locator/callsign association was hardened with `CALL3.TXT` + AD1CCty
+  fallback to avoid missing arrows where locator text is not explicit.
+- Label rendering is constrained to reduce clutter (smaller font, top-priority
+  labels first, cap on visible labels).
 
 ## Build and Runtime Notes
 

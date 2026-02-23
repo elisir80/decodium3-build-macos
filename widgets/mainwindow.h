@@ -119,6 +119,7 @@ class MultiSettings;
 class EqualizationToolsDialog;
 class DecodedText;
 class Cloudlog;
+class WorldMapWidget;
 
 class MainWindow
   : public MultiGeometryWidget<3, QMainWindow>
@@ -528,6 +529,7 @@ private:
   bool elide_tx1_not_allowed () const;
   void readWidebandDecodes();
   void configActiveStations();
+  void updateWorldMapFromDecode(DecodedText const& decoded_text);
   void sfox_tx();
   bool play_DXcall = false;
   bool inSettings = false;
@@ -566,6 +568,9 @@ private:
   QScopedPointer<HelpTextWindow> m_mouseCmnds;
   QScopedPointer<MessageAveraging> m_msgAvgWidget;
   QScopedPointer<ActiveStations> m_ActiveStationsWidget;
+  WorldMapWidget * m_worldMapWidget {nullptr};
+  QHash<QString, QString> m_worldMapGridByCall;
+  bool m_worldMapCall3Loaded {false};
   QScopedPointer<FoxLogWindow> m_foxLogWindow;
   QScopedPointer<CabrilloLogWindow> m_contestLogWindow;
   QScopedPointer<ColorHighlighting> m_colorHighlighting;

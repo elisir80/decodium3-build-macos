@@ -7,17 +7,24 @@ Non sostituisce la guida utente completa WSJT-X in `doc/user_guide/en/`.
 
 ## Contesto release attuale
 
-- Ultima release stabile: `v1.0.7`
-- Target compatibilita': macOS Sequoia (15.x) + Tahoe (26.x)
+- Ultima release stabile: `v1.0.9`
+- Target compatibilita': macOS Sequoia (15.x), Tahoe (26.x), e Intel Sequoia (15.x)
 
-## Cambi principali in v1.0.7
+## Cambi principali in v1.0.9
 
-- Il titolo finestra principale ora include attribuzione fork e versione release del fork.
-- Il sistema build include `FORK_RELEASE_VERSION`, e l'automazione release passa
-  il tag all'app per mostrarlo nel titolo.
-- I contenuti root del DMG sono stati puliti, rimuovendo file installer legacy
-  WSJT-X e aggiungendo note specifiche FT2 (`ReadMe_FT2.txt`).
-- Migliorata la visibilita' dello Skip Tx1 con tooltip espliciti e feedback in status bar.
+- La GUI principale ora ha un terzo pannello integrato (`Live World Map`) a
+  fianco di Attivita' di Banda e Frequenza Rx.
+- La mappa usa sfondo terra reale, overlay geografico, maschera giorno/notte e
+  zoom automatico sull'area con traffico attivo.
+- I tracciati sono separati per ruolo:
+  `IN->ME` (chiamata diretta verso di te), `ME->DX` (tua chiamata verso DX),
+  `BAND` (stazione vista in banda ma non in QSO diretto con te).
+- Durante la TX viene animato solo il percorso `ME->DX`; a fine TX vengono
+  mostrati per pochi secondi i chiamanti in coda ricevuti durante la TX.
+- Rafforzata l'associazione nominativo/locator con fallback `CALL3.TXT` +
+  AD1CCty per evitare frecce mancanti quando il locator non e' esplicito.
+- Rendering etichette ottimizzato per ridurre sovrapposizioni (font piu'
+  piccolo, priorita' ai casi rilevanti, limite etichette visibili).
 
 ## Note di Build e Runtime
 

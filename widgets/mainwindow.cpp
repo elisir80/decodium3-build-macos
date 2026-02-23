@@ -77,6 +77,7 @@
 #include "about.h"
 #include "messageaveraging.h"
 #include "activeStations.h"
+#include "worldmapwidget.h"
 #include "colorhighlighting.h"
 #include "widegraph.h"
 #include "sleep.h"
@@ -625,6 +626,11 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   ui->sbTR_FST4W->values ({120, 300, 900, 1800});
   ui->decodedTextBrowser->set_configuration (&m_config, true);
   ui->decodedTextBrowser2->set_configuration (&m_config);
+  m_worldMapWidget = new WorldMapWidget {ui->map_container_widget};
+  ui->map_container_layout->addWidget(m_worldMapWidget);
+  ui->decodes_splitter->setStretchFactor(0, 4);
+  ui->decodes_splitter->setStretchFactor(1, 4);
+  ui->decodes_splitter->setStretchFactor(2, 5);
 
   m_optimizingProgress.setWindowModality (Qt::WindowModal);
   m_optimizingProgress.setAutoReset (false);
@@ -2239,7 +2245,26 @@ void MainWindow::readSettings()
   ui->actionEnable_AP_JT65->setChecked (m_settings->value ("JT65AP", false).toBool());
   ui->actionAuto_Clear_Avg->setChecked (m_settings->value ("AutoClearAvg", false).toBool());
   ui->actionDisable_clicks_on_waterfall->setChecked (m_settings->value ("DisableClicksOnWaterfall", false).toBool());
-  ui->decodes_splitter->restoreState(m_settings->value("SplitterState").toByteArray());
+  if (!ui->decodes_splitter->restoreState(m_settings->value("SplitterState").toByteArray()))
+    {
+      ui->decodes_splitter->setSizes({500, 500, 620});
+    }
+  else
+    {
+      auto sizes = ui->decodes_splitter->sizes();
+      int const minMapPanelWidth = 300;
+      if (sizes.size() == 3 && sizes.at(2) < minMapPanelWidth)
+        {
+          int totalWidth = sizes.at(0) + sizes.at(1) + sizes.at(2);
+          int leftWidth = qMax(220, (totalWidth - minMapPanelWidth) / 2);
+          int rightWidth = qMax(220, totalWidth - minMapPanelWidth - leftWidth);
+          ui->decodes_splitter->setSizes({leftWidth, rightWidth, minMapPanelWidth});
+        }
+    }
+  if (m_worldMapWidget)
+    {
+      m_worldMapWidget->setHomeGrid(m_config.my_grid());
+    }
   ui->sbNB->setValue(m_settings->value("Blanker",0).toInt());
   ui->sbEchoAvg->setValue(m_settings->value("EchoAvg",10).toInt());
   {
@@ -5181,6 +5206,7 @@ void MainWindow::trim_view (bool checked)
     ui->lh_decodes_title_label->setVisible(!checked);
     ui->rh_decodes_title_label->setVisible(!checked);
   }
+  ui->map_title_label->setVisible(!checked);
   ui->lh_decodes_headings_label->setVisible(!checked);
   ui->rh_decodes_headings_label->setVisible(!checked);
   ui->gridLayout_5->layout()->setSpacing(spacing);
@@ -5196,6 +5222,7 @@ void MainWindow::trim_view (bool checked)
   ui->horizontalLayout_13->layout()->setSpacing(spacing);
   ui->horizontalLayout_14->layout()->setSpacing(spacing);
   ui->rh_decodes_widget->layout()->setSpacing(spacing);
+  ui->map_panel_layout->setSpacing(spacing);
   ui->verticalLayout_2->layout()->setSpacing(spacing);
   ui->verticalLayout_3->layout()->setSpacing(spacing);
   ui->verticalLayout_5->layout()->setSpacing(spacing);
@@ -9019,6 +9046,10 @@ void MainWindow::stopTx()
   else Q_EMIT endTransmitMessage ();
   m_btxok = false;
   m_transmitting = false;
+  if (m_worldMapWidget)
+    {
+      m_worldMapWidget->setTransmitState(false, QString {}, QString {}, m_mode);
+    }
   g_iptt=0;
   if (!m_tx_watchdog) {
     tx_status_label.setStyleSheet("");
@@ -13664,6 +13695,58 @@ void MainWindow::transmitDisplay (bool transmitting)
     // the following are always disallowed in transmit
     ui->menuMode->setEnabled (!transmitting);
   }
+
+  if (m_worldMapWidget)
+    {
+      auto normalizeCall = [] (QString call)
+        {
+          call = call.trimmed().toUpper();
+          call.remove('<');
+          call.remove('>');
+          return call;
+        };
+      auto callKey = [&normalizeCall] (QString const& call)
+        {
+          auto normalized = normalizeCall(call);
+          if (normalized.isEmpty())
+            {
+              return QString {};
+            }
+          auto key = normalizeCall(Radio::base_callsign(normalized));
+          if (key.isEmpty())
+            {
+              key = normalized;
+            }
+          return key;
+        };
+
+      auto myGrid = m_config.my_grid().trimmed().toUpper();
+      auto dxCall = normalizeCall(ui->dxCallEntry->text());
+      auto dxGrid = ui->dxGridEntry->text().trimmed().toUpper();
+      if (dxCall.isEmpty())
+        {
+          dxCall = normalizeCall(m_hisCall);
+        }
+      if (!dxGrid.contains(grid_regexp))
+        {
+          auto hisGrid = m_hisGrid.trimmed().toUpper();
+          if (hisGrid.contains(grid_regexp))
+            {
+              dxGrid = hisGrid.left(6);
+            }
+        }
+
+      if (!dxGrid.contains(grid_regexp) && !dxCall.isEmpty())
+        {
+          dxGrid = m_worldMapGridByCall.value(callKey(dxCall));
+        }
+
+      if (transmitting && myGrid.contains(grid_regexp) && dxGrid.contains(grid_regexp))
+        {
+          m_worldMapWidget->addContact(dxCall, myGrid, dxGrid, WorldMapWidget::PathRole::OutgoingFromMe);
+        }
+      m_worldMapWidget->setTransmitState(transmitting, dxCall, dxGrid, m_mode);
+    }
 }
 
 void MainWindow::on_sbFtol_valueChanged(int value)
@@ -14045,9 +14128,278 @@ void MainWindow::locationChange (QString const& location)
       pskSetLocal ();
       statusUpdate ();
     }
+    if (m_worldMapWidget)
+      {
+        m_worldMapWidget->setHomeGrid(grid);
+      }
   } else {
     qDebug() << "locationChange: Invalid grid " << grid;
   }
+}
+
+void MainWindow::updateWorldMapFromDecode(DecodedText const& decoded_text)
+{
+  if (!m_worldMapWidget)
+    {
+      return;
+    }
+
+  auto normalizeCall = [] (QString call)
+    {
+      call = call.trimmed().toUpper();
+      call.remove('<');
+      call.remove('>');
+      if (call.endsWith(';'))
+        {
+          call.chop(1);
+        }
+      return call.trimmed();
+    };
+
+  auto callKey = [&normalizeCall] (QString const& call)
+    {
+      auto normalized = normalizeCall(call);
+      if (normalized.isEmpty())
+        {
+          return QString {};
+        }
+      auto key = normalizeCall(Radio::base_callsign(normalized));
+      if (key.isEmpty())
+        {
+          key = normalized;
+        }
+      return key;
+    };
+
+  auto myGrid = m_config.my_grid().trimmed().toUpper();
+  if (!myGrid.contains(grid_regexp))
+    {
+      return;
+    }
+
+  auto myCall = normalizeCall(m_config.my_callsign());
+  auto myBaseCall = normalizeCall(Radio::base_callsign(m_config.my_callsign()));
+  auto const myCallKey = callKey(myCall);
+  auto const myBaseCallKey = callKey(myBaseCall);
+
+  auto isMine = [&callKey, &myCallKey, &myBaseCallKey] (QString const& call)
+    {
+      auto key = callKey(call);
+      return !key.isEmpty() && (key == myCallKey || key == myBaseCallKey);
+    };
+
+  auto rememberGrid = [&] (QString const& call, QString const& grid)
+    {
+      auto key = callKey(call);
+      auto locator = grid.trimmed().toUpper();
+      if (key.isEmpty() || !locator.contains(grid_regexp))
+        {
+          return;
+        }
+      m_worldMapGridByCall.insert(key, locator.left(6));
+    };
+
+  auto loadCall3GridCache = [&] ()
+    {
+      if (m_worldMapCall3Loaded)
+        {
+          return;
+        }
+      m_worldMapCall3Loaded = true;
+
+      QFile fPrimary {m_config.writeable_data_dir().absoluteFilePath("CALL3.TXT")};
+      QFile fFallback {QDir::current().absoluteFilePath("CALL3.TXT")};
+      QFile * f = &fPrimary;
+      if (!f->open(QIODevice::ReadOnly | QIODevice::Text))
+        {
+          f = &fFallback;
+          if (!f->open(QIODevice::ReadOnly | QIODevice::Text))
+            {
+              return;
+            }
+        }
+
+      QTextStream in(f);
+      while (!in.atEnd())
+        {
+          auto line = in.readLine().trimmed();
+          if (line.isEmpty() || line.startsWith('#') || line.startsWith(';'))
+            {
+              continue;
+            }
+
+          int comma1 = line.indexOf(',');
+          if (comma1 <= 0)
+            {
+              continue;
+            }
+          int comma2 = line.indexOf(',', comma1 + 1);
+          if (comma2 < 0)
+            {
+              comma2 = line.size();
+            }
+
+          auto call = normalizeCall(line.left(comma1));
+          auto locator = line.mid(comma1 + 1, comma2 - comma1 - 1).trimmed().toUpper();
+          if (call.isEmpty() || !locator.contains(grid_regexp))
+            {
+              continue;
+            }
+
+          auto key = callKey(call);
+          if (!key.isEmpty() && !m_worldMapGridByCall.contains(key))
+            {
+              m_worldMapGridByCall.insert(key, locator.left(6));
+            }
+        }
+    };
+
+  auto lookupGrid = [&] (QString const& call)
+    {
+      auto key = callKey(call);
+      if (key.isEmpty())
+        {
+          return QString {};
+        }
+      auto locator = m_worldMapGridByCall.value(key);
+      if (locator.isEmpty())
+        {
+          loadCall3GridCache();
+          locator = m_worldMapGridByCall.value(key);
+        }
+      return locator;
+    };
+
+  auto words = decoded_text.messageWords();
+  QString word1 = words.size() > 2 ? normalizeCall(words.at(2)) : QString {};
+  QString word2 = words.size() > 3 ? normalizeCall(words.at(3)) : QString {};
+  QString word3 = words.size() > 4 ? words.at(4).trimmed().toUpper() : QString {};
+  bool hasGrid = word3.contains(grid_regexp);
+  bool isCqLike = (word1 == "CQ" || word1 == "QRZ" || word1 == "DE");
+
+  // In directed messages like "CALL_TO CALL_FROM GRID", the locator belongs to CALL_FROM (word2).
+  // In "CQ CALL GRID", the locator belongs to CALL.
+  if (hasGrid)
+    {
+      if (isCqLike && !word2.isEmpty())
+        {
+          rememberGrid(word2, word3);
+        }
+      else if (!word2.isEmpty())
+        {
+          rememberGrid(word2, word3);
+        }
+    }
+
+  QString deCall;
+  QString deGrid;
+  decoded_text.deCallAndGrid(/*out*/deCall, deGrid);
+  deCall = normalizeCall(deCall);
+  deGrid = deGrid.trimmed().toUpper();
+  if (!deCall.isEmpty() && deGrid.contains(grid_regexp) && !isMine(deCall))
+    {
+      rememberGrid(deCall, deGrid);
+    }
+
+  QString remoteCall;
+  QString remoteGrid;
+  auto role = WorldMapWidget::PathRole::Generic;
+
+  // Standard directed semantics:
+  //   CALL_TO CALL_FROM ...  => CALL_FROM (word2) is TX station, CALL_TO (word1) is RX station.
+  bool outgoingFromMe = !isCqLike && !word1.isEmpty() && !word2.isEmpty() && isMine(word2) && !isMine(word1);
+  bool incomingToMe = !isCqLike && !word1.isEmpty() && !word2.isEmpty() && isMine(word1) && !isMine(word2);
+
+  bool txMessageActive = decoded_text.isTX() && m_transmitting;
+  if (outgoingFromMe || txMessageActive)
+    {
+      remoteCall = outgoingFromMe ? word1 : QString {};
+      if (remoteCall.isEmpty() && !word1.isEmpty() && word1 != "CQ" && word1 != "QRZ" && word1 != "DE" && !isMine(word1))
+        {
+          remoteCall = word1;
+        }
+      if (remoteCall.isEmpty() && !word2.isEmpty() && !isMine(word2))
+        {
+          remoteCall = word2;
+        }
+      if (remoteCall.isEmpty())
+        {
+          remoteCall = normalizeCall(ui->dxCallEntry->text());
+        }
+
+      if (!remoteCall.isEmpty())
+        {
+          remoteGrid = lookupGrid(remoteCall);
+          auto dxCall = normalizeCall(ui->dxCallEntry->text());
+          auto dxGrid = ui->dxGridEntry->text().trimmed().toUpper();
+          if (remoteGrid.isEmpty() && callKey(remoteCall) == callKey(dxCall) && dxGrid.contains(grid_regexp))
+            {
+              remoteGrid = dxGrid.left(6);
+              rememberGrid(remoteCall, remoteGrid);
+            }
+        }
+
+      role = WorldMapWidget::PathRole::OutgoingFromMe;
+      if (remoteGrid.contains(grid_regexp))
+        {
+          m_worldMapWidget->addContact(remoteCall, myGrid, remoteGrid, role);
+          return;
+        }
+    }
+  else if (incomingToMe)
+    {
+      remoteCall = word2;
+      remoteGrid = hasGrid ? word3 : lookupGrid(remoteCall);
+      role = WorldMapWidget::PathRole::IncomingToMe;
+      if (remoteGrid.contains(grid_regexp))
+        {
+          m_worldMapWidget->addContact(remoteCall, remoteGrid, myGrid, role);
+          return;
+        }
+      if (!remoteCall.isEmpty())
+        {
+          auto const lookedUp = m_logBook.countries()->lookup(remoteCall);
+          if (std::isfinite(lookedUp.latitude) && std::isfinite(lookedUp.longtitude))
+            {
+              // AD1CCty uses positive west longitudes; convert to standard east-positive.
+              QPointF approxLonLat {-static_cast<double>(lookedUp.longtitude),
+                                    static_cast<double>(lookedUp.latitude)};
+              m_worldMapWidget->addContactByLonLat(remoteCall, approxLonLat, myGrid, role);
+              return;
+            }
+        }
+    }
+  else
+    {
+      if (!deCall.isEmpty() && deGrid.contains(grid_regexp) && !isMine(deCall))
+        {
+          remoteCall = deCall;
+          remoteGrid = deGrid;
+        }
+      else if (isCqLike && !word2.isEmpty() && hasGrid)
+        {
+          remoteCall = word2;
+          remoteGrid = word3;
+        }
+      role = WorldMapWidget::PathRole::BandOnly;
+    }
+
+  if (!remoteGrid.contains(grid_regexp))
+    {
+      return;
+    }
+  if (remoteCall.isEmpty())
+    {
+      remoteCall = deCall;
+    }
+  if (role == WorldMapWidget::PathRole::BandOnly)
+    {
+      m_worldMapWidget->addContact(remoteCall, remoteGrid, remoteGrid, role);
+    }
+  else
+    {
+      m_worldMapWidget->addContact(remoteCall, remoteGrid, myGrid, role);
+    }
 }
 
 void MainWindow::replayDecodes ()
@@ -14094,6 +14446,12 @@ void MainWindow::postDecode (bool is_new, DecodedText decoded_text)      //avt 1
     }
 
   if (!is_new) return;    //avt 8/22/23
+
+  if (m_worldMapWidget)
+    {
+      m_worldMapWidget->setHomeGrid(m_config.my_grid());
+      updateWorldMapFromDecode(decoded_text);
+    }
 
   //avt 1/2/21
   bool callB4;
@@ -14280,6 +14638,10 @@ void MainWindow::p1ReadFromStdout()                        //p1readFromStdout
           rxLine = t;
       }
       if(grid!="") {
+        if (m_worldMapWidget && rxFields.count() >= 6) {
+          m_worldMapWidget->setHomeGrid(m_config.my_grid());
+          m_worldMapWidget->addContact(rxFields.at(5), grid, grid, WorldMapWidget::PathRole::BandOnly);
+        }
         double utch=0.0;
         int nAz,nEl,nDmiles,nDkm,nHotAz,nHotABetter;
         azdist_(const_cast <char *> ((m_config.my_grid () + "      ").left (6).toLatin1 ().constData ()),

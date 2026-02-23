@@ -83,7 +83,7 @@ set (PROJECT_VENDOR "IU8LMC")
 set (PROJECT_CONTACT "IU8LMC <qrz.com/db/IU8LMC>")
 set (PROJECT_COPYRIGHT "See Help | Copyright info")
 set (PROJECT_HOMEPAGE qrz.com/db/IU8LMC)
-set (FORK_RELEASE_VERSION "v1.0.7" CACHE STRING "Fork release tag shown in the UI title")
+set (FORK_RELEASE_VERSION "v1.0.9" CACHE STRING "Fork release tag shown in the UI title")
 set (PROJECT_MANUAL wsjtx-main)
 set (PROJECT_MANUAL_DIRECTORY_URL https://wsjt.sourceforge.io/wsjtx-doc/)
 set (PROJECT_SAMPLES_URL http://downloads.sourceforge.net/project/wsjt/)
@@ -299,6 +299,7 @@ set (wsjtx_CXXSRCS
   widgets/astro.cpp
   widgets/messageaveraging.cpp
   widgets/activeStations.cpp
+  widgets/worldmapwidget.cpp
   widgets/colorhighlighting.cpp
   WSPR/WsprTxScheduler.cpp
   widgets/mainwindow.cpp
@@ -855,6 +856,8 @@ set (TOP_LEVEL_RESOURCES
   icons/Darwin/wsjtx.iconset/icon_128x128.png
   contrib/gpl-v3-logo.svg
   artwork/splash.png
+  artwork/maps/earth_2048x1024.jpg
+  artwork/maps/world_overlay_2048x1024.png
   )
 
 set (PALETTE_FILES

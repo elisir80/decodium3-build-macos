@@ -15,15 +15,20 @@ It includes practical fixes for modern macOS build and runtime behaviour:
 ## Current Baseline
 
 - Source branch: `master`
-- Latest stable release: `v1.0.7`
-- Compatibility target: macOS Sequoia (15.x) + Tahoe (26.x)
+- Latest stable release: `v1.0.9`
+- Compatibility target: macOS Sequoia (15.x), Tahoe (26.x), and Intel Sequoia (15.x)
 
-## What is New in v1.0.7
+## What is New in v1.0.9
 
-- Updated main window title to include fork attribution and fork release version.
-- Added `FORK_RELEASE_VERSION` build variable and release-script wiring so packaged builds show the correct fork tag in UI title.
-- Cleaned DMG root contents: removed legacy WSJT-X plist/readme and added `ReadMe_FT2.txt` plus updated FT2/JTDX coexistence notes.
-- Improved Skip Tx1 discoverability (tooltips + status-bar feedback) to speed up first reply selection.
+- Added integrated third panel "Live World Map" in the main GUI layout.
+- Added real map background + geographic overlay with active-area auto-zoom.
+- Added directional path rendering:
+  `IN->ME` for stations calling you, `ME->DX` when you call a station, `BAND` for passive spotted stations.
+- Added TX-mode behavior aligned with FT modes:
+  while transmitting, show only your active outgoing path animation; after TX, briefly show queued incoming callers.
+- Corrected locator handling for 6-char Maidenhead positions (e.g. `JM75FV`) and call/grid lookup fallback.
+- Reduced map-label clutter (smaller labels, visibility cap) and clarified counters (`active paths` vs `in band`).
+- Kept release automation for dual architecture outputs (arm64 + x86_64 Intel).
 
 ## Quick Start (macOS)
 
@@ -38,14 +43,14 @@ open build/ft2.app
 Use the local release script:
 
 ```bash
-scripts/release-macos.sh v1.0.7 --publish --repo elisir80/decodium3-build-macos
+scripts/release-macos.sh v1.0.9 --publish --repo elisir80/decodium3-build-macos
 ```
 
 For one DMG that works on both macOS Sequoia (15.x) and Tahoe (26.x), build
 with:
 
 ```bash
-scripts/release-macos.sh v1.0.7 --compat-macos 15.0
+scripts/release-macos.sh v1.0.9 --compat-macos 15.0
 ```
 
 Important: if you build locally on Tahoe with Homebrew libraries compiled with

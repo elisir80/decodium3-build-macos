@@ -7,14 +7,16 @@ build, packaging, compatibility, and runtime fixes.
 
 Latest stable release line:
 
-- `v1.0.7` (macOS arm64)
-- Compatibility target: macOS Sequoia (15.x) and Tahoe (26.x)
+- `v1.0.9` (macOS arm64 + x86_64 Intel)
+- Compatibility target: macOS Sequoia (15.x), Tahoe (26.x), and Intel Sequoia (15.x)
 
-## Highlights in v1.0.7
+## Highlights in v1.0.9
 
-- main title now includes fork attribution and release version (`Decodium 3 v3.0.0 | Fork By Salvatore Raccampo 9H1SR v1.0.7`);
-- DMG root now includes FT2-focused notes and no longer ships legacy WSJT-X plist/readme files;
-- Skip Tx1 usability improved with tooltip and explicit status feedback.
+- main title includes fork attribution and release tag (`... 9H1SR v1.0.9`);
+- new integrated live world map panel with TX/RX path rendering and active-area auto-zoom;
+- improved FT2/FT4/FT8 map behavior:
+  markers for band-only stations, directional arrows for real calls, and post-TX callers queue;
+- release automation kept for dual architecture artifacts (arm64 + x86_64 Intel).
 
 ## Language Guides
 

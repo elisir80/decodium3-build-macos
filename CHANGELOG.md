@@ -2,6 +2,40 @@
 
 All notable changes for the Decodium 3 FT2 macOS fork are documented here.
 
+## v1.0.9 - 2026-02-23
+
+### English (UK)
+
+- Added a third integrated panel in the main UI: `Live World Map`.
+- Added world texture background + geographic overlay + day/night rendering.
+- Added active-area auto-zoom with smooth viewport motion.
+- Implemented directional path roles and legend:
+  `IN->ME` (incoming to operator), `ME->DX` (outgoing from operator), `BAND` (station seen in band only).
+- Corrected directed decode semantics (`CALL_TO CALL_FROM GRID`) so locator ownership maps to the right callsign.
+- Fixed Maidenhead 6-character positioning (`JM75FV` etc.) and added robust call-to-grid fallback lookup (`CALL3.TXT`, AD1CCty).
+- During TX, map now displays only the active `ME->DX` path with slowed animation timing based on mode (FT2/FT4/FT8).
+- Added post-TX incoming-callers queue rendering window and removed stale outgoing arrows after TX ends.
+- Reduced label clutter: smaller label font and capped visible labels for readability.
+- Clarified bottom-left counters: `active paths` now excludes `BAND` markers, shown separately as `in band`.
+- Updated release baseline/tag/version references to `v1.0.9`.
+- Kept release pipeline compatible for macOS Sequoia/Tahoe on Apple Silicon and Sequoia on Intel (`x86_64`).
+
+### Italiano
+
+- Aggiunto il terzo pannello integrato nella UI principale: `Live World Map`.
+- Aggiunto sfondo mappa reale + overlay geografico + rendering giorno/notte.
+- Introdotto zoom automatico area attiva con movimento viewport fluido.
+- Implementati ruoli direzionali e legenda:
+  `IN->ME` (in ingresso verso operatore), `ME->DX` (in uscita dall'operatore), `BAND` (stazione solo presente in banda).
+- Corrette le semantiche dei messaggi diretti (`CALL_TO CALL_FROM GRID`) per associare il locator al nominativo corretto.
+- Corretto il posizionamento Maidenhead a 6 caratteri (`JM75FV` ecc.) e aggiunto fallback robusto call->grid (`CALL3.TXT`, AD1CCty).
+- Durante la TX, la mappa mostra solo il percorso attivo `ME->DX` con animazione rallentata in base al modo (FT2/FT4/FT8).
+- Aggiunta finestra post-TX per mostrare la coda chiamanti in ingresso ed eliminazione frecce outgoing residue a fine TX.
+- Ridotta la congestione etichette: font piu' piccolo e limite etichette visibili.
+- Chiariti i contatori in basso a sinistra: `active paths` esclude ora i marker `BAND`, mostrati separatamente in `in band`.
+- Aggiornata la baseline release/tag/versione a `v1.0.9`.
+- Mantenuta compatibilita' pipeline release per macOS Sequoia/Tahoe Apple Silicon e Sequoia Intel (`x86_64`).
+
 ## v1.0.7 - 2026-02-22
 
 ### English (UK)
