@@ -83,7 +83,16 @@ set (PROJECT_VENDOR "IU8LMC")
 set (PROJECT_CONTACT "IU8LMC <qrz.com/db/IU8LMC>")
 set (PROJECT_COPYRIGHT "See Help | Copyright info")
 set (PROJECT_HOMEPAGE qrz.com/db/IU8LMC)
-set (FORK_RELEASE_VERSION "v1.0.9" CACHE STRING "Fork release tag shown in the UI title")
+set (FORK_RELEASE_VERSION_DEFAULT "v1.0.9")
+# Keep explicit -DFORK_RELEASE_VERSION overrides, but auto-migrate stale cache defaults.
+if (NOT DEFINED FORK_RELEASE_VERSION
+    OR FORK_RELEASE_VERSION STREQUAL ""
+    OR FORK_RELEASE_VERSION STREQUAL "v1.0.7"
+    OR FORK_RELEASE_VERSION STREQUAL "v1.0.8")
+  set (FORK_RELEASE_VERSION "${FORK_RELEASE_VERSION_DEFAULT}" CACHE STRING "Fork release tag shown in the UI title" FORCE)
+else ()
+  set (FORK_RELEASE_VERSION "${FORK_RELEASE_VERSION}" CACHE STRING "Fork release tag shown in the UI title")
+endif ()
 set (PROJECT_MANUAL wsjtx-main)
 set (PROJECT_MANUAL_DIRECTORY_URL https://wsjt.sourceforge.io/wsjtx-doc/)
 set (PROJECT_SAMPLES_URL http://downloads.sourceforge.net/project/wsjt/)
