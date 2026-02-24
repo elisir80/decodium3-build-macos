@@ -7,16 +7,25 @@ build, packaging, compatibility, and runtime fixes.
 
 Latest stable release line:
 
-- `v1.0.9` (macOS arm64 + x86_64 Intel)
+- `v1.1.0` (macOS arm64 + x86_64 Intel)
 - Compatibility target: macOS Sequoia (15.x), Tahoe (26.x), and Intel Sequoia (15.x)
 
-## Highlights in v1.0.9
+## Highlights in v1.1.0
 
-- main title includes fork attribution and release tag (`... 9H1SR v1.0.9`);
-- new integrated live world map panel with TX/RX path rendering and active-area auto-zoom;
-- improved FT2/FT4/FT8 map behavior:
-  markers for band-only stations, directional arrows for real calls, and post-TX callers queue;
+- audio output auto-rebind recovery on transient runtime failures;
+- improved output-device stability and non-fatal underrun handling;
+- improved UDP/network interface handling (preserve selected interfaces even when temporarily unavailable);
+- NTP hardening and fallback reliability improvements, plus status-bar "last sync age";
+- DT timing improvements for remote operation with configurable clock compensation limits in `Settings -> Advanced`;
 - release automation kept for dual architecture artifacts (arm64 + x86_64 Intel).
+
+## If ft2.app Does Not Start (macOS)
+
+Run from Terminal:
+
+```bash
+xattr -r -d com.apple.quarantine /Applications/ft2.app
+```
 
 ## Language Guides
 

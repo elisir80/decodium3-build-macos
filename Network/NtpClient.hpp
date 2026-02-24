@@ -10,6 +10,7 @@
 #include <QString>
 #include <QElapsedTimer>
 #include <QHash>
+#include <QSet>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 
@@ -51,6 +52,8 @@ private:
 
   struct PendingQuery {
     qint64 t1Ms;  // client send time (ms since Unix epoch)
+    quint32 t1Sec;
+    quint32 t1Frac;
   };
 
   void sendQuery(QHostAddress const& address);
@@ -77,6 +80,8 @@ private:
   bool m_synced {false};
   bool m_enabled {false};
   int m_pendingDnsLookups {0};
+  QSet<int> m_activeLookupIds;
+  QSet<QString> m_queriedAddresses;
 };
 
 #endif // NTP_CLIENT_HPP__

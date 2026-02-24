@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. v1.0.9)"
+        description: "Release version (e.g. v1.1.0)"
         required: true
-        default: "v1.0.9"
+        default: "v1.1.0"
       publish_release:
         description: "Publish GitHub release"
         required: true
@@ -143,16 +143,34 @@ jobs:
             echo "# Decodium 3 FT2 ${VERSION} (macOS)"
             echo
             echo "## English (UK)"
-            echo "Release including two architectures:"
-            echo "- Apple Silicon (arm64): compatible with macOS Sequoia and Tahoe"
-            echo "- Intel (x86_64): built on GitHub macOS Intel runner"
+            echo "This release includes:"
+            echo "- Audio output auto-rebind recovery on runtime failures."
+            echo "- Improved output-device resilience for underruns."
+            echo "- UDP/network interface reliability improvements."
+            echo "- NTP protocol hardening and improved fallback handling."
+            echo "- NTP status bar improvements with last-sync age."
+            echo "- DT timing improvements for remote stations with configurable clamp limits in Settings -> Advanced."
+            echo "- Apple Silicon build for macOS Sequoia/Tahoe."
+            echo "- Intel build for macOS Sequoia."
+            echo
+            echo "If the app does not start on macOS, run from Terminal:"
+            echo "\`xattr -r -d com.apple.quarantine /Applications/ft2.app\`"
             echo
             echo "Refer to \`CHANGELOG.md\` for full details."
             echo
             echo "## Italiano"
-            echo "Release con due architetture:"
-            echo "- Apple Silicon (arm64): compatibile con macOS Sequoia e Tahoe"
-            echo "- Intel (x86_64): compilata su runner macOS Intel di GitHub"
+            echo "Questa release include:"
+            echo "- Recupero automatico auto-rebind dell'uscita audio su errori runtime."
+            echo "- Maggiore robustezza delle periferiche audio in uscita sugli underrun."
+            echo "- Miglioramenti affidabilita' UDP/interfacce di rete."
+            echo "- NTP piu' robusto e fallback migliorato."
+            echo "- Miglioramenti barra stato NTP con eta' ultima sincronizzazione."
+            echo "- Miglioramenti timing DT per stazioni remote con limiti configurabili in Impostazioni -> Avanzate."
+            echo "- Build Apple Silicon per macOS Sequoia/Tahoe."
+            echo "- Build Intel per macOS Sequoia."
+            echo
+            echo "Se l'app non si avvia su macOS, esegui da Terminale:"
+            echo "\`xattr -r -d com.apple.quarantine /Applications/ft2.app\`"
             echo
             echo "Per i dettagli completi, vedi \`CHANGELOG.md\`."
           } > "${NOTES_FILE}"

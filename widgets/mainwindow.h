@@ -518,7 +518,12 @@ private:
   Q_SIGNAL void download_finished (bool) const;  //avt 10/2/25
 
 private:
+  void log_audio_rebind_event (QString const& message, bool warning = false);
   void set_mode (QString const& mode);
+  void attempt_audio_output_rebind ();
+  QAudioDeviceInfo select_audio_output_rebind_device ();
+  QString format_ntp_sync_age (qint64 ageMs) const;
+  void update_ntp_status_display (bool force = false);
   void astroUpdate ();
   void writeAllTxt(QString message);
   void auto_sequence (DecodedText const& message, unsigned start_tolerance, unsigned stop_tolerance);
@@ -832,6 +837,7 @@ private:
   int			m_nsendingsh;
   double	m_onAirFreq0;
   bool		m_first_error;
+  qint64  m_last_tx_audio_rebind_ms;
 
   char    m_msg[100][80];
 
@@ -1037,12 +1043,19 @@ private:
   double m_dtSmoothFactor {0.3};      // exponential smoothing factor (0-1)
   int m_dtMinSamples {3};             // minimum decodes before applying correction
   bool m_dtFeedbackEnabled {true};    // enable/disable DT feedback loop
+  bool m_dtClampCustomEnabled {false}; // use custom DT clamp limits from settings
+  double m_dtClampSynced_ms {600.0};  // DT clamp when NTP is synced
+  double m_dtClampUnsynced_ms {2000.0}; // DT clamp when NTP is not synced
   int m_dtLastSampleCount {0};        // sample count for status display
 
   // NTP Time Synchronization
   NtpClient *m_ntpClient {nullptr};
   double m_ntpOffset_ms {0.0};
   bool m_ntpEnabled {true};
+  bool m_ntpSyncedNow {false};
+  qint64 m_ntpLastSyncEpochMs {0};
+  qint64 m_ntpLastUiRefreshMs {0};
+  QString m_ntpStatusText;
   QCheckBox ntp_checkbox;
   QLabel ntp_status_label;
 

@@ -2,6 +2,62 @@
 
 All notable changes for the Decodium 3 FT2 macOS fork are documented here.
 
+## v1.1.0 - 2026-02-24
+
+### English (UK)
+
+- Added automatic audio output rebind recovery (`AudioRebind`) when runtime output errors occur.
+- Added throttled auto-recovery attempts and improved output-device selection fallback (preferred/configured/default).
+- Changed output underrun handling to recoverable status (no immediate fatal invalidation of the selected output device).
+- Improved UDP/network interface handling:
+  selected interfaces remain visible in Settings even when temporarily unavailable;
+  loopback/multicast state details are shown in tooltips;
+  stale selected interfaces are preserved as disabled entries instead of disappearing.
+- Hardened internal NTP client behavior:
+  proper sync-cycle resets, stale DNS lookup filtering, deduplicated query targets,
+  NTPv4 transmit timestamp handling, echoed-originate validation, improved failure signaling,
+  and clearer HTTP fallback state transitions.
+- Added NTP status-bar enhancements:
+  display now includes offset plus last sync age,
+  periodic age refresh,
+  clearer OFF/no-sync/waiting/synced states and richer tooltips.
+- Added configurable DT clock-compensation limits for remote operation:
+  dedicated checkable block in `Settings -> Advanced`,
+  separate clamp values for NTP-synced and unsynced states,
+  persisted settings and immediate runtime reload after closing Settings.
+- Updated release/build baseline to fork tag `v1.1.0`.
+- Release target remains dual architecture:
+  Apple Silicon (Sequoia/Tahoe) and Intel (Sequoia).
+- macOS launch fallback command to keep in release notes/troubleshooting:
+  `xattr -r -d com.apple.quarantine /Applications/ft2.app`
+
+### Italiano
+
+- Aggiunto recupero automatico auto-rebind dell'uscita audio (`AudioRebind`) quando si verificano errori runtime di output.
+- Aggiunti tentativi di recupero con throttling e migliorato fallback selezione device (preferito/configurato/default).
+- Modificata la gestione underrun output come condizione recuperabile (senza invalidazione fatal immediata del device selezionato).
+- Migliorata la gestione UDP/interfacce di rete:
+  le interfacce selezionate restano visibili nelle Impostazioni anche se temporaneamente non disponibili;
+  i dettagli loopback/multicast sono mostrati nei tooltip;
+  le interfacce selezionate ma non rilevate vengono preservate come voci disabilitate invece di sparire.
+- Rafforzato il comportamento del client NTP interno:
+  reset corretti del ciclo sync, filtro lookup DNS stale, deduplicazione target query,
+  gestione timestamp NTPv4, validazione originate echoed, segnalazione errori migliorata
+  e transizioni stato fallback HTTP piu' coerenti.
+- Aggiunti miglioramenti alla status bar NTP:
+  la visualizzazione ora include offset + eta' ultima sincronizzazione,
+  refresh periodico dell'eta',
+  stati OFF/no-sync/in attesa/synced piu' chiari con tooltip piu' ricchi.
+- Aggiunti limiti di compensazione clock DT configurabili per operazioni remote:
+  blocco dedicato e checkable in `Impostazioni -> Avanzate`,
+  valori clamp separati per stato NTP synced/unsynced,
+  persistenza impostazioni e ricarica runtime immediata dopo chiusura Impostazioni.
+- Aggiornata la baseline release/build al tag fork `v1.1.0`.
+- Target release confermato dual architecture:
+  Apple Silicon (Sequoia/Tahoe) e Intel (Sequoia).
+- Comando fallback macOS da mantenere sempre in note release/troubleshooting:
+  `xattr -r -d com.apple.quarantine /Applications/ft2.app`
+
 ## v1.0.9 - 2026-02-23
 
 ### English (UK)

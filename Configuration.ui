@@ -3266,7 +3266,86 @@ Right click for insert and delete options.</string>
          </layout>
         </widget>
        </item>
-       <item row="3" column="0" colspan="2">
+       <item row="2" column="0" colspan="2">
+        <widget class="QGroupBox" name="groupBox_dt_clamp_top">
+         <property name="title">
+          <string>Clock compensation limits (FT2/FT4/FT8)</string>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+         <property name="checked">
+          <bool>false</bool>
+         </property>
+         <layout class="QFormLayout" name="formLayout_dt_clamp_top">
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_dt_clamp_synced_top">
+            <property name="text">
+             <string>Max DT correction with NTP sync:</string>
+            </property>
+            <property name="buddy">
+             <cstring>sbDtClampSyncedAdv</cstring>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QSpinBox" name="sbDtClampSyncedAdv">
+            <property name="toolTip">
+             <string>Limits automatic DT correction when NTP is synced. Increase for remote stations with stable extra latency.</string>
+            </property>
+            <property name="suffix">
+             <string> ms</string>
+            </property>
+            <property name="minimum">
+             <number>100</number>
+            </property>
+            <property name="maximum">
+             <number>5000</number>
+            </property>
+            <property name="singleStep">
+             <number>50</number>
+            </property>
+            <property name="value">
+             <number>600</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_dt_clamp_unsynced_top">
+            <property name="text">
+             <string>Max DT correction without NTP sync:</string>
+            </property>
+            <property name="buddy">
+             <cstring>sbDtClampUnsyncedAdv</cstring>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QSpinBox" name="sbDtClampUnsyncedAdv">
+            <property name="toolTip">
+             <string>Limits automatic DT correction when NTP is unavailable. Use a higher value only if needed.</string>
+            </property>
+            <property name="suffix">
+             <string> ms</string>
+            </property>
+            <property name="minimum">
+             <number>100</number>
+            </property>
+            <property name="maximum">
+             <number>10000</number>
+            </property>
+            <property name="singleStep">
+             <number>100</number>
+            </property>
+            <property name="value">
+             <number>2000</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item row="4" column="0" colspan="2">
         <widget class="QGroupBox" name="gbCloudlog">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
@@ -3369,7 +3448,7 @@ Right click for insert and delete options.</string>
          </layout>
         </widget>
        </item>
-       <item row="2" column="0" colspan="2">
+       <item row="3" column="0" colspan="2">
         <widget class="QGroupBox" name="gbSpecialOpActivity">
          <property name="title">
           <string>Special operating activity</string>
@@ -3934,10 +4013,86 @@ Right click for insert and delete options.</string>
             <attribute name="buttonGroup">
              <string notr="true">special_op_activity_button_group</string>
             </attribute>
+       </widget>
+      </item>
+       <item row="2" column="0" colspan="2">
+       <widget class="QGroupBox" name="groupBox_dt_clamp">
+         <property name="visible">
+          <bool>false</bool>
+         </property>
+         <property name="title">
+          <string>Clock compensation limits (FT2/FT4/FT8)</string>
+         </property>
+         <layout class="QFormLayout" name="formLayout_dt_clamp">
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_dt_clamp_synced">
+            <property name="text">
+             <string>Max DT correction with NTP sync:</string>
+            </property>
+            <property name="buddy">
+             <cstring>sbDtClampSynced</cstring>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QSpinBox" name="sbDtClampSynced">
+            <property name="toolTip">
+             <string>Limits automatic DT correction when NTP is synced. Increase for remote stations with stable extra latency.</string>
+            </property>
+            <property name="suffix">
+             <string> ms</string>
+            </property>
+            <property name="minimum">
+             <number>100</number>
+            </property>
+            <property name="maximum">
+             <number>5000</number>
+            </property>
+            <property name="singleStep">
+             <number>50</number>
+            </property>
+            <property name="value">
+             <number>600</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_dt_clamp_unsynced">
+            <property name="text">
+             <string>Max DT correction without NTP sync:</string>
+            </property>
+            <property name="buddy">
+             <cstring>sbDtClampUnsynced</cstring>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QSpinBox" name="sbDtClampUnsynced">
+            <property name="toolTip">
+             <string>Limits automatic DT correction when NTP is unavailable. Use a higher value only if needed.</string>
+            </property>
+            <property name="suffix">
+             <string> ms</string>
+            </property>
+            <property name="minimum">
+             <number>100</number>
+            </property>
+            <property name="maximum">
+             <number>10000</number>
+            </property>
+            <property name="singleStep">
+             <number>100</number>
+            </property>
+            <property name="value">
+             <number>2000</number>
+            </property>
            </widget>
           </item>
          </layout>
         </widget>
+       </item>
+     </layout>
+    </widget>
        </item>
        <item row="0" column="1" rowspan="2">
         <widget class="QGroupBox" name="groupBox_5">
@@ -4797,6 +4952,9 @@ Right click for insert and delete options.</string>
   <tabstop>sbNtrials</tabstop>
   <tabstop>sbAggressive</tabstop>
   <tabstop>cbTwoPass</tabstop>
+  <tabstop>groupBox_dt_clamp_top</tabstop>
+  <tabstop>sbDtClampSyncedAdv</tabstop>
+  <tabstop>sbDtClampUnsyncedAdv</tabstop>
   <tabstop>sbDegrade</tabstop>
   <tabstop>sbBandwidth</tabstop>
   <tabstop>sbTxDelay</tabstop>

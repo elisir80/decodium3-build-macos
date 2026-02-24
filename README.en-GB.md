@@ -15,19 +15,17 @@ It includes practical fixes for modern macOS build and runtime behaviour:
 ## Current Baseline
 
 - Source branch: `master`
-- Latest stable release: `v1.0.9`
+- Latest stable release: `v1.1.0`
 - Compatibility target: macOS Sequoia (15.x), Tahoe (26.x), and Intel Sequoia (15.x)
 
-## What is New in v1.0.9
+## What is New in v1.1.0
 
-- Added integrated third panel "Live World Map" in the main GUI layout.
-- Added real map background + geographic overlay with active-area auto-zoom.
-- Added directional path rendering:
-  `IN->ME` for stations calling you, `ME->DX` when you call a station, `BAND` for passive spotted stations.
-- Added TX-mode behavior aligned with FT modes:
-  while transmitting, show only your active outgoing path animation; after TX, briefly show queued incoming callers.
-- Corrected locator handling for 6-char Maidenhead positions (e.g. `JM75FV`) and call/grid lookup fallback.
-- Reduced map-label clutter (smaller labels, visibility cap) and clarified counters (`active paths` vs `in band`).
+- Added audio output auto-rebind recovery on transient runtime failures.
+- Improved output-device stability by handling underruns as recoverable.
+- Improved UDP/network interface handling so selected interfaces remain visible when temporarily unavailable.
+- Hardened NTP logic (query de-duplication, timestamp validation, stale DNS lookup filtering, cleaner fallback state).
+- Added NTP status-bar "last sync age" and clearer status tooltip behavior.
+- Added configurable DT clock compensation limits for remote operation in `Settings -> Advanced`.
 - Kept release automation for dual architecture outputs (arm64 + x86_64 Intel).
 
 ## Quick Start (macOS)
@@ -43,14 +41,14 @@ open build/ft2.app
 Use the local release script:
 
 ```bash
-scripts/release-macos.sh v1.0.9 --publish --repo elisir80/decodium3-build-macos
+scripts/release-macos.sh v1.1.0 --publish --repo elisir80/decodium3-build-macos
 ```
 
 For one DMG that works on both macOS Sequoia (15.x) and Tahoe (26.x), build
 with:
 
 ```bash
-scripts/release-macos.sh v1.0.9 --compat-macos 15.0
+scripts/release-macos.sh v1.1.0 --compat-macos 15.0
 ```
 
 Important: if you build locally on Tahoe with Homebrew libraries compiled with
@@ -90,6 +88,12 @@ Terminal fallback (advanced users only):
 ```bash
 xattr -dr com.apple.quarantine /path/to/decodium3-ft2-<version>-macos-arm64.pkg
 open /path/to/decodium3-ft2-<version>-macos-arm64.pkg
+```
+
+If `ft2.app` does not start after installation, run:
+
+```bash
+xattr -r -d com.apple.quarantine /Applications/ft2.app
 ```
 
 ## Shared Memory on macOS

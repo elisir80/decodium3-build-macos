@@ -9,6 +9,35 @@
  \$$      \$$  \$$$$$$   \$$$$$$     \$$        \$$   \$$
                                                          
                                                          
+               Decodium 3 FT2 macOS fork - Release v1.1.0
+                      ------------------------------------
+
+English (UK)
+- Audio output: automatic auto-rebind recovery on runtime failures and
+  non-fatal underrun handling.
+- UDP/network interfaces: selected interfaces are preserved in Settings
+  even when temporarily unavailable.
+- NTP: protocol hardening, improved fallback behavior, and status bar with
+  offset + last sync age.
+- DT timing: configurable remote-friendly clock compensation limits in
+  Settings -> Advanced with dedicated enable checkbox.
+- Release target: Apple Silicon Sequoia/Tahoe + Intel Sequoia.
+- If ft2.app does not start on macOS:
+  xattr -r -d com.apple.quarantine /Applications/ft2.app
+
+Italiano
+- Uscita audio: recupero automatico auto-rebind su errori runtime e
+  gestione underrun non-fatal.
+- UDP/interfacce di rete: le interfacce selezionate vengono preservate
+  nelle Impostazioni anche se temporaneamente non disponibili.
+- NTP: robustezza protocollo migliorata, fallback piu' affidabile e
+  status bar con offset + eta' ultima sincronizzazione.
+- Timing DT: limiti compensazione clock configurabili (stazioni remote)
+  in Impostazioni -> Avanzate con checkbox dedicata di attivazione.
+- Target release: Apple Silicon Sequoia/Tahoe + Intel Sequoia.
+- Se ft2.app non si avvia su macOS:
+  xattr -r -d com.apple.quarantine /Applications/ft2.app
+
 Copyright 2001 - 2025 by Joe Taylor, K1JT, and the WSJT Development Team
 
                         Release: WSJT-X 3.0.0-rc1

@@ -905,6 +905,9 @@ private:
   bool auto_astro_;
   bool single_decode_;
   bool twoPass_;
+  bool dt_clamp_custom_enabled_;
+  qint32 dt_clamp_synced_ms_;
+  qint32 dt_clamp_unsynced_ms_;
   bool highDPI_;
   bool largerTabWidget_;
   bool bSuperFox_;
@@ -1935,7 +1938,13 @@ Configuration::impl::impl (Configuration * self, QNetworkAccessManager * network
   // set up dynamic loading of network interfaces
   connect (ui_->udp_interfaces_combo_box, &LazyFillComboBox::about_to_show_popup, [this] () {
       QGuiApplication::setOverrideCursor (QCursor {Qt::WaitCursor});
-      load_network_interfaces (ui_->udp_interfaces_combo_box, udp_interface_names_);
+      // Preserve unsaved in-dialog choices when reloading the list.
+      auto selected = get_selected_network_interfaces (ui_->udp_interfaces_combo_box);
+      if (!selected.size ())
+        {
+          selected = udp_interface_names_;
+        }
+      load_network_interfaces (ui_->udp_interfaces_combo_box, selected);
       QGuiApplication::restoreOverrideCursor ();
     });
   connect (ui_->udp_interfaces_combo_box, &QComboBox::currentTextChanged, this, &Configuration::impl::validate_network_interfaces);
@@ -2252,6 +2261,9 @@ void Configuration::impl::initialize_models ()
   ui_->auto_astro_check_box->setChecked(auto_astro_);
   ui_->single_decode_check_box->setChecked(single_decode_);
   ui_->cbTwoPass->setChecked(twoPass_);
+  ui_->groupBox_dt_clamp_top->setChecked(dt_clamp_custom_enabled_);
+  ui_->sbDtClampSyncedAdv->setValue(dt_clamp_synced_ms_);
+  ui_->sbDtClampUnsyncedAdv->setValue(dt_clamp_unsynced_ms_);
   ui_->cbHighDPI->setChecked(highDPI_);
   ui_->cbLargerTabWidget->setChecked(largerTabWidget_);
   ui_->cbSuperFox->setChecked(bSuperFox_);
@@ -2695,6 +2707,14 @@ void Configuration::impl::read_settings ()
   auto_astro_ = settings_->value("AutoAstroWindow",false).toBool ();
   single_decode_ = settings_->value("SingleDecode",false).toBool ();
   twoPass_ = settings_->value("TwoPass",true).toBool ();
+  dt_clamp_custom_enabled_ = settings_->value("DTClampCustomEnabled", false).toBool ();
+  dt_clamp_synced_ms_ = settings_->value("DTClampSynced_ms", 600).toInt ();
+  dt_clamp_unsynced_ms_ = settings_->value("DTClampUnsynced_ms", 2000).toInt ();
+  if (dt_clamp_synced_ms_ < 100) dt_clamp_synced_ms_ = 100;
+  if (dt_clamp_synced_ms_ > 5000) dt_clamp_synced_ms_ = 5000;
+  if (dt_clamp_unsynced_ms_ < 100) dt_clamp_unsynced_ms_ = 100;
+  if (dt_clamp_unsynced_ms_ > 10000) dt_clamp_unsynced_ms_ = 10000;
+  if (dt_clamp_unsynced_ms_ < dt_clamp_synced_ms_) dt_clamp_unsynced_ms_ = dt_clamp_synced_ms_;
   highDPI_ = settings_->value("HighDPI",true).toBool ();
   largerTabWidget_ = settings_->value("LargerTabWidget",false).toBool ();
   bSuperFox_ = settings_->value("SuperFox",true).toBool ();
@@ -2962,6 +2982,9 @@ void Configuration::impl::write_settings ()
   settings_->setValue ("AutoAstroWindow", auto_astro_);
   settings_->setValue ("SingleDecode", single_decode_);
   settings_->setValue ("TwoPass", twoPass_);
+  settings_->setValue ("DTClampCustomEnabled", dt_clamp_custom_enabled_);
+  settings_->setValue ("DTClampSynced_ms", dt_clamp_synced_ms_);
+  settings_->setValue ("DTClampUnsynced_ms", dt_clamp_unsynced_ms_);
   settings_->setValue ("HighDPI", highDPI_);
   settings_->setValue ("LargerTabWidget", largerTabWidget_);
   settings_->setValue ("SuperFox", bSuperFox_);
@@ -3548,6 +3571,12 @@ void Configuration::impl::accept ()
   auto_astro_ = ui_->auto_astro_check_box->isChecked ();
   single_decode_ = ui_->single_decode_check_box->isChecked ();
   twoPass_ = ui_->cbTwoPass->isChecked ();
+  dt_clamp_custom_enabled_ = ui_->groupBox_dt_clamp_top->isChecked ();
+  dt_clamp_synced_ms_ = ui_->sbDtClampSyncedAdv->value ();
+  dt_clamp_unsynced_ms_ = ui_->sbDtClampUnsyncedAdv->value ();
+  if (dt_clamp_unsynced_ms_ < dt_clamp_synced_ms_) {
+    dt_clamp_unsynced_ms_ = dt_clamp_synced_ms_;
+  }
   highDPI_ = ui_->cbHighDPI->isChecked ();
   largerTabWidget_ = ui_->cbLargerTabWidget->isChecked ();
   bSuperFox_ = ui_->cbSuperFox->isChecked ();
@@ -5552,13 +5581,22 @@ void Configuration::impl::load_audio_devices(QAudio::Mode mode, QComboBox * comb
 void Configuration::impl::load_network_interfaces (CheckableItemComboBox * combo_box, QStringList current)
 {
   combo_box->clear ();
+  QStringList available_interface_names;
   for (auto const& net_if : QNetworkInterface::allInterfaces ())
     {
-      auto flags = QNetworkInterface::IsUp | QNetworkInterface::CanMulticast;
-      if ((net_if.flags () & flags) == flags)
+      auto flags = net_if.flags ();
+      bool is_up = flags.testFlag (QNetworkInterface::IsUp);
+      bool can_multicast = flags.testFlag (QNetworkInterface::CanMulticast);
+      bool is_loopback = flags.testFlag (QNetworkInterface::IsLoopBack);
+      bool selected = current.contains (net_if.name ());
+      bool usable = (is_up && can_multicast) || is_loopback;
+
+      // Keep selected interfaces visible even when they are temporarily
+      // unavailable, so users do not lose their choice mid-session.
+      if (usable || selected)
         {
-          bool check_it = current.contains (net_if.name ());
-          if (net_if.flags () & QNetworkInterface::IsLoopBack)
+          bool check_it = selected;
+          if (is_loopback)
             {
               loopback_interface_name_ = net_if.name ();
               if (!current.size ())
@@ -5570,7 +5608,8 @@ void Configuration::impl::load_network_interfaces (CheckableItemComboBox * combo
                                                , net_if.name ()
                                                , check_it ? Qt::Checked : Qt::Unchecked);
           auto tip = QString {"name(index): %1(%2) - %3"}.arg (net_if.name ()).arg (net_if.index ())
-                       .arg (net_if.flags () & QNetworkInterface::IsUp ? "Up" : "Down");
+                       .arg (is_up ? "Up" : "Down");
+          tip += QString {"\nmulticast: %1"}.arg (can_multicast ? "yes" : "no");
           auto hw_addr = net_if.hardwareAddress ();
           if (hw_addr.size ())
             {
@@ -5585,7 +5624,26 @@ void Configuration::impl::load_network_interfaces (CheckableItemComboBox * combo
                   tip += QString {"\n  ip: %1/%2"}.arg (ae.ip ().toString ()).arg (ae.prefixLength ());
                 }
             }
+          if (!usable)
+            {
+              item->setEnabled (false);
+              tip += "\nstate: temporarily unavailable (kept because selected)";
+            }
           item->setToolTip (tip);
+          available_interface_names << net_if.name ();
+        }
+    }
+
+  // Preserve stale selected entries if OS does not report them right now.
+  for (auto const& if_name : current)
+    {
+      if (!available_interface_names.contains (if_name))
+        {
+          auto item = combo_box->addCheckItem (QString {"%1 (%2)"}.arg (if_name).arg (tr ("Not available"))
+                                               , if_name
+                                               , Qt::Checked);
+          item->setEnabled (false);
+          item->setToolTip (tr ("Interface not currently reported by OS; selection preserved."));
         }
     }
 }

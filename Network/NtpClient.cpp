@@ -81,6 +81,15 @@ void NtpClient::setEnabled(bool enabled)
   } else {
     m_refreshTimer.stop();
     m_queryTimeoutTimer.stop();
+    m_pendingQueries.clear();
+    m_collectedOffsets.clear();
+    m_httpOffsets.clear();
+    m_httpSendTimes.clear();
+    m_httpPendingCount = 0;
+    m_pendingDnsLookups = 0;
+    m_activeLookupIds.clear();
+    m_queriedAddresses.clear();
+    m_synced = false;
     m_socket.close();
   }
 }
@@ -96,7 +105,12 @@ void NtpClient::syncNow()
 
   m_pendingQueries.clear();
   m_collectedOffsets.clear();
+  m_httpOffsets.clear();
+  m_httpSendTimes.clear();
+  m_httpPendingCount = 0;
   m_pendingDnsLookups = 0;
+  m_activeLookupIds.clear();
+  m_queriedAddresses.clear();
 
   // Select a random subset of servers (max 8) to avoid overloading
   QStringList selected = m_servers;
@@ -108,47 +122,68 @@ void NtpClient::syncNow()
   // Start async DNS lookup for selected servers
   for (int i = 0; i < queryCount; ++i) {
     ++m_pendingDnsLookups;
-    QHostInfo::lookupHost(selected[i], this, SLOT(onDnsLookupResult(QHostInfo)));
+    auto lookup_id = QHostInfo::lookupHost(selected[i], this, SLOT(onDnsLookupResult(QHostInfo)));
+    m_activeLookupIds.insert(lookup_id);
   }
 }
 
 void NtpClient::onDnsLookupResult(QHostInfo hostInfo)
 {
+  if (!m_activeLookupIds.contains(hostInfo.lookupId())) {
+    return;
+  }
+  m_activeLookupIds.remove(hostInfo.lookupId());
   --m_pendingDnsLookups;
 
   if (hostInfo.error() != QHostInfo::NoError) {
     Q_EMIT errorOccurred(QString("DNS lookup failed for %1: %2")
                          .arg(hostInfo.hostName(), hostInfo.errorString()));
-    return;
+  } else {
+    auto const addresses = hostInfo.addresses();
+    if (!addresses.isEmpty()) {
+      sendQuery(addresses.first());
+      // Start timeout timer when first query is sent
+      if (!m_queryTimeoutTimer.isActive()) {
+        m_queryTimeoutTimer.start();
+      }
+    }
   }
 
-  auto const addresses = hostInfo.addresses();
-  if (!addresses.isEmpty()) {
-    sendQuery(addresses.first());
-    // Start timeout timer when first query is sent
-    if (!m_queryTimeoutTimer.isActive()) {
-      m_queryTimeoutTimer.start();
-    }
+  // If all lookups are done and no UDP query is pending, finalize now
+  // so we can move promptly to HTTP fallback.
+  if (m_pendingDnsLookups <= 0
+      && m_pendingQueries.isEmpty()
+      && m_collectedOffsets.isEmpty()
+      && !m_queryTimeoutTimer.isActive()) {
+    onQueryTimeout();
   }
 }
 
 void NtpClient::sendQuery(QHostAddress const& address)
 {
+  auto key = address.toString();
+  if (m_queriedAddresses.contains(key)) {
+    return;
+  }
+  m_queriedAddresses.insert(key);
+
   QByteArray packet(NTP_PACKET_SIZE, '\0');
-  packet[0] = 0x1B;  // LI=0, VN=3, Mode=3 (client)
+  packet[0] = 0x23;  // LI=0, VN=4, Mode=3 (client)
 
   // Record T1 (client send time)
   qint64 t1Ms = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
 
-  // Write T1 into Originate Timestamp (bytes 24-31) for server echo
+  // Write T1 into Transmit Timestamp (bytes 40-47).
   quint32 t1Sec, t1Frac;
   msToNtpTimestamp(t1Ms, t1Sec, t1Frac);
-  qToBigEndian(t1Sec, reinterpret_cast<uchar*>(packet.data() + 24));
-  qToBigEndian(t1Frac, reinterpret_cast<uchar*>(packet.data() + 28));
+  qToBigEndian(t1Sec, reinterpret_cast<uchar*>(packet.data() + 40));
+  qToBigEndian(t1Frac, reinterpret_cast<uchar*>(packet.data() + 44));
 
   PendingQuery pq;
   pq.t1Ms = t1Ms;
-  m_pendingQueries.insert(address.toString(), pq);
+  pq.t1Sec = t1Sec;
+  pq.t1Frac = t1Frac;
+  m_pendingQueries.insert(key, pq);
 
   m_socket.writeDatagram(packet, address, NTP_PORT);
 }
@@ -169,6 +204,8 @@ void NtpClient::onReadyRead()
     if (!m_pendingQueries.contains(senderKey)) continue;
 
     qint64 t1Ms = m_pendingQueries.value(senderKey).t1Ms;
+    quint32 sentT1Sec = m_pendingQueries.value(senderKey).t1Sec;
+    quint32 sentT1Frac = m_pendingQueries.value(senderKey).t1Frac;
     m_pendingQueries.remove(senderKey);
 
     // Validate stratum (byte 1): must be 1-15
@@ -182,6 +219,11 @@ void NtpClient::onReadyRead()
     // Extract T3 (server transmit timestamp, bytes 40-47)
     quint32 t3Sec = qFromBigEndian<quint32>(reinterpret_cast<const uchar*>(data.constData() + 40));
     quint32 t3Frac = qFromBigEndian<quint32>(reinterpret_cast<const uchar*>(data.constData() + 44));
+
+    // Validate originate timestamp echoed by server (bytes 24-31).
+    quint32 t1EchoSec = qFromBigEndian<quint32>(reinterpret_cast<const uchar*>(data.constData() + 24));
+    quint32 t1EchoFrac = qFromBigEndian<quint32>(reinterpret_cast<const uchar*>(data.constData() + 28));
+    if (t1EchoSec != sentT1Sec || t1EchoFrac != sentT1Frac) continue;
 
     double t2Ms = ntpTimestampToMs(t2Sec, t2Frac);
     double t3Ms = ntpTimestampToMs(t3Sec, t3Frac);
@@ -211,14 +253,12 @@ void NtpClient::onQueryTimeout()
 {
   m_queryTimeoutTimer.stop();
   m_pendingQueries.clear();
+  m_activeLookupIds.clear();
 
   if (m_collectedOffsets.isEmpty()) {
     // NTP failed — track consecutive failures
     ++m_ntpConsecutiveFailures;
-
-    if (!m_synced) {
-      Q_EMIT syncStatusChanged(false, "NTP: no response from servers");
-    }
+    Q_EMIT syncStatusChanged(false, "NTP: no response from servers");
 
     // Try HTTP time fallback when NTP fails
     httpTimeFallback();
@@ -333,10 +373,14 @@ void NtpClient::onHttpReply(QNetworkReply *reply)
 
       m_offsetMs = median;
       m_synced = true;
+      m_ntpConsecutiveFailures = 0;
+      m_refreshTimer.setInterval(REFRESH_INTERVAL_MS);
 
       Q_EMIT offsetUpdated(m_offsetMs);
       Q_EMIT syncStatusChanged(true, QString("HTTP time sync: %1 servers, offset %2 ms")
                                .arg(n).arg(median, 0, 'f', 0));
+    } else {
+      Q_EMIT syncStatusChanged(false, "HTTP time fallback failed");
     }
     m_httpSendTimes.clear();
   }

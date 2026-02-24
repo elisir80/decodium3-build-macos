@@ -16,19 +16,17 @@ moderni:
 ## Baseline attuale
 
 - Branch sorgente: `master`
-- Ultima release stabile: `v1.0.9`
+- Ultima release stabile: `v1.1.0`
 - Target compatibilita': macOS Sequoia (15.x), Tahoe (26.x), e Intel Sequoia (15.x)
 
-## Novita' in v1.0.9
+## Novita' in v1.1.0
 
-- Inserito il terzo pannello integrato "Live World Map" nella GUI principale.
-- Aggiunto sfondo mappa reale + overlay geografico con zoom automatico sull'area attiva.
-- Introdotta semantica direzionale dei tracciati:
-  `IN->ME` per stazioni che chiamano te, `ME->DX` quando chiami una stazione, `BAND` per stazioni solo presenti in banda.
-- Comportamento TX allineato ai modi FT:
-  durante la TX viene mostrato solo il percorso attivo in uscita; a fine TX viene mostrata brevemente la coda chiamanti in ingresso.
-- Corretto il calcolo locator Maidenhead a 6 caratteri (es. `JM75FV`) e aggiunto fallback di lookup call/grid.
-- Ridotta la congestione etichette (font piu' piccolo, limite visibilita') e chiarito il contatore (`active paths` vs `in band`).
+- Aggiunto recupero automatico auto-rebind dell'uscita audio su errori runtime transitori.
+- Migliorata la stabilita' periferica audio in uscita trattando gli underrun come recuperabili.
+- Migliorata la gestione UDP/interfacce di rete mantenendo visibili le interfacce selezionate anche se temporaneamente non disponibili.
+- NTP reso piu' robusto (de-duplicazione query, validazione timestamp, filtro DNS stale, fallback piu' coerente).
+- Aggiunta visualizzazione "eta' ultima sync" nella status bar NTP con tooltip stato piu' chiaro.
+- Aggiunti limiti di compensazione clock DT configurabili per operazioni remote in `Impostazioni -> Avanzate`.
 - Mantenuta automazione release dual-architecture (arm64 + x86_64 Intel).
 
 ## Avvio rapido (macOS)
@@ -44,14 +42,14 @@ open build/ft2.app
 Usa lo script locale di release:
 
 ```bash
-scripts/release-macos.sh v1.0.9 --publish --repo elisir80/decodium3-build-macos
+scripts/release-macos.sh v1.1.0 --publish --repo elisir80/decodium3-build-macos
 ```
 
 Per avere un solo DMG compatibile sia con macOS Sequoia (15.x) sia con Tahoe
 (26.x), esegui la build con:
 
 ```bash
-scripts/release-macos.sh v1.0.9 --compat-macos 15.0
+scripts/release-macos.sh v1.1.0 --compat-macos 15.0
 ```
 
 Importante: se compili in locale su Tahoe con librerie Homebrew compilate con
@@ -92,6 +90,12 @@ Fallback da terminale (solo utenti esperti):
 ```bash
 xattr -dr com.apple.quarantine /percorso/decodium3-ft2-<version>-macos-arm64.pkg
 open /percorso/decodium3-ft2-<version>-macos-arm64.pkg
+```
+
+Se `ft2.app` non si avvia dopo l'installazione, esegui:
+
+```bash
+xattr -r -d com.apple.quarantine /Applications/ft2.app
 ```
 
 ## Memoria condivisa su macOS

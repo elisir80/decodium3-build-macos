@@ -518,6 +518,7 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   m_nsendingsh {0},
   m_onAirFreq0 {0.0},
   m_first_error {true},
+  m_last_tx_audio_rebind_ms {0},
   tx_status_label {tr ("Receiving")},
   wsprNet {new WSPRNet {&m_network_manager, this}},
   m_baseCall {Radio::base_callsign (m_config.my_callsign ())},
@@ -667,7 +668,8 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   // hook up sound output stream slots & signals and disposal
   connect (this, &MainWindow::initializeAudioOutputStream, m_soundOutput, &SoundOutput::setFormat);
   connect (m_soundOutput, &SoundOutput::error, this, &MainWindow::showSoundOutError);
-  connect (m_soundOutput, &SoundOutput::error, &m_config, &Configuration::invalidate_audio_output_device);
+  // Keep the selected output device on transient runtime errors
+  // (e.g. short underruns on macOS) to avoid ending up with muted TX.
   // connect (m_soundOutput, &SoundOutput::status, this, &MainWindow::showStatusMessage);
   connect (this, &MainWindow::outAttenuationChanged, m_soundOutput, &SoundOutput::setAttenuation);
   connect (&m_audioThread, &QThread::finished, m_soundOutput, &QObject::deleteLater);
@@ -1781,6 +1783,9 @@ void MainWindow::writeSettings()
   m_settings->setValue("DTtol",m_DTtol);
   m_settings->setValue("DTCorrection_ms", m_dtCorrection_ms);
   m_settings->setValue("DTFeedbackEnabled", m_dtFeedbackEnabled);
+  m_settings->setValue("DTClampCustomEnabled", m_dtClampCustomEnabled);
+  m_settings->setValue("DTClampSynced_ms", m_dtClampSynced_ms);
+  m_settings->setValue("DTClampUnsynced_ms", m_dtClampUnsynced_ms);
   m_settings->setValue("NTPOffset_ms", m_ntpOffset_ms);
   m_settings->setValue("NTPEnabled", m_ntpEnabled);
   m_settings->setValue("MinSync",m_minSync);
@@ -2133,6 +2138,14 @@ void MainWindow::readSettings()
   m_bSWL=m_settings->value("SWL",false).toBool();
   m_dtCorrection_ms = m_settings->value("DTCorrection_ms", 0.0).toDouble();
   m_dtFeedbackEnabled = m_settings->value("DTFeedbackEnabled", true).toBool();
+  m_dtClampCustomEnabled = m_settings->value("DTClampCustomEnabled", false).toBool();
+  m_dtClampSynced_ms = m_settings->value("DTClampSynced_ms", 600.0).toDouble();
+  m_dtClampUnsynced_ms = m_settings->value("DTClampUnsynced_ms", 2000.0).toDouble();
+  if (m_dtClampSynced_ms < 100.0) m_dtClampSynced_ms = 100.0;
+  if (m_dtClampSynced_ms > 5000.0) m_dtClampSynced_ms = 5000.0;
+  if (m_dtClampUnsynced_ms < 100.0) m_dtClampUnsynced_ms = 100.0;
+  if (m_dtClampUnsynced_ms > 10000.0) m_dtClampUnsynced_ms = 10000.0;
+  if (m_dtClampUnsynced_ms < m_dtClampSynced_ms) m_dtClampUnsynced_ms = m_dtClampSynced_ms;
   m_ntpOffset_ms = m_settings->value("NTPOffset_ms", 0.0).toDouble();
   m_ntpEnabled = m_settings->value("NTPEnabled", true).toBool();
   ntp_checkbox.setChecked(m_ntpEnabled);
@@ -3730,9 +3743,155 @@ void MainWindow::showSoundInError(const QString& errorMsg)
   MessageBox::critical_message (this, tr ("Error in Sound Input"), errorMsg);
 }
 
+void MainWindow::log_audio_rebind_event (QString const& message, bool warning)
+{
+  QString tagged = QString {"AudioRebind: %1"}.arg (message);
+  if (warning)
+    {
+      LOG_WARN (tagged.toStdString ());
+    }
+  else
+    {
+      LOG_INFO (tagged.toStdString ());
+    }
+  debugToFile (QString {"audioRebind  %1"}.arg (message));
+}
+
+QAudioDeviceInfo MainWindow::select_audio_output_rebind_device ()
+{
+  QString preferred_name;
+  m_settings->beginGroup ("Configuration");
+  preferred_name = m_settings->value ("SoundOutName").toString ().trimmed ();
+  m_settings->endGroup ();
+
+  auto const& configured_device = m_config.audio_output_device ();
+  auto const configured_name = configured_device.isNull () ? QString {"<null>"} : configured_device.deviceName ();
+  auto const outputs = QAudioDeviceInfo::availableDevices (QAudio::AudioOutput);
+  QStringList available_names;
+  Q_FOREACH (auto const& dev, outputs)
+    {
+      available_names << dev.deviceName ();
+    }
+  log_audio_rebind_event (
+    QString {"scan preferred=\"%1\" configured=\"%2\" available=[%3]"}
+      .arg (preferred_name.size () ? preferred_name : "<empty>")
+      .arg (configured_name)
+      .arg (available_names.join (", "))
+  );
+
+  if (preferred_name.size ())
+    {
+      Q_FOREACH (auto const& dev, outputs)
+        {
+          if (dev.deviceName () == preferred_name)
+            {
+              log_audio_rebind_event (
+                QString {"selected preferred device \"%1\""}.arg (dev.deviceName ())
+              );
+              return dev;
+            }
+        }
+    }
+
+  if (!configured_device.isNull ())
+    {
+      Q_FOREACH (auto const& dev, outputs)
+        {
+          if (dev.deviceName () == configured_device.deviceName ())
+            {
+              log_audio_rebind_event (
+                QString {"selected configured device \"%1\""}.arg (dev.deviceName ())
+              );
+              return dev;
+            }
+        }
+    }
+
+  auto const default_device = QAudioDeviceInfo::defaultOutputDevice ();
+  if (!default_device.isNull ())
+    {
+      log_audio_rebind_event (
+        QString {"selected default device \"%1\""}.arg (default_device.deviceName ())
+      );
+    }
+  else
+    {
+      log_audio_rebind_event (
+        "no default output device available",
+        true
+      );
+    }
+
+  return default_device;
+}
+
+void MainWindow::attempt_audio_output_rebind ()
+{
+  if (m_tci_audio)
+    {
+      log_audio_rebind_event ("skip auto-rebind while TCI audio is active");
+      return;
+    }
+
+  auto const device = select_audio_output_rebind_device ();
+  if (device.isNull ())
+    {
+      log_audio_rebind_event ("auto-rebind failed: selected device is null", true);
+      showStatusMessage (tr ("Audio output auto-rebind failed: no output device available."));
+      return;
+    }
+
+  log_audio_rebind_event (
+    QString {"attempting rebind to \"%1\" ch=%2 frames=%3 tx=%4 monitor=%5 tune=%6"}
+      .arg (device.deviceName ())
+      .arg (AudioDevice::Mono == m_config.audio_output_channel () ? 1 : 2)
+      .arg (m_tx_audio_buffer_frames)
+      .arg (m_transmitting)
+      .arg (m_monitoring)
+      .arg (m_tune)
+  );
+  Q_EMIT initializeAudioOutputStream (device
+                                      , AudioDevice::Mono == m_config.audio_output_channel () ? 1 : 2
+                                      , m_tx_audio_buffer_frames);
+  showStatusMessage (tr ("Audio output auto-rebind attempted on \"%1\".").arg (device.deviceName ()));
+}
+
 void MainWindow::showSoundOutError(const QString& errorMsg)
 {
   if (m_splash && m_splash->isVisible ()) m_splash->hide ();
+  auto const& configured_device = m_config.audio_output_device ();
+  auto configured_name = configured_device.isNull () ? QString {"<null>"} : configured_device.deviceName ();
+  auto const default_device = QAudioDeviceInfo::defaultOutputDevice ();
+  auto default_name = default_device.isNull () ? QString {"<null>"} : default_device.deviceName ();
+  log_audio_rebind_event (
+    QString {"error=\"%1\" tci_audio=%2 tx=%3 monitor=%4 configured=\"%5\" default=\"%6\""}
+      .arg (errorMsg)
+      .arg (m_tci_audio)
+      .arg (m_transmitting)
+      .arg (m_monitoring)
+      .arg (configured_name)
+      .arg (default_name),
+    true
+  );
+
+  if (!m_tci_audio)
+    {
+      auto const now = QDateTime::currentMSecsSinceEpoch ();
+      // Throttle recovery attempts to avoid tight retry loops.
+      if (now - m_last_tx_audio_rebind_ms > 3000)
+        {
+          m_last_tx_audio_rebind_ms = now;
+          log_audio_rebind_event ("recovery scheduled in 250ms");
+          showStatusMessage (tr ("Audio output error detected, trying automatic recovery..."));
+          QTimer::singleShot (250, [this] () {attempt_audio_output_rebind ();});
+          return;
+        }
+
+      log_audio_rebind_event ("recovery throttled (waiting for next retry window)");
+      showStatusMessage (tr ("Audio output error persists, waiting before next retry."));
+      return;
+    }
+
   MessageBox::critical_message (this, tr ("Error in Sound Output"), errorMsg);
 }
 
@@ -3815,6 +3974,14 @@ void MainWindow::on_actionSettings_triggered()           // Setup Dialog (Settin
   SpecOp nContest0=m_specOp;
   auto psk_on = m_config.spot_to_psk_reporter ();
   if (QDialog::Accepted == m_config.exec ()) {
+    m_dtClampCustomEnabled = m_settings->value("DTClampCustomEnabled", m_dtClampCustomEnabled).toBool();
+    m_dtClampSynced_ms = m_settings->value("DTClampSynced_ms", m_dtClampSynced_ms).toDouble();
+    m_dtClampUnsynced_ms = m_settings->value("DTClampUnsynced_ms", m_dtClampUnsynced_ms).toDouble();
+    if (m_dtClampSynced_ms < 100.0) m_dtClampSynced_ms = 100.0;
+    if (m_dtClampSynced_ms > 5000.0) m_dtClampSynced_ms = 5000.0;
+    if (m_dtClampUnsynced_ms < 100.0) m_dtClampUnsynced_ms = 100.0;
+    if (m_dtClampUnsynced_ms > 10000.0) m_dtClampUnsynced_ms = 10000.0;
+    if (m_dtClampUnsynced_ms < m_dtClampSynced_ms) m_dtClampUnsynced_ms = m_dtClampSynced_ms;
     checkMSK144ContestType();
     if (m_config.my_callsign () != callsign) {
       m_baseCall = Radio::base_callsign (m_config.my_callsign ());
@@ -4763,21 +4930,24 @@ void MainWindow::createStatusBar()                           //createStatusBar
     if (m_ntpClient) {
       m_ntpClient->setEnabled(checked);
     }
-    if (!checked) {
-      ntp_status_label.setText("NTP: OFF");
-      ntp_status_label.setStyleSheet("QLabel{color:#888;background:#333}");
-      ntp_status_label.setToolTip("NTP disabled");
+    if (checked) {
+      m_ntpSyncedNow = false;
+      m_ntpStatusText.clear();
+    } else {
       m_ntpOffset_ms = 0.0;
+      m_ntpSyncedNow = false;
+      m_ntpLastSyncEpochMs = 0;
+      m_ntpStatusText = "NTP disabled";
     }
+    update_ntp_status_display(true);
   });
   statusBar()->addWidget(&ntp_checkbox);
 
   ntp_status_label.setAlignment(Qt::AlignHCenter);
-  ntp_status_label.setMinimumSize(QSize{120, 18});
+  ntp_status_label.setMinimumSize(QSize{150, 18});
   ntp_status_label.setFrameStyle(QFrame::Panel | QFrame::Sunken);
-  ntp_status_label.setText(m_ntpEnabled ? "NTP: --" : "NTP: OFF");
-  ntp_status_label.setStyleSheet("QLabel{color:#888;background:#333}");
   statusBar()->addWidget(&ntp_status_label);
+  update_ntp_status_display(true);
 
   last_tx_label.setAlignment (Qt::AlignHCenter);
   last_tx_label.setMinimumSize (QSize {150, 18});
@@ -6214,8 +6384,16 @@ void MainWindow::decodeDone ()
 
       m_dtCorrection_ms = m_dtCorrection_ms*(1.0-alpha) + newCorr*alpha;
 
-      // Wider clamps: NTP handles coarse clock error, DT handles audio latency
-      double clampMs = (m_ntpClient && m_ntpClient->isSynced()) ? 300.0 : 2000.0;
+      // NTP handles coarse clock error, DT handles audio/remote path latency.
+      // Custom clamp limits can be enabled from Settings -> Advanced.
+      double clampMs;
+      if (m_dtClampCustomEnabled) {
+        clampMs = (m_ntpClient && m_ntpClient->isSynced())
+          ? m_dtClampSynced_ms
+          : m_dtClampUnsynced_ms;
+      } else {
+        clampMs = (m_ntpClient && m_ntpClient->isSynced()) ? 300.0 : 2000.0;
+      }
       if(m_dtCorrection_ms > clampMs) m_dtCorrection_ms = clampMs;
       if(m_dtCorrection_ms < -clampMs) m_dtCorrection_ms = -clampMs;
     }
@@ -8124,6 +8302,7 @@ void MainWindow::guiUpdate()
   if(m_TRperiod==0) m_TRperiod=60.0;
   txDuration=tx_duration(m_mode,m_TRperiod,m_nsps,m_bFast9);
   if(m_mode=="FT8" and m_specOp==SpecOp::FOX and m_config.superFox()) txDuration=1.0+151*1024.0/12000.0;
+  update_ntp_status_display(false);
   // qDebug () << "DEBUG SF " << m_mode << m_TRperiod << m_nsps << (SpecOp::FOX==m_specOp) << m_config.superFox() << txDuration;
   double tx1=0.0;
   double tx2=txDuration;
@@ -19262,25 +19441,86 @@ void MainWindow::setIncrLogCount()
   }
 }
 
+QString MainWindow::format_ntp_sync_age(qint64 ageMs) const
+{
+  qint64 seconds = qMax<qint64>(0, ageMs / 1000);
+  if (seconds < 60) return QString("%1s").arg(seconds);
+
+  qint64 minutes = seconds / 60;
+  if (minutes < 60) return QString("%1m").arg(minutes);
+
+  qint64 hours = minutes / 60;
+  if (hours < 24) return QString("%1h").arg(hours);
+
+  qint64 days = hours / 24;
+  return QString("%1d").arg(days);
+}
+
+void MainWindow::update_ntp_status_display(bool force)
+{
+  qint64 nowMs = preciseCurrentMSecsSinceEpoch();
+  if (!force && (nowMs - m_ntpLastUiRefreshMs) < 1000) return;
+  m_ntpLastUiRefreshMs = nowMs;
+
+  if (!m_ntpEnabled) {
+    ntp_status_label.setText("NTP: OFF");
+    ntp_status_label.setStyleSheet("QLabel{color:#888;background:#333}");
+    ntp_status_label.setToolTip("NTP disabled");
+    return;
+  }
+
+  if (m_ntpLastSyncEpochMs > 0) {
+    qint64 ageMs = qMax<qint64>(0, nowMs - m_ntpLastSyncEpochMs);
+    int rounded = qRound(m_ntpOffset_ms);
+    QString ageText = format_ntp_sync_age(ageMs);
+    QString text = QString("NTP:%1%2ms %3")
+      .arg(rounded > 0 ? "+" : "")
+      .arg(rounded)
+      .arg(ageText);
+    ntp_status_label.setText(text);
+
+    if (m_ntpSyncedNow) {
+      if (qAbs(m_ntpOffset_ms) < 100)
+        ntp_status_label.setStyleSheet("QLabel{color:#000;background:#00ff00}");
+      else if (qAbs(m_ntpOffset_ms) < 500)
+        ntp_status_label.setStyleSheet("QLabel{color:#000;background:#ffff00}");
+      else
+        ntp_status_label.setStyleSheet("QLabel{color:#fff;background:#ff0000}");
+    } else {
+      ntp_status_label.setStyleSheet("QLabel{color:#000;background:#ffb347}");
+    }
+
+    QString tooltip = m_ntpStatusText;
+    QString syncedAt = QDateTime::fromMSecsSinceEpoch(m_ntpLastSyncEpochMs, Qt::UTC)
+      .toString("yyyy-MM-dd HH:mm:ss 'UTC'");
+    if (!tooltip.isEmpty()) tooltip += "\n";
+    tooltip += QString("Last sync: %1\nAge: %2").arg(syncedAt, ageText);
+    ntp_status_label.setToolTip(tooltip);
+    return;
+  }
+
+  bool hasFailure = !m_ntpStatusText.isEmpty() && !m_ntpSyncedNow;
+  ntp_status_label.setText(hasFailure ? "NTP: no sync" : "NTP: --");
+  ntp_status_label.setStyleSheet("QLabel{color:#888;background:#333}");
+  ntp_status_label.setToolTip(hasFailure ? m_ntpStatusText : "NTP waiting for first sync");
+}
+
 void MainWindow::onNtpOffsetUpdated(double offsetMs)
 {
+  if (!m_ntpEnabled) return;
   m_ntpOffset_ms = offsetMs;
-  int rounded = qRound(offsetMs);
-  QString text = QString("NTP:%1%2ms").arg(rounded > 0 ? "+" : "").arg(rounded);
-  ntp_status_label.setText(text);
-  if(qAbs(offsetMs) < 100)
-    ntp_status_label.setStyleSheet("QLabel{color:#000;background:#00ff00}");
-  else if(qAbs(offsetMs) < 500)
-    ntp_status_label.setStyleSheet("QLabel{color:#000;background:#ffff00}");
-  else
-    ntp_status_label.setStyleSheet("QLabel{color:#fff;background:#ff0000}");
+  m_ntpSyncedNow = true;
+  m_ntpLastSyncEpochMs = preciseCurrentMSecsSinceEpoch();
+  update_ntp_status_display(true);
 }
 
 void MainWindow::onNtpSyncStatusChanged(bool synced, QString const& statusText)
 {
-  if(!synced) {
-    ntp_status_label.setText("NTP: no sync");
-    ntp_status_label.setStyleSheet("QLabel{color:#888;background:#333}");
+  if (!m_ntpEnabled) return;
+  m_ntpSyncedNow = synced;
+  m_ntpStatusText = statusText;
+  if (synced) {
+    m_ntpLastSyncEpochMs = preciseCurrentMSecsSinceEpoch();
   }
-  ntp_status_label.setToolTip(statusText);
+  update_ntp_status_display(true);
 }

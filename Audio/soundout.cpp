@@ -29,7 +29,10 @@ bool SoundOutput::checkStream () const
         break;
 
       case QAudio::UnderrunError:
-        Q_EMIT error (tr ("Audio data not being fed to the audio output device fast enough."));
+        // Treat underruns as recoverable: reporting them as fatal can
+        // invalidate the selected output device on transient glitches.
+        Q_EMIT status (tr ("Audio output underrun"));
+        result = true;
         break;
 
       case QAudio::FatalError:

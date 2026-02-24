@@ -9,8 +9,8 @@ Usage:
                                  [--codesign-identity "-"]
 
 Examples:
-  scripts/release-macos.sh v1.0.3
-  scripts/release-macos.sh v1.0.3 --publish --repo elisir80/decodium3-build-macos
+  scripts/release-macos.sh v1.1.0
+  scripts/release-macos.sh v1.1.0 --publish --repo elisir80/decodium3-build-macos
 
 What it does:
   1) Configures the project in ./build
@@ -329,9 +329,22 @@ if [[ "$PUBLISH" -eq 1 ]]; then
 # Decodium 3 FT2 ${VERSION} (macOS)
 
 ## English (UK)
-Incremental release for the macOS fork.
+This release includes:
+- Audio output auto-rebind recovery on runtime failures (prevents silent TX after transient device glitches).
+- Improved output-device resilience for underruns (non-fatal handling).
+- UDP/network interface reliability improvements (preserve selected interfaces even when temporarily unavailable).
+- NTP protocol hardening (query de-duplication, timestamp validation, stale DNS lookup filtering, better fallback state handling).
+- NTP status bar improvements: offset + last sync age with clearer status/tooltip behavior.
+- DT timing improvements for remote stations:
+  configurable DT clamp limits in Settings -> Advanced, with independent synced/unsynced limits and dedicated enable checkbox.
+- Local and release configuration updates for fork version \`${VERSION}\`.
+- Release targets:
+  Apple Silicon build for macOS Sequoia/Tahoe and Intel build for macOS Sequoia.
 
-Refer to \`CHANGELOG.md\` in the repository for detailed release changes.
+If the app does not start on macOS, run from Terminal:
+\`xattr -r -d com.apple.quarantine /Applications/ft2.app\`
+
+See \`CHANGELOG.md\` for full details.
 
 Assets:
 - \`${DMG_OUT}\`
@@ -340,9 +353,27 @@ Assets:
 - \`${SHA_OUT}\`
 
 ## Italiano
-Release incrementale del fork macOS.
+Questa release include:
+- Recupero automatico (auto-rebind) dell'uscita audio in caso di errori runtime
+  (evita TX muta dopo glitch temporanei del device).
+- Maggiore robustezza delle periferiche audio in uscita sugli underrun
+  (gestione non-fatal).
+- Miglioramenti affidabilita' UDP/interfacce di rete
+  (le interfacce selezionate restano visibili anche se temporaneamente non disponibili).
+- Robustezza NTP migliorata (de-duplicazione query, validazione timestamp,
+  filtro lookup DNS stale, stato fallback piu' coerente).
+- Miglioramenti UI NTP: offset + eta' dell'ultima sincronizzazione con stato/tooltip piu' chiari.
+- Miglioramenti timing DT per stazioni remote:
+  limiti DT configurabili in Impostazioni -> Avanzate, con limiti separati synced/unsynced
+  e checkbox dedicata di attivazione.
+- Aggiornamenti configurazione locale/release alla versione fork \`${VERSION}\`.
+- Target release:
+  build Apple Silicon per macOS Sequoia/Tahoe e build Intel per macOS Sequoia.
 
-Per i dettagli delle modifiche, vedi \`CHANGELOG.md\` nel repository.
+Se l'app non si avvia su macOS, esegui da Terminale:
+\`xattr -r -d com.apple.quarantine /Applications/ft2.app\`
+
+Per i dettagli completi, vedi \`CHANGELOG.md\`.
 
 Asset:
 - \`${DMG_OUT}\`
