@@ -3,6 +3,7 @@
 
 #include <QAudio>
 #include <QAudioOutput>
+#include <QAudioInput>
 #include <QSound>
 #include <QCoreApplication>
 #include <cinttypes>
@@ -36,6 +37,7 @@
 #include <QUrl>
 #include <QStandardPaths>
 #include <QDir>
+#include <QFileInfo>
 #include <QDebug>
 #include <QtConcurrent/QtConcurrentRun>
 #include <QProgressDialog>
@@ -319,6 +321,15 @@ namespace
   constexpr int default_rx_audio_buffer_frames {-1}; // lets Qt decide
   constexpr int default_tx_audio_buffer_frames {16384}; // ~341ms @ 48kHz, prevents underrun on Windows
 
+  bool tx_support_verbose_enabled ()
+  {
+    static bool const enabled = [] () {
+      auto const raw = QString::fromLocal8Bit (qgetenv ("FT2_TX_VERBOSE_LOG")).trimmed ().toLower ();
+      return raw == "1" || raw == "true" || raw == "yes" || raw == "on";
+    }();
+    return enabled;
+  }
+
   bool message_is_73 (int type, QStringList const& msg_parts)
   {
     return type >= 0
@@ -375,6 +386,7 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   m_rx_audio_buffer_frames {0},
   m_tx_audio_buffer_frames {0},
   m_last_tx_audio_rebind_ms {0},
+  m_ptt_request_ms {0},
   m_msErase {0},
   m_secBandChanged {0},
   m_msDecStarted {0}, //ft8md
@@ -629,6 +641,12 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   // hook up sound output stream slots & signals and disposal
   connect (this, &MainWindow::initializeAudioOutputStream, m_soundOutput, &SoundOutput::setFormat);
   connect (m_soundOutput, &SoundOutput::error, this, &MainWindow::showSoundOutError);
+  connect (m_soundOutput, &SoundOutput::status, this, [this] (QString const& s) {
+      if (tx_support_verbose_enabled ())
+        {
+          tx_support_log (QString {"soundOut status: %1"}.arg (s));
+        }
+    });
   // Keep the selected output device on transient runtime errors
   // (e.g. short underruns on macOS) to avoid ending up with muted TX.
   // connect (m_soundOutput, &SoundOutput::status, this, &MainWindow::showStatusMessage);
@@ -640,6 +658,22 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   connect (this, &MainWindow::endTransmitMessage, m_modulator, &Modulator::stop);
   connect (this, &MainWindow::tune, m_modulator, &Modulator::tune);
   connect (this, &MainWindow::sendMessage, m_modulator, &Modulator::start);
+  connect (m_modulator, &Modulator::stateChanged, this, [this] (Modulator::ModulatorState s) {
+      if (!tx_support_verbose_enabled ())
+        {
+          return;
+        }
+      QString state = "Idle";
+      if (Modulator::Synchronizing == s) state = "Synchronizing";
+      else if (Modulator::Active == s) state = "Active";
+      tx_support_log (
+        QString {"modulator state=%1 mode=%2 ntx=%3 iptt=%4"}
+          .arg (state)
+          .arg (m_mode)
+          .arg (m_ntx)
+          .arg (g_iptt)
+      );
+    });
   connect (&m_audioThread, &QThread::finished, m_modulator, &QObject::deleteLater);
 
   // hook up the audio input stream signals, slots and disposal
@@ -938,20 +972,6 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   ui->actionMSK144->setActionGroup(modeGroup);
   ui->actionQ65->setActionGroup(modeGroup);
   ui->actionFreqCal->setActionGroup(modeGroup);
-
-  // Decodium FT2-only: hide all non-FT2 mode actions
-  ui->actionFST4->setVisible(false);
-  ui->actionFST4W->setVisible(false);
-  ui->actionFT4->setVisible(false);
-  ui->actionFT8->setVisible(false);
-  ui->actionJT9->setVisible(false);
-  ui->actionJT65->setVisible(false);
-  ui->actionJT4->setVisible(false);
-  ui->actionWSPR->setVisible(false);
-  ui->actionEcho->setVisible(false);
-  ui->actionMSK144->setVisible(false);
-  ui->actionQ65->setVisible(false);
-  ui->actionFreqCal->setVisible(false);
 
   QActionGroup* saveGroup = new QActionGroup(this);
   ui->actionNone->setActionGroup(saveGroup);
@@ -1346,8 +1366,10 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
 
   to_jt9(0,0,0);     //initialize IPC variables
 
+  auto jt9_shm_key = mem_jt9->key ();
+
   QStringList jt9_args {
-    "-s", QApplication::applicationName () // shared memory key,
+    "-s", jt9_shm_key // shared memory key,
                                            // includes rig
 #ifdef NDEBUG
       , "-w", "1"               //FFTW patience - release
@@ -1386,6 +1408,9 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   m_tci_audio = (m_config.tci_audio() && m_config.is_tci());
 
   if (!m_tci_audio) {
+#ifdef Q_OS_MAC
+    prime_microphone_permission_prompt ();
+#endif
     if (!m_config.audio_input_device ().isNull ())
       {
         Q_EMIT startAudioInputStream (m_config.audio_input_device ()
@@ -1528,10 +1553,7 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   splashTimer.setSingleShot (true);
   splashTimer.start (20 * 1000);
 
-  if(QCoreApplication::applicationVersion().contains("-devel") or
-     QCoreApplication::applicationVersion().contains("-rc")) {
-    QTimer::singleShot (0, this, SLOT (not_GA_warning_message ()));
-  }
+  // FT2 fork: disable startup pre-release popup.
 
   m_bMyCallStd=stdCall(m_config.my_callsign ()); //ft8md
   m_bHisCallStd=stdCall(m_hisCall); //ft8md
@@ -1597,19 +1619,6 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
 
 // this must be the last statement of constructor
   if (!m_valid) throw std::runtime_error {"Fatal initialization exception"};
-}
-
-void MainWindow::not_GA_warning_message ()
-{
-  if(m_config.my_callsign()=="IU8LMC") return;    //IU8LMC mod
-  MessageBox::critical_message (this,
-                                "This is a pre-release version of Decodium v3.0 FT2 Raptor " + version (false) + " made\n"
-                                "available for testing purposes.  By design it will\n"
-                                "be nonfunctional after April 30, 2026.");
-  auto now = QDateTime::currentDateTimeUtc ();
-  if (now >= QDateTime {{2026, 4, 30}, {23, 59, 59, 999}, Qt::UTC}) {
-    Q_EMIT finished ();
-  }
 }
 
 void MainWindow::handle_leavingSettings ()
@@ -1985,7 +1994,7 @@ void MainWindow::readSettings()
   m_settings->endGroup();
 
   m_settings->beginGroup("Common");
-  m_mode="FT2";  // Decodium FT2-only: always force FT2 mode
+  m_mode=m_settings->value("Mode","FT8").toString();
   m_settings->endGroup();
 
   // do this outside of settings group because it uses groups internally
@@ -2222,8 +2231,16 @@ void MainWindow::readSettings()
   ui->cbNoOwnCall->setChecked(m_settings->value("NoOwnCall",false).toBool());
   ui->band_hopping_group_box->setChecked (m_settings->value ("BandHopping", false).toBool());
   // setup initial value of tx attenuator
+  // Guard against inherited/corrupted extreme values that can mute TX audio.
+  int outAttenuationValue = m_settings->value ("OutAttenuation", 0).toInt ();
+  if (outAttenuationValue > 400)
+    {
+      LOG_WARN (QString {"OutAttenuation=%1 too high; forcing 0 to avoid silent TX"}.arg (outAttenuationValue).toStdString ());
+      outAttenuationValue = 0;
+      m_settings->setValue ("OutAttenuation", outAttenuationValue);
+    }
   m_block_pwr_tooltip = true;
-  ui->outAttenuation->setValue (m_settings->value ("OutAttenuation", 0).toInt ());
+  ui->outAttenuation->setValue (outAttenuationValue);
   m_block_pwr_tooltip = false;
   ui->sbCQTxFreq->setValue (m_settings->value ("CQTxFreq", 260).toInt());
   m_noSuffix=m_settings->value("NoSuffix",false).toBool();
@@ -3732,6 +3749,91 @@ void MainWindow::showSoundInError(const QString& errorMsg)
   MessageBox::critical_message (this, tr ("Error in Sound Input"), errorMsg);
 }
 
+void MainWindow::tx_support_log (QString const& message)
+{
+  QString const file_path = m_config.writeable_data_dir ().absoluteFilePath ("tx-support.log");
+  QFileInfo info {file_path};
+  if (info.exists () && info.size () > (1024 * 1024))
+    {
+      QString const rotated_path = file_path + ".1";
+      QFile::remove (rotated_path);
+      QFile::rename (file_path, rotated_path);
+    }
+
+  QFile output_file {file_path};
+  if (!output_file.open (QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
+    {
+      return;
+    }
+
+  QTextStream out_stream {&output_file};
+  out_stream << QDateTime::currentDateTimeUtc ().toString ("yyyy-MM-dd HH:mm:ss.zzz") << "Z "
+             << message << Qt::endl;
+}
+
+void MainWindow::stop_modulator_sync (bool quick)
+{
+  if (!m_modulator)
+    {
+      return;
+    }
+
+  bool ok = QMetaObject::invokeMethod (m_modulator, "stop"
+                                       , Qt::BlockingQueuedConnection
+                                       , Q_ARG (bool, quick));
+  if (!ok)
+    {
+      tx_support_log ("modulator stop sync failed; fallback signal emit");
+      Q_EMIT endTransmitMessage (quick);
+    }
+}
+
+void MainWindow::prime_microphone_permission_prompt ()
+{
+#ifdef Q_OS_MAC
+  QAudioDeviceInfo input_device = m_config.audio_input_device ();
+  if (input_device.isNull ())
+    {
+      input_device = QAudioDeviceInfo::defaultInputDevice ();
+    }
+  if (input_device.isNull ())
+    {
+      tx_support_log ("mic-prime skipped: no audio input device");
+      return;
+    }
+
+  QAudioFormat format = input_device.preferredFormat ();
+  if (!format.isValid ())
+    {
+      tx_support_log (QString {"mic-prime skipped: invalid preferred format on \"%1\""}
+                        .arg (input_device.deviceName ()));
+      return;
+    }
+  if (!input_device.isFormatSupported (format))
+    {
+      format = input_device.nearestFormat (format);
+      if (!format.isValid ())
+        {
+          tx_support_log (QString {"mic-prime skipped: unsupported format on \"%1\""}
+                            .arg (input_device.deviceName ()));
+          return;
+        }
+    }
+
+  QAudioInput probe_input {input_device, format, this};
+  probe_input.setNotifyInterval (50);
+  auto * probe_io = probe_input.start ();
+  tx_support_log (QString {"mic-prime start device=\"%1\" ok=%2"}
+                    .arg (input_device.deviceName ())
+                    .arg (probe_io ? "1" : "0"));
+  if (probe_io)
+    {
+      probe_io->close ();
+    }
+  probe_input.stop ();
+#endif
+}
+
 void MainWindow::log_audio_rebind_event (QString const& message, bool warning)
 {
   QString tagged = QString {"AudioRebind: %1"}.arg (message);
@@ -3744,6 +3846,7 @@ void MainWindow::log_audio_rebind_event (QString const& message, bool warning)
       LOG_INFO (tagged.toStdString ());
     }
   debugToFile (QString {"audioRebind  %1"}.arg (message));
+  tx_support_log (QString {"audioRebind  %1"}.arg (message));
 }
 
 QAudioDeviceInfo MainWindow::select_audio_output_rebind_device ()
@@ -4001,6 +4104,20 @@ void MainWindow::on_actionSettings_triggered()           // Setup Dialog (Settin
                                             , m_tx_audio_buffer_frames);
       }
     }
+    tx_support_log (
+      QString {"settings accepted in=%1 out=%2 inCh=%3 outCh=%4 tciAudio=%5 restartIn=%6 restartOut=%7"}
+        .arg (m_config.audio_input_device ().isNull ()
+                ? QString {"<null>"}
+                : m_config.audio_input_device ().deviceName ())
+        .arg (m_config.audio_output_device ().isNull ()
+                ? QString {"<null>"}
+                : m_config.audio_output_device ().deviceName ())
+        .arg (int (m_config.audio_input_channel ()))
+        .arg (int (m_config.audio_output_channel ()))
+        .arg (m_tci_audio)
+        .arg (m_config.restart_audio_input ())
+        .arg (m_config.restart_audio_output ())
+    );
     if (was_monitoring && (m_config.restart_tci () or !m_tci_audio) && !m_monitoring && !m_transmitting && g_iptt!=1) {
       if(m_mode=="MSK144") {
         if (m_tci_audio) {
@@ -6453,14 +6570,23 @@ void MainWindow::applyDtFeedback()
     // amplified oscillations when combined with NTP feedback. Simple proportional
     // correction is more stable with 3.75s FT2 periods.
     double correctionStep = -m_avgDtValue * 1000.0 * m_dtSmoothFactor;
+    bool const ntpStable =
+        m_ntpEnabled
+        && m_ntpClient
+        && m_ntpClient->isSynced()
+        && qAbs(m_ntpOffset_ms) < 100.0;
+    if (m_mode == "FT2" && ntpStable) {
+      // If NTP is healthy, DT feedback must stay conservative.
+      correctionStep *= 0.45;
+    }
 
     // Clamp correction step — tighter for FT2 (short period, small steps safer)
-    double maxStep = (m_mode == "FT2") ? 30.0 : 50.0;
+    double maxStep = (m_mode == "FT2") ? (ntpStable ? 15.0 : 30.0) : 50.0;
     correctionStep = qBound(-maxStep, correctionStep, maxStep);
     m_dtCorrection_ms += correctionStep;
 
     // Clamp total correction — tighter for FT2 (should never be far off sync)
-    double maxTotal = (m_mode == "FT2") ? 300.0 : 500.0;
+    double maxTotal = (m_mode == "FT2") ? (ntpStable ? 180.0 : 300.0) : 500.0;
     m_dtCorrection_ms = qBound(-maxTotal, m_dtCorrection_ms, maxTotal);
 
     // DT correction is computed for TimeSyncPanel display only — NOT applied
@@ -6480,6 +6606,21 @@ void MainWindow::applyDtFeedback()
     } else {
       m_ntpDtDivergenceCount = 0;
     }
+  } else if (m_dtFeedbackEnabled && !m_diskData) {
+    // No fresh DT samples this cycle: decay historical correction so UI
+    // does not stay pinned at clamp limits after transient conditions.
+    if (qAbs(m_dtCorrection_ms) < 0.5) {
+      m_dtCorrection_ms = 0.0;
+    } else {
+      // Decay faster when NTP appears healthy.
+      double decay = 0.92;
+      if (m_ntpEnabled && m_ntpClient && m_ntpClient->isSynced() && qAbs(m_ntpOffset_ms) < 100.0) {
+        decay = 0.85;
+      }
+      m_dtCorrection_ms *= decay;
+    }
+    // Keep the averaged DT from becoming stale forever.
+    m_avgDtValue *= 0.9;
   }
 
   // Calculate decode latency
@@ -6501,20 +6642,25 @@ void MainWindow::applyDtFeedback()
       m_dtSmoothFactor);
   }
 
-  // Update status bar DT label with actual DT info
-  if (m_dtLastSampleCount > 0) {
-    QString text = QString("DT:%1%2ms(%3)")
-      .arg(m_dtCorrection_ms > 0 ? "+" : "")
-      .arg(m_dtCorrection_ms, 0, 'f', 1)
-      .arg(m_dtLastSampleCount);
-    dt_correction_label.setText(text);
-    // Color based on convergence quality
-    if (qAbs(m_avgDtValue) < 0.1)
-      dt_correction_label.setStyleSheet("QLabel{color:#000;background:#00ff00}");
-    else if (qAbs(m_avgDtValue) < 0.3)
-      dt_correction_label.setStyleSheet("QLabel{color:#000;background:#ffff00}");
-    else
-      dt_correction_label.setStyleSheet("QLabel{color:#fff;background:#ff0000}");
+  // Update status bar DT label.
+  // Color now reflects both instantaneous DT quality and accumulated correction.
+  QString text = QString("DT:%1%2ms(%3)")
+    .arg(m_dtCorrection_ms > 0 ? "+" : "")
+    .arg(m_dtCorrection_ms, 0, 'f', 1)
+    .arg(m_dtLastSampleCount);
+  dt_correction_label.setText(text);
+
+  double absAvgDt = qAbs(m_avgDtValue);
+  double absCorr = qAbs(m_dtCorrection_ms);
+  bool corrLarge = absCorr >= 220.0;
+  bool corrMedium = absCorr >= 120.0;
+
+  if (!corrLarge && absAvgDt < 0.1 && absCorr < 80.0) {
+    dt_correction_label.setStyleSheet("QLabel{color:#000;background:#00ff00}");
+  } else if (!corrLarge && !corrMedium && absAvgDt < 0.3) {
+    dt_correction_label.setStyleSheet("QLabel{color:#000;background:#ffff00}");
+  } else {
+    dt_correction_label.setStyleSheet("QLabel{color:#fff;background:#ff0000}");
   }
 
   m_dtSamples.clear();
@@ -8408,10 +8554,10 @@ void MainWindow::guiUpdate()
     tx2 += m_TRperiod;
   }
 
-  // Use precise system time + DT feedback correction + NTP offset
-  // DT > 0 means signals arrive late → our clock is FAST → subtract correction
-  // NTP offset > 0 means our clock is ahead of UTC → subtract offset
-  qint64 ms = (preciseCurrentMSecsSinceEpoch() - qRound64(m_ntpOffset_ms)) % 86400000;
+  // Keep TX/RX slot scheduling on raw system time.
+  // NTP offset is for monitoring/diagnostics and must not phase-shift
+  // the real-time transmit scheduler.
+  qint64 ms = preciseCurrentMSecsSinceEpoch() % 86400000;
   if(ms < 0) ms += 86400000;  // handle negative modulo
   int nsec=ms/1000;
   double tsec=0.001*ms;
@@ -8587,8 +8733,33 @@ void MainWindow::guiUpdate()
       }
 
       setXIT (ui->TxFreqSpinBox->value ());
+      m_ptt_request_ms = QDateTime::currentMSecsSinceEpoch ();
+      tx_support_log (
+        QString {"ptt request mode=%1 ntx=%2 tune=%3 txFreq=%4 fTR=%5"}
+          .arg (m_mode)
+          .arg (m_ntx)
+          .arg (m_tune)
+          .arg (ui->TxFreqSpinBox->value () - m_XIT)
+          .arg (fTR, 0, 'f', 3)
+      );
       m_config.transceiver_ptt (true); //Assert the PTT
       m_tx_when_ready = true;
+      // Some CAT backends may report PTT active with variable delay.
+      // If the acknowledgement is late, FT2 can start too far into slot.
+      // Fallback: start audio anyway after a short guard time.
+      QTimer::singleShot (200, [this] () {
+          if (m_tx_when_ready && g_iptt)
+            {
+              auto lag_ms = m_ptt_request_ms > 0
+                ? QDateTime::currentMSecsSinceEpoch () - m_ptt_request_ms
+                : -1;
+              tx_support_log (
+                QString {"ptt fallback start (no rig ack yet), lagMs=%1"}.arg (lag_ms)
+              );
+              ptt1Timer.start (0);
+              m_tx_when_ready = false;
+            }
+        });
     }
 //    if(!m_bTxTime and !m_tune and m_mode!="FT4") m_btxok=false;       //Time to stop transmitting
     if(!m_bTxTime and !m_tune) m_btxok=false;       //Time to stop transmitting
@@ -9338,46 +9509,100 @@ void MainWindow::useNextCall()
 
 void MainWindow::startTx2()
 {    
-  bool modulator_active;
   bool tci_active = m_tci_audio;
-  if (tci_active) modulator_active=m_tci_mod_active;
-  else modulator_active=m_modulator->isActive ();
-    if (!modulator_active) { // TODO - not thread safe
-    double fSpread=0.0;
-    double snr=99.0;
-    QString t=ui->tx5->currentText();
-    if(t.mid(0,1)=="#") fSpread=t.mid(1,5).toDouble();
-    if (tci_active) Q_EMIT m_config.transceiver_spread(fSpread);
-    else m_modulator->setSpread(fSpread); // TODO - not thread safe
-    t=ui->tx6->text();
-    if(t.mid(0,1)=="#") snr=t.mid(1,5).toDouble();
-    if(snr>0.0 or snr < -50.0) snr=99.0;
-    if((m_ntx==6 or m_ntx==7) and m_config.force_call_1st() and
-       ui->respondComboBox->currentIndex()==0) {
-      ui->cbAutoSeq->setChecked(true);
-      ui->respondComboBox->setCurrentIndex(1);
-    }
-    transmit (snr);
-    ui->signal_meter_widget->setValue(0,0);
-    if(m_mode=="Echo" and !m_tune) m_bTransmittedEcho=true;
+  bool modulator_active = tci_active ? m_tci_mod_active : m_modulator->isActive (); // TODO - not thread safe
 
-    if((m_mode=="WSPR" or m_mode=="FST4W") and !m_tune) {
-      if (m_config.TX_messages ()) {
-        t = " Transmitting " + m_mode + " ----------------------- " +
-          m_config.bands ()->find (m_freqNominal);
-        t=beacon_start_time (m_TRperiod / 2) + ' ' + t.rightJustified (66, '-');
-        ui->decodedTextBrowser->insertText(t);
-      }
-      write_all("Tx",m_currentMessage);
-      if(m_position != 0) ui->decodedTextBrowser->horizontalScrollBar()->setValue(m_position);
+  if (tx_support_verbose_enabled ())
+    {
+      tx_support_log (
+        QString {"startTx2 enter mode=%1 ntx=%2 tx=%3 tune=%4 iptt=%5 tci=%6 modActive=%7 msg=\"%8\""}
+          .arg (m_mode)
+          .arg (m_ntx)
+          .arg (m_transmitting)
+          .arg (m_tune)
+          .arg (g_iptt)
+          .arg (tci_active)
+          .arg (modulator_active)
+          .arg (m_currentMessage.left (64))
+      );
     }
+
+  if (modulator_active)
+    {
+      // Recover from stale active-state detections that can mute FT2 from second TX onward.
+      tx_support_log ("startTx2 forcing modulator restart due to active state");
+      if (tci_active)
+        {
+          Q_EMIT m_config.transceiver_modulator_stop (true);
+          m_tci_mod_active = false;
+        }
+      else
+        {
+          stop_modulator_sync (true);
+        }
+    }
+
+  double fSpread=0.0;
+  double snr=99.0;
+  QString t=ui->tx5->currentText();
+  if(t.mid(0,1)=="#") fSpread=t.mid(1,5).toDouble();
+  if (tci_active) Q_EMIT m_config.transceiver_spread(fSpread);
+  else m_modulator->setSpread(fSpread); // TODO - not thread safe
+  t=ui->tx6->text();
+  if(t.mid(0,1)=="#") snr=t.mid(1,5).toDouble();
+  if(snr>0.0 or snr < -50.0) snr=99.0;
+  if((m_ntx==6 or m_ntx==7) and m_config.force_call_1st() and
+     ui->respondComboBox->currentIndex()==0) {
+    ui->cbAutoSeq->setChecked(true);
+    ui->respondComboBox->setCurrentIndex(1);
+  }
+  if (tx_support_verbose_enabled ())
+    {
+      tx_support_log (
+        QString {"startTx2 transmit snr=%1 spread=%2 txFreq=%3 outDev=\"%4\" outCh=%5"}
+          .arg (snr, 0, 'f', 2)
+          .arg (fSpread, 0, 'f', 2)
+          .arg (ui->TxFreqSpinBox->value () - m_XIT)
+          .arg (m_config.audio_output_device ().isNull ()
+                  ? QString {"<null>"}
+                  : m_config.audio_output_device ().deviceName ())
+          .arg (int (m_config.audio_output_channel ()))
+      );
+    }
+  transmit (snr);
+  ui->signal_meter_widget->setValue(0,0);
+  if(m_mode=="Echo" and !m_tune) m_bTransmittedEcho=true;
+
+  if((m_mode=="WSPR" or m_mode=="FST4W") and !m_tune) {
+    if (m_config.TX_messages ()) {
+      t = " Transmitting " + m_mode + " ----------------------- " +
+        m_config.bands ()->find (m_freqNominal);
+      t=beacon_start_time (m_TRperiod / 2) + ' ' + t.rightJustified (66, '-');
+      ui->decodedTextBrowser->insertText(t);
+    }
+    write_all("Tx",m_currentMessage);
+    if(m_position != 0) ui->decodedTextBrowser->horizontalScrollBar()->setValue(m_position);
   }
 }
 
 void MainWindow::stopTx()
 {
+  // Cancel any pending delayed start from a previous PTT cycle.
+  ptt1Timer.stop ();
+  m_tx_when_ready = false;
+  m_ptt_request_ms = 0;
+  if (tx_support_verbose_enabled ())
+    {
+      tx_support_log (
+        QString {"stopTx tx=%1 tune=%2 iptt=%3 tci=%4"}
+          .arg (m_transmitting)
+          .arg (m_tune)
+          .arg (g_iptt)
+          .arg (m_tci_audio)
+      );
+    }
   if (m_tci_audio) Q_EMIT m_config.transceiver_modulator_stop();
-  else Q_EMIT endTransmitMessage ();
+  else stop_modulator_sync (false);
   m_btxok = false;
   m_transmitting = false;
   if (m_worldMapWidget)
@@ -9400,6 +9625,20 @@ void MainWindow::stopTx()
 
 void MainWindow::stopTx2()
 {
+  // Ensure no stale delayed-start survives the Tx teardown path.
+  ptt1Timer.stop ();
+  m_tx_when_ready = false;
+  m_ptt_request_ms = 0;
+  if (tx_support_verbose_enabled ())
+    {
+      tx_support_log (
+        QString {"stopTx2 tx=%1 tune=%2 iptt=%3 tci=%4"}
+          .arg (m_transmitting)
+          .arg (m_tune)
+          .arg (g_iptt)
+          .arg (m_tci_audio)
+      );
+    }
   if (m_tci_audio) {
       Q_EMIT m_config.transceiver_ptt (false);      //Lower PTT
       monitor (true);
@@ -12696,9 +12935,26 @@ void MainWindow::switch_mode (Mode mode)
       m_specOp=m_config.special_op_id();
       ui->tx1->setEnabled(true);
       ui->txb1->setEnabled(true);
-   }
+  }
   m_fastGraph->setMode(m_mode);
   m_config.frequencies ()->filter (m_config.region (), mode, true); // filter on current time
+
+  // Older WSJT-X profiles may have no FT2 entries; merge FT2 defaults so the band list is usable.
+  if (mode == Modes::FT2 && m_config.frequencies ()->rowCount () == 0) {
+    FrequencyList_v2_101 defaults {m_config.bands (), this};
+    defaults.reset_to_defaults ();
+    FrequencyList_v2_101::FrequencyItems ft2_defaults;
+    for (auto const& item : defaults.frequency_list ()) {
+      if (item.mode_ == Modes::FT2) {
+        ft2_defaults << item;
+      }
+    }
+    if (!ft2_defaults.isEmpty ()) {
+      m_config.frequencies ()->frequency_list_merge (ft2_defaults);
+      m_config.frequencies ()->filter (m_config.region (), mode, true);
+    }
+  }
+
   auto const& row = m_config.frequencies ()->best_working_frequency (m_freqNominal);
   if (!keep_frequency) {
       ui->bandComboBox->setCurrentIndex (row);
@@ -13290,6 +13546,21 @@ void MainWindow::on_stopTxButton_clicked()                    // Stop Tx
   if (m_enableButtonNotify) debugToFile(QString{});       //avt 10/2/25 by operator, not from a controller command
   debugToFile(QString{"on_stopTxBut by operator:%1"}.arg(m_enableButtonNotify));   //avt 2/2/24
   debugToFile(QString{"             autoButton m_autoButtonState:%1"}.arg(m_autoButtonState));   //avt 2/2/24
+  if (tx_support_verbose_enabled ())
+    {
+      tx_support_log (
+        QString {"stopTxButton clicked tx=%1 iptt=%2 txWhenReady=%3 pttTimerActive=%4"}
+          .arg (m_transmitting)
+          .arg (g_iptt)
+          .arg (m_tx_when_ready)
+          .arg (ptt1Timer.isActive ())
+      );
+    }
+
+  // Defensive cleanup: user can stop while PTT/audio start is still pending.
+  ptt1Timer.stop ();
+  m_tx_when_ready = false;
+  m_ptt_request_ms = 0;
 
   ui->pbBandHopping->setChecked(false); // disable band hopping
   if (m_tune) stop_tuning ();
@@ -13457,6 +13728,12 @@ void MainWindow::handle_transceiver_update (Transceiver::TransceiverState const&
     if (m_tx_when_ready && g_iptt) {    // waiting to Tx and still needed
       int ms_delay=1000*m_config.txDelay();
       if(m_mode=="FT2" or m_mode=="FT4") ms_delay=20;
+      auto lag_ms = m_ptt_request_ms > 0
+        ? QDateTime::currentMSecsSinceEpoch () - m_ptt_request_ms
+        : -1;
+      tx_support_log (
+        QString {"ptt ack received lagMs=%1 -> startTx2 in %2ms"}.arg (lag_ms).arg (ms_delay)
+      );
       ptt1Timer.start(ms_delay); //Start-of-transmission sequencer delay
       m_tx_when_ready = false;
     }
@@ -15160,7 +15437,7 @@ void MainWindow::WSPR_scheduling ()
     int n=t.right (1).toInt (&ok);
     if (!ok || 0 == n) return;
 
-    qint64 ms = (preciseCurrentMSecsSinceEpoch() - qRound64(m_ntpOffset_ms)) % 86400000;
+    qint64 ms = preciseCurrentMSecsSinceEpoch() % 86400000;
     if(ms < 0) ms += 86400000;  // handle negative modulo
     int nsec=ms/1000;
     int ntr=m_TRperiod;
@@ -16794,19 +17071,13 @@ void MainWindow::on_pbBestSP_clicked()
 
 void MainWindow::set_mode (QString const& mode)
 {
-    if ("FT2" == mode) on_actionFT2_triggered ();
-    else if ("FT4" == mode) on_actionFT4_triggered ();
-    else if ("FST4" == mode) on_actionFST4_triggered ();
-    else if ("FST4W" == mode) on_actionFST4W_triggered ();
-    else if ("FT8" == mode) on_actionFT8_triggered ();
-    else if ("JT4" == mode) on_actionJT4_triggered ();
-    else if ("JT9" == mode) on_actionJT9_triggered ();
-    else if ("JT65" == mode) on_actionJT65_triggered ();
-    else if ("Q65" == mode) on_actionQ65_triggered ();
-    else if ("FreqCal" == mode) on_actionFreqCal_triggered ();
-    else if ("MSK144" == mode) on_actionMSK144_triggered ();
-    else if ("WSPR" == mode) on_actionWSPR_triggered ();
-    else if ("Echo" == mode) on_actionEcho_triggered ();
+    if ("FT2" == mode) {
+      on_actionFT2_triggered ();
+    } else if ("FT2" != m_mode) {
+      on_actionFT2_triggered ();
+    } else {
+      ui->actionFT2->setChecked(true);
+    }
     initExternalCtrl();    //avt 12/5/20
 }
 
@@ -16831,9 +17102,13 @@ void MainWindow::remote_configure (QString const& mode, quint32 frequency_tolera
                                    , QString const& submode, bool fast_mode, quint32 tr_period, quint32 rx_df
                                    , QString const& dx_call, QString const& dx_grid, bool generate_messages)
 {
-  if (mode.size ())
+  if (mode.size () && mode != "FT2")
     {
-      if (mode != m_mode) set_mode (mode);
+      set_mode ("FT2");
+    }
+  else if (m_mode != "FT2")
+    {
+      set_mode ("FT2");
     }
   auto is_FST4W = "FST4W" == m_mode;
   if (frequency_tolerance != quint32_max && (ui->sbFtol->isVisible () || is_FST4W))
@@ -19632,8 +19907,18 @@ void MainWindow::onNtpOffsetUpdated(double offsetMs)
 void MainWindow::onNtpSyncStatusChanged(bool synced, QString const& statusText)
 {
   if(!synced) {
-    ntp_status_label.setText("NTP: no sync");
-    ntp_status_label.setStyleSheet("QLabel{color:#888;background:#333}");
+    if (m_ntpEnabled && qAbs(m_ntpOffset_ms) > 1.0) {
+      int rounded = qRound(m_ntpOffset_ms);
+      int srvCount = m_ntpClient ? m_ntpClient->lastServerCount() : 0;
+      ntp_status_label.setText(QString("NTP:hold %1%2ms(%3srv)")
+                               .arg(rounded > 0 ? "+" : "")
+                               .arg(rounded)
+                               .arg(srvCount));
+      ntp_status_label.setStyleSheet("QLabel{color:#000;background:#ffff00}");
+    } else {
+      ntp_status_label.setText("NTP: no sync");
+      ntp_status_label.setStyleSheet("QLabel{color:#888;background:#333}");
+    }
   }
   ntp_status_label.setToolTip(statusText);
 

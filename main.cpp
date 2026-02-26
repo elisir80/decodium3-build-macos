@@ -177,7 +177,9 @@ int main(int argc, char *argv[])
       std::locale::global (std::locale::classic ());
 
       // Override programs executable basename as application name.
-      a.setApplicationName ("WSJT-X");
+      // Keep a dedicated FT2 profile namespace (settings/data/temp) to avoid
+      // collisions with WSJT-X profiles and preserve ft2.ini behavior.
+      a.setApplicationName ("ft2");
       a.setApplicationVersion (version ());
 
       QCommandLineParser parser;

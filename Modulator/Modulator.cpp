@@ -53,6 +53,14 @@ void Modulator::start (QString mode, unsigned symbolsLength, double framesPerSym
 {
   // qDebug () << "mode:" << mode << "symbolsLength:" << symbolsLength << "framesPerSymbol:" << framesPerSymbol << "frequency:" << frequency << "toneSpacing:" << toneSpacing << "channel:" << channel << "synchronize:" << synchronize << "fastMode:" << fastMode << "dBSNR:" << dBSNR << "TRperiod:" << TRperiod;
   Q_ASSERT (stream);
+  // FT2 stability guard: keep encoder/modulator contract fixed even if
+  // a stale/incorrect queued start slips through.
+  if (mode == "FT2")
+    {
+      symbolsLength = 105;
+      framesPerSymbol = 288.0;
+      toneSpacing = -2.0;
+    }
 // Time according to this computer which becomes our base time
   qint64 ms0 = QDateTime::currentMSecsSinceEpoch() % 86400000;
   unsigned mstr = ms0 % int(1000.0*m_period); // ms into the nominal Tx start time

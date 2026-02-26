@@ -48,9 +48,11 @@ project (wsjtx
   VERSION 3.0.0.0
   LANGUAGES C CXX Fortran
   )
-set (PROJECT_DESCRIPTION "Decodium v3.0 SE KP5/NP3VI: Digital Modes for Weak Signal Communications in Amateur Radio")
+set (PROJECT_DESCRIPTION "Decodium v3.0 SE Raptor: Digital Modes for Weak Signal Communications in Amateur Radio")
 set (CMAKE_PROJECT_DESCRIPTION ${PROJECT_DESCRIPTION})
 set (CMAKE_AUTOUIC ON)
+set (WSJT_APP_BUNDLE_NAME "ft2")
+set (WSJT_APP_EXECUTABLE_NAME "ft2")
 
 #
 # Local CMake modules and support files
@@ -78,7 +80,7 @@ set (wsjtx_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_
 #
 # project information
 #
-set (PROJECT_BUNDLE_NAME "Decodium v3.0 SE DXpedition KP5/NP3VI")
+set (PROJECT_BUNDLE_NAME "Decodium v3.0 SE")
 set (PROJECT_VENDOR "IU8LMC")
 set (PROJECT_CONTACT "IU8LMC <qrz.com/db/IU8LMC>")
 set (PROJECT_COPYRIGHT "See Help | Copyright info")
@@ -147,8 +149,8 @@ attach a debugger which will then receive the console output inside its console.
 #
 
 if (APPLE)
-  set (CMAKE_INSTALL_BINDIR ${CMAKE_PROJECT_NAME}.app/Contents/MacOS)
-  set (CMAKE_INSTALL_DATAROOTDIR ${CMAKE_PROJECT_NAME}.app/Contents/Resources)
+  set (CMAKE_INSTALL_BINDIR ${WSJT_APP_BUNDLE_NAME}.app/Contents/MacOS)
+  set (CMAKE_INSTALL_DATAROOTDIR ${WSJT_APP_BUNDLE_NAME}.app/Contents/Resources)
 endif ()
 
 include (GNUInstallDirs)
@@ -1616,6 +1618,7 @@ if (WSJT_CREATE_WINMAIN)
 endif (WSJT_CREATE_WINMAIN)
 
 set_target_properties (wsjtx PROPERTIES
+  OUTPUT_NAME "${WSJT_APP_EXECUTABLE_NAME}"
   MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Darwin/Info.plist.in"
   MACOSX_BUNDLE_INFO_STRING "${PROJECT_DESCRIPTION}"
   MACOSX_BUNDLE_ICON_FILE "${WSJTX_ICON_FILE}"
@@ -1623,9 +1626,9 @@ set_target_properties (wsjtx PROPERTIES
   MACOSX_BUNDLE_SHORT_VERSION_STRING "v${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}"
   MACOSX_BUNDLE_LONG_VERSION_STRING "Version ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}${SCS_VERSION_STR}"
   MACOSX_BUNDLE_BUNDLE_NAME "${PROJECT_BUNDLE_NAME}"
-  MACOSX_BUNDLE_BUNDLE_EXECUTABLE_NAME "${PROJECT_NAME}"
+  MACOSX_BUNDLE_BUNDLE_EXECUTABLE_NAME "${WSJT_APP_EXECUTABLE_NAME}"
   MACOSX_BUNDLE_COPYRIGHT "${PROJECT_COPYRIGHT}"
-  MACOSX_BUNDLE_GUI_IDENTIFIER "org.k1jt.wsjtx"
+  MACOSX_BUNDLE_GUI_IDENTIFIER "org.decodium.ft2"
   )
 
 target_include_directories (wsjtx PRIVATE ${FFTW3_INCLUDE_DIRS})
@@ -1649,6 +1652,16 @@ else ()
   endif ()
 endif ()
 target_link_libraries (wsjtx Qt5::SerialPort wsjt_cxx wsjt_qt wsjt_qtmm ${FFTW3_LIBRARIES} ${LIBM_LIBRARIES})
+
+if (APPLE)
+  # jt9 must live next to the app executable for runtime subprocess launch.
+  add_dependencies (wsjtx jt9)
+  add_custom_command (TARGET wsjtx POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      $<TARGET_FILE:jt9>
+      $<TARGET_FILE_DIR:wsjtx>/jt9
+    )
+endif ()
 
 # make a library for WSJT-X UDP servers
 # add_library (wsjtx_udp SHARED ${UDP_library_CXXSRCS})

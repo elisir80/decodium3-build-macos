@@ -469,7 +469,6 @@ private slots:
   void on_pbFreeText_clicked();
   void FoxReset(QString reason);
   void on_comboBoxHoundSort_activated (int index);
-  void not_GA_warning_message ();
   void checkMSK144ContestType();
   void on_pbBestSP_clicked();
   void on_RoundRobin_currentTextChanged(QString text);
@@ -535,6 +534,9 @@ private:
   void configActiveStations();
   void updateWorldMapFromDecode(DecodedText const& decoded_text);
   void log_audio_rebind_event (QString const& message, bool warning = false);
+  void tx_support_log (QString const& message);
+  void stop_modulator_sync (bool quick);
+  void prime_microphone_permission_prompt ();
   void attempt_audio_output_rebind ();
   QAudioDeviceInfo select_audio_output_rebind_device ();
   void sfox_tx();
@@ -598,6 +600,7 @@ private:
   int m_rx_audio_buffer_frames;
   int m_tx_audio_buffer_frames;
   qint64 m_last_tx_audio_rebind_ms;
+  qint64 m_ptt_request_ms;
   QThread m_audioThread;
 
   qint64  m_msErase;

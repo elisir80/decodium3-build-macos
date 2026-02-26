@@ -29,16 +29,10 @@ bool SoundOutput::checkStream () const
         break;
 
       case QAudio::UnderrunError:
-        // Underrun recovery: resume the stream so audio continues
-        // instead of stalling permanently.  The stream transitions to
-        // IdleState on underrun; resuming it restarts pulling data.
-        qDebug () << "SoundOutput: underrun detected, recovering...";
-        if (m_stream->state () == QAudio::IdleState
-            || m_stream->state () == QAudio::SuspendedState)
-          {
-            m_stream->resume ();
-          }
-        result = true;  // non-fatal, keep going
+        // Keep underruns non-fatal and report status. This behavior
+        // proved more stable on macOS with repeated short FT2 cycles.
+        Q_EMIT status (tr ("Audio output underrun"));
+        result = true;
         break;
 
       case QAudio::FatalError:
@@ -87,7 +81,7 @@ void SoundOutput::restart (QIODevice * source)
           m_stream.reset (new QAudioOutput (m_device, format));
           checkStream ();
           m_stream->setVolume (m_volume);
-          m_stream->setNotifyInterval(20);
+          m_stream->setNotifyInterval(1000);
           error_ = false;
 
           connect (m_stream.data(), &QAudioOutput::stateChanged, this, &SoundOutput::handleStateChanged);
@@ -126,7 +120,7 @@ void SoundOutput::restart (QIODevice * source)
     }
   m_stream->setCategory ("production");
   m_stream->start (source);
-  qDebug () << "SoundOut buffer size (bytes):" << m_stream->bufferSize () << "period size:" << m_stream->periodSize ();
+//  LOG_DEBUG ("Selected buffer size (bytes): " << m_stream->bufferSize () << " period size: " << m_stream->periodSize ());
 }
 
 void SoundOutput::suspend ()
