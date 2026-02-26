@@ -52,8 +52,8 @@ jobs:
           echo "CMAKE_PREFIX_PATH=${QT5_PREFIX}" >> "${GITHUB_ENV}"
           echo "FC=${GFORTRAN}" >> "${GITHUB_ENV}"
 
-          gfortran --version
-          qmake -v
+          "${GFORTRAN}" --version
+          "${QT5_PREFIX}/bin/qmake" -v
 
       - name: Configure CMake
         run: |
