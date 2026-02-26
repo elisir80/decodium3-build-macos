@@ -53,6 +53,7 @@ set (CMAKE_PROJECT_DESCRIPTION ${PROJECT_DESCRIPTION})
 set (CMAKE_AUTOUIC ON)
 set (WSJT_APP_BUNDLE_NAME "ft2")
 set (WSJT_APP_EXECUTABLE_NAME "ft2")
+include (CTest)
 
 #
 # Local CMake modules and support files
@@ -1239,7 +1240,7 @@ endif ()
 if (WSJT_GENERATE_DOCS)
   add_subdirectory (doc)
 endif (WSJT_GENERATE_DOCS)
-if (EXISTS ${CMAKE_SOURCE_DIR}/tests AND IS_DIRECTORY ${CMAKE_SOURCE_DIR}/tests)
+if (BUILD_TESTING AND EXISTS ${CMAKE_SOURCE_DIR}/tests AND IS_DIRECTORY ${CMAKE_SOURCE_DIR}/tests)
   add_subdirectory (tests)
 endif ()
 
