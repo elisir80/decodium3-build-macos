@@ -1,43 +1,73 @@
-# Changelog
+# Changelog / Registro Modifiche
 
 ## [1.2.0] - 2026-02-26
 
+### English
+
 Fork release based on Decodium v3.0 SE Raptor with macOS-focused runtime stabilization and robust DT/NTP timing control.
 
-### Added
+#### Added
 
-- Dedicated fork release identity `v1.2.0` in window title and release metadata.
-- `tx-support.log` runtime log for TX/PTT/audio troubleshooting.
-- macOS microphone permission preflight at startup.
+- Fork release identity `v1.2.0` in title/release metadata.
+- `tx-support.log` for TX/PTT/audio troubleshooting.
+- Startup microphone preflight on macOS.
 - NTP robust sync controls:
-  - deadband + confirmation weak-sync,
-  - cluster/consensus filtering,
+  - weak-sync deadband + confirmations,
+  - cluster/coherence filtering,
   - sparse-server jump confirmation,
   - lock hold behavior during temporary outages.
 
-### Changed
+#### Changed
 
 - App namespace and bundle path standardized to `ft2.app` / `ft2`.
-- macOS subprocess launch fixed (`jt9` copied beside app executable at build time).
-- TX start/stop sequencing hardened for CAT/PTT lag and race conditions.
-- Modulator FT2 guard enforces coherent symbol/tone parameters.
-- Audio settings persistence made more defensive for channel/device restoration.
-- FT2 band defaults auto-merged for legacy profiles without FT2 entries.
-- Graph window titles aligned to Decodium branding.
-- Removed pre-release popup from startup path.
+- macOS subprocess layout fixed (`jt9` colocated in bundle runtime path).
+- TX start/stop sequencing hardened for CAT/PTT lag and races.
+- Audio settings restore made more defensive for channels/devices.
+- FT2 band defaults auto-merged for legacy profiles missing FT2 entries.
+- Graph windows branding aligned to Decodium.
 
-### Fixed
+#### Fixed
 
-- `execve` failures caused by legacy `wsjtx.app` path assumptions.
-- Intermittent "PTT active but no modulation" scenarios in repeated FT2 cycles.
-- Late macOS microphone popup interrupting active operations.
-- Disabled/clipped audio channel selectors and invalid persisted channel states.
-- NTP state dropping to unstable offsets when server set quality degrades.
+- `execve` failures caused by legacy `wsjtx.app` assumptions.
+- Intermittent "PTT active but no modulation" cases in repeated FT2 cycles.
+- Late microphone popup appearing during active operation.
+- Invalid persisted channel states causing silent TX/RX.
+
+### Italiano
+
+Release fork basata su Decodium v3.0 SE Raptor con stabilizzazione runtime su macOS e controllo temporale DT/NTP robusto.
+
+#### Aggiunto
+
+- Identita release fork `v1.2.0` in titolo/metadati release.
+- `tx-support.log` per diagnostica TX/PTT/audio.
+- Preflight permesso microfono all'avvio su macOS.
+- Controlli sync NTP robusti:
+  - deadband weak-sync + conferme,
+  - filtro cluster/coerenza,
+  - conferma salti con pochi server,
+  - comportamento hold del lock su outage temporanei.
+
+#### Modificato
+
+- Namespace app e path bundle standardizzati su `ft2.app` / `ft2`.
+- Layout sottoprocesso macOS corretto (`jt9` co-locato nel runtime bundle).
+- Sequenza start/stop TX resa piu robusta contro lag/race CAT/PTT.
+- Ripristino impostazioni audio reso piu difensivo per canali/device.
+- Default banda FT2 auto-merge per profili legacy senza voci FT2.
+- Branding finestre grafico allineato a Decodium.
+
+#### Corretto
+
+- Errori `execve` causati da assunzioni legacy su `wsjtx.app`.
+- Casi intermittenti "PTT attivo ma senza modulazione" nei cicli FT2 ripetuti.
+- Popup microfono tardivo durante l'operativita.
+- Stati canale persistiti non validi che causavano TX/RX muta.
 
 ### CI/Build
 
-- macOS build workflow prepared for multi-target release matrix:
+- Release matrix macOS su:
   - Apple Silicon Tahoe
   - Apple Silicon Sequoia
   - Apple Intel Sequoia
-- Workflow dependency set updated and artifact naming aligned to `v1.2.0`.
+- Artifact naming allineato a `v1.2.0`.

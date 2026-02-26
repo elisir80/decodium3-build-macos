@@ -1,33 +1,66 @@
 # Decodium Fork v1.2.0 (base: Decodium v3.0 SE Raptor)
 
-Fork release focused on macOS operational stability and robust timing behavior for live FT2 usage, while preserving the Raptor coding/decoding baseline.
+## English
 
-## Highlights
+Fork release focused on macOS runtime stability and robust DT/NTP behavior for real FT2 operation.
+
+### Highlights
 
 - Based on upstream Decodium v3.0 SE Raptor.
-- macOS app/runtime migration finalized on `ft2.app`.
-- Fixed subprocess layout (`jt9` path and bundle colocation).
-- Startup microphone preflight to prevent delayed macOS permission popup during operation.
-- TX/PTT/audio stabilization:
-  - PTT ack/fallback guard path,
-  - synchronous modulator stop/start cleanup,
-  - defensive timer/state cleanup on stop/restart.
-- Audio/radio settings persistence hardened (channels/devices/CAT TX source behavior).
-- Robust DT/NTP synchronization strategy:
-  - weak-sync with confirmation/deadband,
-  - coherence/cluster filtering,
-  - sparse-server jump confirmation,
-  - lock hold during temporary response loss.
-- Release docs and changelog added.
+- Runtime migration completed on `ft2.app` / `ft2`.
+- Fixed bundle subprocess path/layout (`jt9`).
+- TX/PTT/audio race-condition hardening.
+- Persistent audio/radio behavior improvements.
+- Robust DT/NTP strategy with weak-sync, confirmations, sparse-jump guard, and hold mode.
 
-## Documentation
+### macOS quarantine command
 
-- Release notes: `RELEASE_NOTES_v1.2.0.md`
-- Changelog: `CHANGELOG.md`
-- macOS porting details: `doc/MACOS_PORTING_v1.2.0.md`
-- DT/NTP technical details: `doc/DT_NTP_ROBUST_SYNC_v1.2.0.md`
+```bash
+sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
+```
 
-## Build targets in CI
+### Documentation
+
+- `RELEASE_NOTES_v1.2.0.md`
+- `CHANGELOG.md`
+- `doc/MACOS_PORTING_v1.2.0.md`
+- `doc/DT_NTP_ROBUST_SYNC_v1.2.0.md`
+
+### CI targets
+
+- Apple Silicon Tahoe
+- Apple Silicon Sequoia
+- Apple Intel Sequoia
+
+---
+
+## Italiano
+
+Release fork focalizzata su stabilita runtime macOS e comportamento DT/NTP robusto per operativita FT2 reale.
+
+### Highlights
+
+- Basata su Decodium v3.0 SE Raptor upstream.
+- Migrazione runtime completata su `ft2.app` / `ft2`.
+- Correzione path/layout sottoprocessi nel bundle (`jt9`).
+- Hardening race-condition TX/PTT/audio.
+- Miglioramenti persistenza audio/radio.
+- Strategia DT/NTP robusta con weak-sync, conferme, filtro sparse-jump e hold mode.
+
+### Comando quarantena macOS
+
+```bash
+sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
+```
+
+### Documentazione
+
+- `RELEASE_NOTES_v1.2.0.md`
+- `CHANGELOG.md`
+- `doc/MACOS_PORTING_v1.2.0.md`
+- `doc/DT_NTP_ROBUST_SYNC_v1.2.0.md`
+
+### Target CI
 
 - Apple Silicon Tahoe
 - Apple Silicon Sequoia

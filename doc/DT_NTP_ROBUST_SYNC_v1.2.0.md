@@ -1,136 +1,171 @@
-# DT/NTP Robust Sync Architecture - Fork v1.2.0
+# DT/NTP Robust Sync Architecture / Architettura Sync DT/NTP - Fork v1.2.0
 
-Date: 2026-02-26
+Date / Data: 2026-02-26
+
+---
+
+## English
 
 ## Context
 
-In real-world FT2 operation, timing quality is constrained by:
+Real FT2 operation is affected by:
 
-- local clock drift,
+- system clock drift,
 - audio-device drift,
 - CAT/PTT latency variability,
-- sparse or partially inconsistent NTP responses.
+- sparse/inconsistent NTP server sets.
 
-The v1.2.0 fork introduces a lock-preserving strategy that avoids abrupt timing swings while keeping responsiveness to true drift.
+v1.2.0 introduces a lock-preserving strategy: avoid false timing jumps while still tracking real drift.
 
-## Design principles
+## Design rules
 
-1. TX slot scheduling must remain tied to raw system time.
-2. NTP is used for synchronization state and correction logic, not direct hard phase injection into slot scheduler.
-3. Sparse server sets (`2-3`) must not be trusted for immediate medium/large jumps.
-4. DT feedback must be conservative when NTP is healthy.
+1. TX slot scheduling stays tied to raw system time.
+2. NTP drives sync/correction logic, not direct hard phase injection in slot scheduler.
+3. Sparse sets (`2-3` servers) cannot cause immediate medium/large jumps.
+4. DT correction remains conservative when NTP health is good.
 
-## Architecture overview
+## Pipeline
 
-### A) NTP sample pipeline
+### A) NTP sample handling
 
-1. Resolve and query a randomized subset of NTP servers.
-2. Prefer IPv4 path when available (macOS path reliability).
-3. Validate packet structure and echoed originate timestamp.
-4. Reject RTT above configured threshold.
-5. Reject absurd offsets (`MAX_OFFSET_MS` guard).
+- Query randomized server subset.
+- Validate packet and originate timestamp echo.
+- Reject high RTT and absurd offsets.
 
-### B) Coherence filtering
+### B) Coherence/cluster filtering
 
-Before offset application:
-
-- build densest cluster within configurable window (`m_clusterWindowMs`),
-- optionally tighten around existing lock (`m_lockWindowMs`),
-- reject incoherent high-range sets.
-
-This reduces mixed-cluster contamination (example: divergent server groups).
+- Build densest offset cluster.
+- Tighten around lock window when lock exists.
+- Reject incoherent sets.
 
 ### C) Weak-sync gate
 
-Offset updates are mediated by:
-
-- deadband (`m_weakDeadbandMs`),
+- Deadband,
 - standard confirmation count,
 - strong-step confirmation count,
-- emergency threshold for very large unavoidable corrections.
+- emergency threshold for unavoidable large corrections.
 
-This prevents oscillation from jittery sample cycles.
+### D) Sparse jump guard
 
-### D) Sparse-jump guard (new in v1.2.0)
+With lock active and low server count:
 
-If lock exists and server count is low (`<=3`):
+- jumps over threshold require repeated same-direction confirmations before apply.
 
-- jumps above `m_sparseJumpMs` require `m_sparseJumpConfirmNeeded` consecutive confirmations in same direction.
+### E) Hold mode
 
-Effect:
+On temporary no-response cycles:
 
-- suppresses one-off `+/-100ms` class jumps from sparse cycles,
-- still allows true drift over repeated consistent evidence.
+- keep lock state,
+- avoid abrupt "No sync" collapse,
+- delay coarse fallback when prior lock is still credible.
 
-### E) Hold behavior
-
-On no-response cycles:
-
-- maintain lock and report hold state when previous sync context is still valid,
-- delay coarse fallback actions,
-- avoid UI collapse to "no sync" when usable lock is still active.
-
-### F) HTTP fallback behavior
-
-Used only as safety net when UDP/NTP path fails.
-
-With active lock:
-
-- coarse HTTP jumps are rejected if outside tolerance,
-- fallback failure keeps lock hold state instead of forcing desync.
-
-## DT feedback behavior
-
-DT correction loop now applies:
+### F) DT correction behavior
 
 - adaptive EMA,
-- per-step clamp,
-- total clamp,
-- decay on sample drought,
-- additional conservatism when NTP is healthy (`isSynced && |offset| < 100ms`).
+- step clamp + total clamp,
+- decay when sample flow is poor,
+- reduced aggressiveness when NTP offset is healthy.
 
-Coloring logic uses both:
+## Field-tested defaults promoted in v1.2.0
 
-- instantaneous DT quality (`m_avgDtValue`),
-- accumulated correction magnitude (`m_dtCorrection_ms`).
+- `FT2_NTP_WEAK_SYNC=1`
+- `FT2_NTP_WEAK_STRONG_MS=350`
+- `FT2_NTP_WEAK_STRONG_CONFIRM=4`
+- `FT2_NTP_SPARSE_JUMP_MS=50`
+- `FT2_NTP_SPARSE_JUMP_CONFIRM=4`
 
-This avoids misleading "green" status while correction remains heavily saturated.
+These values are now default in code and no longer require manual startup env overrides.
 
-## Default robust parameters in v1.2.0
+## Difference vs original Raptor baseline
 
-- strong step threshold: `350ms`
-- strong step confirm: `4`
-- sparse jump threshold: `50ms`
-- sparse jump confirm: `4`
+- Lock-aware hold state management.
+- Sparse-jump confirmation layer.
+- Stronger coherence filtering before applying offsets.
+- Safer behavior on temporary NTP degradation.
+- DT color semantics include correction saturation, not only instantaneous DT.
 
-These defaults were promoted from field-tested runtime env values.
+Operational tradeoff: slightly slower adaptation, much lower false-jump rate.
 
-## Environment overrides retained
+---
 
-All key guards remain overrideable for diagnostics and edge tuning:
+## Italiano
 
-- `FT2_NTP_WEAK_SYNC`
-- `FT2_NTP_WEAK_DEADBAND_MS`
-- `FT2_NTP_WEAK_STRONG_MS`
-- `FT2_NTP_WEAK_EMERGENCY_MS`
-- `FT2_NTP_WEAK_CONFIRM`
-- `FT2_NTP_WEAK_STRONG_CONFIRM`
-- `FT2_NTP_CLUSTER_WINDOW_MS`
-- `FT2_NTP_LOCK_WINDOW_MS`
-- `FT2_NTP_HTTP_LOCK_TOL_MS`
-- `FT2_NTP_SPARSE_JUMP_MS`
-- `FT2_NTP_SPARSE_JUMP_CONFIRM`
-- `FT2_NTP_HTTP_HOLDOFF_MS`
+## Contesto
 
-## Difference versus original Raptor behavior
+L'operativita FT2 reale e influenzata da:
 
-Compared with upstream Raptor baseline:
+- drift clock di sistema,
+- drift scheda audio,
+- variabilita latenza CAT/PTT,
+- set NTP sparsi/incoerenti.
 
-- added explicit lock-aware hold state management,
-- added sparse-server jump confirmation layer,
-- strengthened coherence/cluster filtering before apply,
-- made HTTP fallback lock-safe (non-destructive),
-- reduced DT aggressiveness when NTP is healthy,
-- improved DT visual semantics to reflect correction saturation.
+La v1.2.0 introduce una strategia che preserva il lock: evita salti temporali falsi ma segue comunque il drift reale.
 
-Operationally this trades a small amount of adaptation speed for a large reduction in false jumps and drift oscillation under imperfect network/server conditions.
+## Regole di progetto
+
+1. Lo scheduling slot TX resta agganciato al tempo grezzo di sistema.
+2. NTP guida logica sync/correzione, non inietta fase hard nello scheduler slot.
+3. Set sparsi (`2-3` server) non possono causare salti medi/grandi immediati.
+4. La correzione DT resta conservativa quando la salute NTP e buona.
+
+## Pipeline
+
+### A) Gestione campioni NTP
+
+- Query su subset random di server.
+- Validazione pacchetto ed echo timestamp originate.
+- Scarto RTT elevato e offset assurdi.
+
+### B) Filtro coerenza/cluster
+
+- Costruzione cluster offset piu denso.
+- Restrizione attorno finestra lock quando il lock esiste.
+- Scarto set incoerenti.
+
+### C) Gate weak-sync
+
+- Deadband,
+- conferme standard,
+- conferme per step forte,
+- soglia emergenza per correzioni grandi inevitabili.
+
+### D) Guardia sparse jump
+
+Con lock attivo e pochi server:
+
+- i salti sopra soglia richiedono conferme ripetute nella stessa direzione prima dell'applicazione.
+
+### E) Hold mode
+
+Su cicli senza risposta temporanei:
+
+- mantiene stato lock,
+- evita crollo brusco a "No sync",
+- ritarda fallback grossolani se il lock precedente e ancora credibile.
+
+### F) Correzione DT
+
+- EMA adattiva,
+- clamp per step + clamp totale,
+- decay quando i campioni scarseggiano,
+- aggressivita ridotta quando offset NTP e sano.
+
+## Default validati sul campo promossi in v1.2.0
+
+- `FT2_NTP_WEAK_SYNC=1`
+- `FT2_NTP_WEAK_STRONG_MS=350`
+- `FT2_NTP_WEAK_STRONG_CONFIRM=4`
+- `FT2_NTP_SPARSE_JUMP_MS=50`
+- `FT2_NTP_SPARSE_JUMP_CONFIRM=4`
+
+Questi valori sono ora default nel codice e non richiedono piu override manuali all'avvio.
+
+## Differenze rispetto alla baseline Raptor originale
+
+- Gestione stato hold lock-aware.
+- Livello conferme su sparse-jump.
+- Filtro coerenza piu forte prima di applicare offset.
+- Comportamento piu sicuro su degrado NTP temporaneo.
+- Semantica colori DT include saturazione correzione, non solo DT istantaneo.
+
+Tradeoff operativo: adattamento leggermente piu lento, ma forte riduzione dei salti falsi.

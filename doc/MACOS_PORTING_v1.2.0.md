@@ -1,151 +1,148 @@
-# macOS Porting Notes - Fork v1.2.0
+# macOS Porting Notes / Note Porting macOS - Fork v1.2.0
 
-Date: 2026-02-26
+Date / Data: 2026-02-26
+Target branch: `merge/raptor-v110-port`
 
-Target repo state: branch `merge/raptor-v110-port`
+---
+
+## English
 
 ## Objective
 
-Make the Raptor base operationally stable on macOS for continuous FT2 use with real rigs (CAT/PTT + USB audio), without requiring manual workaround loops at each startup.
+Keep Decodium Raptor base and make it stable on macOS for continuous FT2 operation with real rigs (CAT/PTT + USB audio).
 
-## 1) Bundle/executable migration to `ft2.app`
-
-### Problem
-
-Upstream path assumptions and helper scripts still expected `wsjtx.app`/`wsjtx` in key places. On macOS this caused subprocess launch failures (`jt9` not found next to executable).
-
-### Applied changes
-
-- `WSJT_APP_BUNDLE_NAME` and `WSJT_APP_EXECUTABLE_NAME` introduced in CMake.
-- install and bundle-fixup paths switched to these variables.
-- `wsjtx` target output executable set to `ft2`.
-- GUI identifier updated to `org.decodium.ft2`.
-- post-build copy ensures `jt9` sits in the same `Contents/MacOS` directory as `ft2`.
-
-### Result
-
-- Startup no longer depends on legacy `wsjtx.app` assumptions.
-- `ft2` can start `jt9` reliably from app bundle runtime path.
-
-## 2) Application namespace and settings isolation
+## 1) Bundle and executable migration (`ft2.app`)
 
 ### Problem
 
-Using `WSJT-X` app name risks profile overlap, stale settings collision, and inconsistent restore behavior in shared environments.
+Legacy assumptions still expected `wsjtx.app` paths in several runtime/build points.
 
-### Applied change
+### Applied
 
-- `QApplication::setApplicationName("ft2")`.
+- Introduced `WSJT_APP_BUNDLE_NAME` and `WSJT_APP_EXECUTABLE_NAME` in CMake.
+- Switched bundle fixup/copy logic to app variables.
+- Set executable name to `ft2`.
+- Ensured `jt9` is copied beside `ft2` in `Contents/MacOS`.
 
-### Result
+### Outcome
 
-- Separate profile namespace under macOS app-support path.
-- Consistent `ft2.ini` style behavior without WSJT-X interference.
+`ft2.app` starts `jt9` reliably without legacy path mismatches.
 
-## 3) Microphone permission reliability
+## 2) Application namespace isolation
 
-### Problem
+- Set `QApplication::setApplicationName("ft2")`.
+- Avoid profile collision with WSJT-X data.
+- Keep settings under dedicated macOS app-support namespace.
 
-macOS microphone consent popup appearing late (during operation) caused instability and TX/audio side effects.
-
-### Applied change
-
-- Startup preflight probe with `QAudioInput` on selected/default input device.
-- Immediate start/stop just to trigger permission flow predictably.
-- Logging integrated into `tx-support.log`.
-
-### Result
-
-- Permission prompt appears at startup phase instead of mid-QSO.
-
-## 4) TX/PTT/audio race-condition hardening
+## 3) Microphone permission preflight
 
 ### Problem
 
-Intermittent behavior where CAT/PTT appeared successful but modulation became mute after repeated cycles.
+macOS consent popup could appear late during operation and disrupt TX/audio state.
 
-### Applied changes
+### Applied
 
-- PTT request timestamping and audit logs.
-- PTT ack path starts TX with controlled delay.
-- fallback start triggers if ack is late beyond guard time.
-- stop path clears delayed-start timers and pending flags.
-- synchronous modulator stop helper to avoid stale active-state carryover.
-- explicit restart when stale active modulator state is detected at TX start.
+- Startup input preflight with short `QAudioInput` open/close.
+- Prompt appears at startup time.
 
-### Result
+## 4) TX/PTT/audio race hardening
 
-- Repeated FT2 TX cycles no longer depend on manual re-selection/reopen.
-- Lower probability of "first TX ok, next TX silent" behavior.
+- Added PTT request timestamping and guarded delayed-start path.
+- Added fallback start if CAT/PTT ack is late.
+- Cleared pending timers/flags on stop/restart.
+- Added synchronous modulator stop handling to prevent stale state.
+- Added support logging in `~/Library/Application Support/ft2/tx-support.log`.
 
-## 5) Audio device/channel persistence fixes
+## 5) Audio persistence hardening
 
-### Problem
+- Revalidated stored channel values against runtime capabilities.
+- Auto-fallback to valid channels when persisted values are invalid.
+- Reduced silent-TX cases caused by stale device/channel state.
 
-Stored channel selections could become invalid after device re-enumeration, resulting in silent TX/RX.
+## 6) First run command on macOS
 
-### Applied changes
+If Gatekeeper quarantine blocks the app, run:
 
-- channel combo width/contents policy adjusted for translated UI labels.
-- persisted channel values revalidated against runtime-supported channels.
-- automatic fallback to first valid channel if persisted value is invalid.
-- explicit revalidation pass after setting restored channel indices.
+```bash
+sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
+```
 
-### Result
+## 7) CI release packaging
 
-- Less risk of silent audio due to stale or unsupported channel settings.
+`build-macos.yml` currently produces per-target `.zip`, `.tar.gz`, and `.sha256` artifacts for:
 
-## 6) CAT UI behavior for DX Lab style rigs
+- Apple Silicon Tahoe
+- Apple Silicon Sequoia
+- Apple Intel Sequoia
 
-### Problem
+---
 
-TX audio source section could be disabled when CAT capability probing was incomplete in proxy/backend flows.
+## Italiano
 
-### Applied change
+## Obiettivo
 
-- TX audio source group kept enabled for `DX Lab` rig path, allowing persisted preference management.
+Mantenere la base Decodium Raptor e renderla stabile su macOS per uso FT2 continuo con radio reali (CAT/PTT + audio USB).
 
-### Result
+## 1) Migrazione bundle ed eseguibile (`ft2.app`)
 
-- predictable config experience for DX Lab integration path.
+### Problema
 
-## 7) Legacy profile compatibility (FT2 frequencies)
+Restavano assunzioni legacy su path `wsjtx.app` in vari punti runtime/build.
 
-### Problem
+### Applicato
 
-Some imported WSJT-X/legacy profiles lacked FT2 entries, leaving band selection unusable in FT2 mode.
+- Introdotti `WSJT_APP_BUNDLE_NAME` e `WSJT_APP_EXECUTABLE_NAME` in CMake.
+- Conversione logica bundle fixup/copy alle variabili app.
+- Nome eseguibile impostato a `ft2`.
+- `jt9` copiato accanto a `ft2` in `Contents/MacOS`.
 
-### Applied change
+### Risultato
 
-- FT2 frequency rows auto-merged from defaults when missing.
+`ft2.app` avvia `jt9` in modo affidabile senza mismatch di path legacy.
 
-### Result
+## 2) Isolamento namespace applicazione
 
-- FT2 mode remains operable even with old profile data.
+- Impostato `QApplication::setApplicationName("ft2")`.
+- Evitata collisione con profili dati WSJT-X.
+- Impostazioni mantenute in namespace dedicato macOS.
 
-## 8) Branding and runtime UX consistency
+## 3) Preflight permesso microfono
 
-### Applied changes
+### Problema
 
-- graph windows title switched to Decodium branding.
-- pre-release blocking popup removed from runtime path.
-- title string updated with fork identity/version.
+Il popup consenso microfono di macOS poteva apparire in ritardo durante l'operativita, disturbando lo stato TX/audio.
 
-## 9) Support logging
+### Applicato
 
-Path:
+- Preflight input all'avvio con apertura/chiusura breve `QAudioInput`.
+- Popup mostrato in fase di startup.
 
-- `~/Library/Application Support/ft2/tx-support.log`
+## 4) Hardening race TX/PTT/audio
 
-Modes:
+- Timestamp richieste PTT e percorso start ritardato con guardia.
+- Fallback start se ack CAT/PTT in ritardo.
+- Pulizia timer/flag pendenti su stop/restart.
+- Stop sincrono modulator per evitare stati stale.
+- Logging supporto in `~/Library/Application Support/ft2/tx-support.log`.
 
-- default compact logging for critical events,
-- verbose mode via `FT2_TX_VERBOSE_LOG=1`.
+## 5) Hardening persistenza audio
 
-Purpose:
+- Rivalidazione canali salvati rispetto alle capacita runtime.
+- Fallback automatico su canali validi se il valore salvato non e valido.
+- Ridotti casi TX muta da stato device/canale obsoleto.
 
-- isolate root cause of PTT/audio state mismatches in field tests.
+## 6) Comando primo avvio macOS
 
-## 10) CI/release packaging alignment
+Se la quarantena Gatekeeper blocca l'app, eseguire:
 
-`build-macos.yml` updated to package `ft2.app` artifacts and align launcher/executable naming with the migrated bundle layout.
+```bash
+sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
+```
+
+## 7) Packaging CI release
+
+`build-macos.yml` produce attualmente per target: `.zip`, `.tar.gz` e `.sha256` per:
+
+- Apple Silicon Tahoe
+- Apple Silicon Sequoia
+- Apple Intel Sequoia
