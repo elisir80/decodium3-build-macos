@@ -67,7 +67,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake --build build --target wsjtx -j"$(sysctl -n hw.ncpu)"
+          cmake --build build --target wsjtx udp_daemon -j"$(sysctl -n hw.ncpu)"
 
       - name: Install
         run: |
