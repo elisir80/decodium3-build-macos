@@ -2,6 +2,16 @@ get_target_property (QtCore_location Qt5::Core LOCATION)
 get_filename_component (QtCore_location ${QtCore_location} PATH)
 list (APPEND fixup_library_dirs ${QtCore_location})
 
+if (APPLE)
+  # Homebrew Qt image plugins depend on webp/sharpyuv dylibs that are outside Qt's own lib dir.
+  if (EXISTS "/opt/homebrew/opt/webp/lib")
+    list (APPEND fixup_library_dirs "/opt/homebrew/opt/webp/lib")
+  endif ()
+  if (EXISTS "/usr/local/opt/webp/lib")
+    list (APPEND fixup_library_dirs "/usr/local/opt/webp/lib")
+  endif ()
+endif ()
+
 if (APPLE OR WIN32)
   # install rules for including 3rd party libs such as Qt
 

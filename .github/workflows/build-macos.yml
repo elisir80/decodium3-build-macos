@@ -21,14 +21,17 @@ jobs:
             platform_id: macos-tahoe-arm64
             os_name: tahoe
             arch: arm64
+            deployment_target: "11.0"
           - runner: macos-15
             platform_id: macos-sequoia-arm64
             os_name: sequoia
             arch: arm64
+            deployment_target: "11.0"
           - runner: macos-15-intel
             platform_id: macos-sequoia-x86_64
             os_name: sequoia
             arch: x86_64
+            deployment_target: "10.12"
 
     steps:
       - name: Checkout repository
@@ -59,6 +62,7 @@ jobs:
         run: |
           cmake -S . -B build -G "Unix Makefiles" \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ matrix.deployment_target }} \
             -DCMAKE_PREFIX_PATH="${CMAKE_PREFIX_PATH}" \
             -DWSJT_GENERATE_DOCS=OFF \
             -DWSJT_SKIP_MANPAGES=ON \
