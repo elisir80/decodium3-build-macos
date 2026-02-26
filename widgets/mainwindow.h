@@ -8,6 +8,7 @@
 #include <QStringList>
 #include <QLabel>
 #include <QCheckBox>
+#include <QLineEdit>
 #include <QThread>
 #include <QProcess>
 #include <QProgressBar>
@@ -51,6 +52,7 @@
 #include "widgets/QSYMessageCreator.h"
 #include "widgets/QSYMessage.h"
 #include "widgets/qsymonitor.h"
+#include "widgets/TimeSyncPanel.h"
 #include "MessageBox.hpp"
 #include "Network/NetworkAccessManager.hpp"
 #include "Network/NtpClient.hpp"
@@ -398,6 +400,7 @@ private slots:
   void on_actionAstronomical_data_toggled (bool);
   void on_actionQSYMessage_Creator_triggered();
   void on_actionQSY_Monitor_triggered();
+  void on_actionTime_Sync_triggered();
   void alertQSYmessage();
   void on_actionShort_list_of_add_on_prefixes_and_suffixes_triggered();
   void band_changed (Frequency);
@@ -466,7 +469,6 @@ private slots:
   void on_pbFreeText_clicked();
   void FoxReset(QString reason);
   void on_comboBoxHoundSort_activated (int index);
-  void not_GA_warning_message ();
   void checkMSK144ContestType();
   void on_pbBestSP_clicked();
   void on_RoundRobin_currentTextChanged(QString text);
@@ -490,6 +492,7 @@ private slots:
   void downloadQslComplete(bool result);  //avt 10/2/25
   void onNtpOffsetUpdated(double offsetMs);
   void onNtpSyncStatusChanged(bool synced, QString const& statusText);
+  void onSoundcardDriftUpdated(double driftMsPerPeriod, double driftPpm);
 
 private:
   Q_SIGNAL void initializeAudioOutputStream (QAudioDeviceInfo,
@@ -518,12 +521,7 @@ private:
   Q_SIGNAL void download_finished (bool) const;  //avt 10/2/25
 
 private:
-  void log_audio_rebind_event (QString const& message, bool warning = false);
   void set_mode (QString const& mode);
-  void attempt_audio_output_rebind ();
-  QAudioDeviceInfo select_audio_output_rebind_device ();
-  QString format_ntp_sync_age (qint64 ageMs) const;
-  void update_ntp_status_display (bool force = false);
   void astroUpdate ();
   void writeAllTxt(QString message);
   void auto_sequence (DecodedText const& message, unsigned start_tolerance, unsigned stop_tolerance);
@@ -535,6 +533,12 @@ private:
   void readWidebandDecodes();
   void configActiveStations();
   void updateWorldMapFromDecode(DecodedText const& decoded_text);
+  void log_audio_rebind_event (QString const& message, bool warning = false);
+  void tx_support_log (QString const& message);
+  void stop_modulator_sync (bool quick);
+  void prime_microphone_permission_prompt ();
+  void attempt_audio_output_rebind ();
+  QAudioDeviceInfo select_audio_output_rebind_device ();
   void sfox_tx();
   bool play_DXcall = false;
   bool inSettings = false;
@@ -568,6 +572,7 @@ private:
   QScopedPointer<QSYMessageCreator> m_QSYMessageCreatorWidget;
   QScopedPointer<QSYMessage> m_QSYMessageWidget;
   QScopedPointer<QSYMonitor> m_qsymonitorWidget;
+  QScopedPointer<TimeSyncPanel> m_timeSyncPanel;
   QScopedPointer<HelpTextWindow> m_shortcuts;
   QScopedPointer<HelpTextWindow> m_prefixes;
   QScopedPointer<HelpTextWindow> m_mouseCmnds;
@@ -594,6 +599,8 @@ private:
   SoundOutput * m_soundOutput;
   int m_rx_audio_buffer_frames;
   int m_tx_audio_buffer_frames;
+  qint64 m_last_tx_audio_rebind_ms;
+  qint64 m_ptt_request_ms;
   QThread m_audioThread;
 
   qint64  m_msErase;
@@ -684,7 +691,7 @@ private:
   qint32  m_nSortedHounds=0;
   qint32  m_nHoundsCalling=0;
   qint32  m_Nlist=12;
-  qint32  m_Nslots=5;
+  qint32  m_Nslots=3;
   qint32  m_Nslots0=0;
   qint32  m_nFoxMsgTimes[5]={0,0,0,0,0};
   qint32  m_tAutoOn;
@@ -696,6 +703,11 @@ private:
   qint32  m_tFoxTxSinceCQ=999; //Fox Tx cycles since most recent CQ
   qint32  m_nFoxFreq;          //Audio freq at which Hound received a call from Fox
   qint32  m_nSentFoxRrpt=0;    //Serial number for next R+rpt Hound will send to Fox
+  qint32  m_txRetryCount {0};  // Consecutive Tx retry counter for auto-sequence timeout
+  qint32  m_lastNtx {-1};     // Last Tx number sent (for retry detection)
+  qint32  m_cqRetryCount {0}; // CQ (Tx6) retry counter for period toggle
+  static constexpr int MAX_TX_RETRIES = 3;    // Tx2/Tx3/Tx4 retries before returning to CQ
+  static constexpr int MAX_CQ_RETRIES = 10;   // CQ retries before toggling Tx Even/1st
   qint32  m_kin0=0;
   qint32  m_earlyDecode=41;
   qint32  m_earlyDecode2=47;
@@ -837,7 +849,6 @@ private:
   int			m_nsendingsh;
   double	m_onAirFreq0;
   bool		m_first_error;
-  qint64  m_last_tx_audio_rebind_ms;
 
   char    m_msg[100][80];
 
@@ -869,6 +880,7 @@ private:
   WSPRNet *wsprNet;
 
   QTimer m_guiTimer;
+  QTimer m_decoderWatchdog;
   QTimer stopWRTimer;               //Wait & Reply
   QTimer stopWCTimer;               //Wait & Call
   QTimer ptt1Timer;                 //StartTx delay
@@ -1037,26 +1049,34 @@ private:
   bool m_externalCtrl;         //avt  10/1/25
   bool m_autoButtonState;     //avt 10/2/25
 
-  //---- DT Feedback Loop (clock drift auto-correction) ----
+  //---- DT Feedback Loop ----
   QVector<double> m_dtSamples;        // DT values collected in current period
   double m_dtCorrection_ms {0.0};     // accumulated time correction (milliseconds)
-  double m_dtSmoothFactor {0.3};      // exponential smoothing factor (0-1)
+  double m_dtSmoothFactor {0.3};      // EMA smoothing factor (0-1)
   int m_dtMinSamples {3};             // minimum decodes before applying correction
-  bool m_dtFeedbackEnabled {true};    // enable/disable DT feedback loop
-  bool m_dtClampCustomEnabled {false}; // use custom DT clamp limits from settings
-  double m_dtClampSynced_ms {600.0};  // DT clamp when NTP is synced
-  double m_dtClampUnsynced_ms {2000.0}; // DT clamp when NTP is not synced
+  bool m_dtFeedbackEnabled {true};    // enabled — applies NTP+DT correction to Detector
   int m_dtLastSampleCount {0};        // sample count for status display
+
+  // Decode timing statistics
+  qint64 m_decodeStartMs {0};         // timestamp when decode was triggered
+  double m_lastDecodeLatencyMs {0.0}; // last decode cycle latency
+  double m_avgDtValue {0.0};          // EMA of DT values across periods
+  int m_totalDecodesForDt {0};        // total decodes used for DT calculation
+
+  // #5: NTP vs DT cross-validation
+  int m_ntpDtDivergenceCount {0};     // consecutive periods where NTP and DT diverge
+
+  // Soundcard clock drift detection
+  double m_soundcardDriftPpm {0.0};
+  double m_soundcardDriftMsPerPeriod {0.0};
 
   // NTP Time Synchronization
   NtpClient *m_ntpClient {nullptr};
   double m_ntpOffset_ms {0.0};
-  bool m_ntpEnabled {true};
-  bool m_ntpSyncedNow {false};
-  qint64 m_ntpLastSyncEpochMs {0};
-  qint64 m_ntpLastUiRefreshMs {0};
-  QString m_ntpStatusText;
+  bool m_ntpEnabled {false};
+  QString m_ntpCustomServer;
   QCheckBox ntp_checkbox;
+  QLineEdit ntp_server_edit;
   QLabel ntp_status_label;
 
   //---------------------------------------------------- private functions
@@ -1120,6 +1140,7 @@ private:
   void rm_tb4(QString houndCall);
   void read_wav_file (QString const& fname);
   void decodeDone ();
+  void applyDtFeedback ();
   bool subProcessFailed (QProcess *, int exit_code, QProcess::ExitStatus);
   void subProcessError (QProcess *, QProcess::ProcessError);
   void statusUpdate () const;

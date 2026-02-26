@@ -2047,6 +2047,12 @@ Configuration::impl::impl (Configuration * self, QNetworkAccessManager * network
     connect (ui_->sound_output_combo_box, static_cast<void (QComboBox::*)(int)> (&QComboBox::currentIndexChanged), cb);
   }
 
+  // Keep translated channel names fully visible (e.g. Italian labels) and avoid clipped combos.
+  ui_->sound_input_channel_combo_box->setSizeAdjustPolicy (QComboBox::AdjustToContents);
+  ui_->sound_output_channel_combo_box->setSizeAdjustPolicy (QComboBox::AdjustToContents);
+  ui_->sound_input_channel_combo_box->setMinimumContentsLength (10);
+  ui_->sound_output_channel_combo_box->setMinimumContentsLength (10);
+
   //
   // setup macros list view
   //
@@ -2236,7 +2242,6 @@ void Configuration::impl::initialize_models ()
   ui_->show_country_names_check_box->setChecked (show_country_names_);
   if (!ui_->DXCC_check_box->isChecked()) {
     ui_->ppfx_check_box->setEnabled (false);
-    ui_->show_country_names_check_box->setEnabled (false);
   }
   ui_->Map_Grid_to_State->setChecked(gridMap_);
   ui_->Map_All_Messages->setChecked(gridMapAll_);
@@ -2327,8 +2332,7 @@ void Configuration::impl::initialize_models ()
     }
   ui_->udp_TTL_spin_box->setValue (udp_TTL_);
   ui_->accept_udp_requests_check_box->setChecked (accept_udp_requests_);
-  ui_->accept_udp_requests_check_box->setEnabled(false);      //avt 12/28/23  prevent disabling "accept UDP requests"
-  ui_->accept_udp_requests_check_box->setChecked(true);       //avt 10/1/25
+  ui_->accept_udp_requests_check_box->setEnabled(true);
   ui_->n1mm_server_name_line_edit->setText (n1mm_server_name_);
   ui_->n1mm_server_port_spin_box->setValue (n1mm_server_port_);
   ui_->enable_n1mm_broadcast_check_box->setChecked (broadcast_to_n1mm_);
@@ -2633,6 +2637,28 @@ void Configuration::impl::read_settings ()
         }
     }
 
+  // Legacy WSJT-X profiles may not include FT2 rows; ensure the FT2 band plan exists.
+  bool has_ft2_frequency = false;
+  for (auto const& item : frequencies_.frequency_list ()) {
+    if (item.mode_ == Modes::FT2) {
+      has_ft2_frequency = true;
+      break;
+    }
+  }
+  if (!has_ft2_frequency) {
+    FrequencyList_v2_101 defaults {&bands_, this};
+    defaults.reset_to_defaults ();
+    FrequencyList_v2_101::FrequencyItems ft2_defaults;
+    for (auto const& item : defaults.frequency_list ()) {
+      if (item.mode_ == Modes::FT2) {
+        ft2_defaults << item;
+      }
+    }
+    if (!ft2_defaults.isEmpty ()) {
+      frequencies_.frequency_list_merge (ft2_defaults);
+    }
+  }
+
   stations_.station_list (settings_->value ("stations").value<StationList::Stations> ());
 
   auto highlight_items = settings_->value ("DecodeHighlighting", QVariant::fromValue (DecodeHighlightingModel::default_items ())).value<DecodeHighlightingModel::HighlightItems> ();
@@ -2744,7 +2770,7 @@ void Configuration::impl::read_settings ()
   n1mm_server_name_ = settings_->value ("N1MMServer", "127.0.0.1").toString ();
   n1mm_server_port_ = settings_->value ("N1MMServerPort", 2333).toUInt ();
   broadcast_to_n1mm_ = settings_->value ("BroadcastToN1MM", false).toBool ();
-  accept_udp_requests_ = true; //avt 12/28/23 always accept UDP requests
+  accept_udp_requests_ = settings_->value ("AcceptUDPRequests", true).toBool ();
   udpWindowToFront_ = settings_->value ("udpWindowToFront",false).toBool ();
   udpWindowRestore_ = settings_->value ("udpWindowRestore",false).toBool ();
   calibration_.intercept = settings_->value ("CalibrationIntercept", 0.).toDouble ();
@@ -2807,6 +2833,9 @@ void Configuration::impl::find_audio_devices ()
       next_audio_input_channel_ = AudioDevice::fromString (settings_->value ("AudioInputChannel", "Mono").toString ());
       update_audio_channels (ui_->sound_input_combo_box, ui_->sound_input_combo_box->currentIndex (), ui_->sound_input_channel_combo_box, false);
       ui_->sound_input_channel_combo_box->setCurrentIndex (next_audio_input_channel_);
+      // Re-run channel validation after applying persisted value.
+      update_audio_channels (ui_->sound_input_combo_box, ui_->sound_input_combo_box->currentIndex (), ui_->sound_input_channel_combo_box, false);
+      next_audio_input_channel_ = static_cast<AudioDevice::Channel> (ui_->sound_input_channel_combo_box->currentIndex ());
     }
   //
   // retrieve audio output device
@@ -2819,6 +2848,9 @@ void Configuration::impl::find_audio_devices ()
       next_audio_output_channel_ = AudioDevice::fromString (settings_->value ("AudioOutputChannel", "Mono").toString ());
       update_audio_channels (ui_->sound_output_combo_box, ui_->sound_output_combo_box->currentIndex (), ui_->sound_output_channel_combo_box, true);
       ui_->sound_output_channel_combo_box->setCurrentIndex (next_audio_output_channel_);
+      // Re-run channel validation after applying persisted value.
+      update_audio_channels (ui_->sound_output_combo_box, ui_->sound_output_combo_box->currentIndex (), ui_->sound_output_channel_combo_box, true);
+      next_audio_output_channel_ = static_cast<AudioDevice::Channel> (ui_->sound_output_channel_combo_box->currentIndex ());
     }
 }
 
@@ -3136,7 +3168,13 @@ void Configuration::impl::set_rig_invariants ()
       }
       ui_->test_CAT_push_button->setEnabled (true);
       ui_->test_PTT_push_button->setEnabled (false);
-      ui_->TX_audio_source_group_box->setEnabled (transceiver_factory_.has_CAT_PTT_mic_data (rig) && TransceiverFactory::PTT_method_CAT == ptt_method);
+      // DX Lab proxy path: keep Front/Rear selection editable so preference
+      // can be saved in settings even when CAT mic-data capability is unknown.
+      bool allow_tx_audio_source =
+          rig.startsWith ("DX Lab")
+          || (transceiver_factory_.has_CAT_PTT_mic_data (rig)
+              && TransceiverFactory::PTT_method_CAT == ptt_method);
+      ui_->TX_audio_source_group_box->setEnabled (allow_tx_audio_source);
       if (port_type != last_port_type_)
         {
           last_port_type_ = port_type;
@@ -3348,7 +3386,12 @@ TransceiverFactory::ParameterPack Configuration::impl::gather_rig_data ()
   if (is_tci_ && ui_->tci_audio_check_box->isChecked ()) result.poll_interval |= tci__audio;
   result.ptt_type = static_cast<TransceiverFactory::PTTMethod> (ui_->PTT_method_button_group->checkedId ());
   result.ptt_port = ui_->PTT_port_combo_box->currentText ();
-  result.audio_source = static_cast<TransceiverFactory::TXAudioSource> (ui_->TX_audio_source_button_group->checkedId ());
+  auto tx_audio_source_id = ui_->TX_audio_source_button_group->checkedId ();
+  if (tx_audio_source_id < 0)
+    {
+      tx_audio_source_id = static_cast<int> (rig_params_.audio_source);
+    }
+  result.audio_source = static_cast<TransceiverFactory::TXAudioSource> (tx_audio_source_id);
   result.split_mode = static_cast<TransceiverFactory::SplitMode> (ui_->split_mode_button_group->checkedId ());
   return result;
 }
@@ -3795,7 +3838,7 @@ void Configuration::impl::on_CTY_download_button_clicked (bool /*clicked*/)
   cty_download.configure(network_manager_,
                          "http://www.country-files.com/bigcty/cty.dat",
                          dataPath.absoluteFilePath("cty.dat"),
-                         "Decodium 3 FT2 CTY Downloader");
+                         "Decodium v3.0 SE KP5 CTY Downloader");
 
   // set up LoTW users CSV file fetching
   connect (&cty_download, &FileDownload::complete, this, &Configuration::impl::after_CTY_downloaded, Qt::UniqueConnection);
@@ -3926,7 +3969,7 @@ void Configuration::impl::on_LotW_CSV_fetch_push_button_clicked (bool /*checked*
 void Configuration::impl::on_decoded_text_font_push_button_clicked ()
 {
   next_decoded_text_font_ = QFontDialog::getFont (0, decoded_text_font_ , this
-                                                  , tr ("Decodium 3 FT2 Decoded Text Font Chooser")
+                                                  , tr ("Decodium v3.0 SE KP5 Decoded Text Font Chooser")
                                                   , QFontDialog::MonospacedFonts
                                                   );
 }
@@ -4052,13 +4095,7 @@ void Configuration::impl::display_file_information ()
 
 void Configuration::impl::on_DXCC_check_box_clicked(bool checked)
 {
-    if (checked) {
-        ui_->ppfx_check_box->setEnabled (true);
-        ui_->show_country_names_check_box->setEnabled (true);
-    } else {
-        ui_->ppfx_check_box->setEnabled (false);
-        ui_->show_country_names_check_box->setEnabled (false);
-    }
+    ui_->ppfx_check_box->setEnabled (checked);
 }
 
 void Configuration::impl::on_PTT_port_combo_box_activated (int /* index */)
@@ -5716,6 +5753,45 @@ void Configuration::impl::update_audio_channels (QComboBox const * source_combo_
       else if (1 == n)
         {
           combo_box->setItemData (AudioDevice::Mono, combo_box_item_enabled, Qt::UserRole - 1);
+        }
+    }
+
+  auto is_enabled = [combo_box] (int channel_index)
+    {
+      return combo_box_item_disabled != combo_box->itemData (channel_index, Qt::UserRole - 1);
+    };
+
+  // If persisted settings point to an unsupported channel (e.g. "Both" on a
+  // mono-only device), force a valid fallback so TX audio cannot stay silent.
+  auto current_index = combo_box->currentIndex ();
+  if (current_index < 0 || !is_enabled (current_index))
+    {
+      QList<int> preferred;
+      if (allow_both)
+        {
+          preferred << AudioDevice::Both << AudioDevice::Mono << AudioDevice::Left << AudioDevice::Right;
+        }
+      else
+        {
+          preferred << AudioDevice::Mono << AudioDevice::Left << AudioDevice::Right;
+        }
+
+      for (auto const channel_index : preferred)
+        {
+          if (channel_index >= 0 && channel_index < combo_box->count () && is_enabled (channel_index))
+            {
+              combo_box->setCurrentIndex (channel_index);
+              return;
+            }
+        }
+
+      for (int i (0); i < combo_box->count (); ++i)
+        {
+          if (is_enabled (i))
+            {
+              combo_box->setCurrentIndex (i);
+              return;
+            }
         }
     }
 }

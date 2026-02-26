@@ -148,7 +148,11 @@ void CPlotter::draw(float swide[], bool bScroll, bool bRed)
   if (!m_TRperiod) return;      // not ready to plot yet
   int j,j0;
   float y,y2,ymin;
-  double fac = sqrt(m_binsPerPixel*m_waterfallAvg/15.0);
+  // Normalize gain by TR period — shorter periods (FT2=3.75s) accumulate less
+  // energy per waterfall row, so we boost gain proportionally.
+  // Reference baseline is 15s (FT8). FT2 gets sqrt(15/3.75)=2x boost.
+  double periodNorm = (m_TRperiod > 0.0) ? 15.0 / m_TRperiod : 1.0;
+  double fac = sqrt(m_binsPerPixel*m_waterfallAvg*periodNorm/15.0);
   double gain = fac*pow(10.0,0.015*m_plotGain);
   double gain2d = pow(10.0,0.02*(m_plot2dGain));
 
@@ -261,6 +265,7 @@ void CPlotter::draw(float swide[], bool bScroll, bool bRed)
 
   if(swide[0]>1.0e29) m_line=0;
   if(m_mode=="FT4" and m_line==34) m_line=0;
+  if(m_mode=="FT2" and m_line==17) m_line=0;  // FT2: half FT4 period → half pixel count
   if(m_line == painter1.fontMetrics ().height () && m_timestamp!=0) {
     painter1.setPen(Qt::white);
     QString t;
@@ -706,6 +711,31 @@ void CPlotter::DrawOverlay()                   //DrawOverlay()
     painter0.drawLine(x2,yTxTop,x2,yTxTop+yh);
   }
 
+  // === Multi-slot markers (orange dashed goal posts + bars) ===
+  if(m_Nslots > 1 && (m_mode=="FT8" || m_mode=="FT2")) {
+    QPen penSlot(QColor(255,165,0), 2, Qt::DashLine);   // orange dashed
+    painter0.setPen(penSlot);
+    for(int i=1; i<m_Nslots; i++) {
+      float slotFreq = m_txFreq + i * m_slotSpacing;
+      x1=XfromFreq(slotFreq);
+      x2=XfromFreq(slotFreq + bw);
+      // Goal post on frequency scale
+      painter0.drawLine(x1,yTxTop,x1,yTxTop+yh);
+      painter0.drawLine(x1,yTxTop,x2,yTxTop);
+      painter0.drawLine(x2,yTxTop,x2,yTxTop+yh);
+    }
+    if(m_bars) {
+      overPainter.setPen(QColor(255,165,0));             // orange bars
+      for(int i=1; i<m_Nslots; i++) {
+        float slotFreq = m_txFreq + i * m_slotSpacing;
+        int sx1=XfromFreq(slotFreq);
+        int sx2=XfromFreq(slotFreq + bw);
+        overPainter.drawLine(sx1,0,sx1,m_h);
+        overPainter.drawLine(sx2,0,sx2,m_h);
+      }
+    }
+  }
+
   QPainter hoverPainter(&m_HoverOverlayPixmap);
   if (m_bars) {
     if (!hoverPainter.isActive()) hoverPainter.begin(this);
@@ -1002,6 +1032,12 @@ void CPlotter::setSuperFox(bool b)
 {
   m_bSuperFox=b;
   if(m_bSuperFox) m_bSuperHound=false;
+}
+void CPlotter::setMultiSlot(int nslots, int spacing)
+{
+  m_Nslots=nslots;
+  m_slotSpacing=spacing;
+  DrawOverlay();
 }
 void CPlotter::setSuperHound(bool b)
 {

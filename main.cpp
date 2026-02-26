@@ -124,7 +124,7 @@ namespace
         auto const checksum = QString::number (qChecksum (utf8.constData (), static_cast<uint> (utf8.size ())), 16)
           .rightJustified (4, QLatin1Char {'0'});
         app_name = app_name.left (max_native_name_len - 5) + "_" + checksum.right (4);
-    }
+      }
     return "/" + app_name;
   }
 
@@ -177,6 +177,8 @@ int main(int argc, char *argv[])
       std::locale::global (std::locale::classic ());
 
       // Override programs executable basename as application name.
+      // Keep a dedicated FT2 profile namespace (settings/data/temp) to avoid
+      // collisions with WSJT-X profiles and preserve ft2.ini behavior.
       a.setApplicationName ("ft2");
       a.setApplicationVersion (version ());
 
@@ -423,35 +425,35 @@ int main(int argc, char *argv[])
           if (!mem_jt9.attach ())
             {
               if (!mem_jt9.create (sizeof (dec_data)))
-              {
-                auto const key = mem_jt9.nativeKey ().isEmpty () ? mem_jt9.key () : mem_jt9.nativeKey ();
-                auto reason = mem_jt9.errorString ();
+                {
+                  auto const key = mem_jt9.nativeKey ().isEmpty () ? mem_jt9.key () : mem_jt9.nativeKey ();
+                  auto reason = mem_jt9.errorString ();
 #if defined (Q_OS_DARWIN)
-                auto const shmmax = read_macos_sysctl ("kern.sysv.shmmax");
-                auto const shmall = read_macos_sysctl ("kern.sysv.shmall");
-                if (shmmax)
-                  {
-                    reason += "\nshmmax=" + QString::number (shmmax)
-                      + " bytes, required=" + QString::number (sizeof (dec_data)) + " bytes";
-                    if (shmmax < sizeof (dec_data))
-                      {
-                        reason += "\nHint: kern.sysv.shmmax is too small.";
-                      }
-                  }
-                if (shmall)
-                  {
-                    reason += "\nshmall=" + QString::number (shmall) + " pages";
-                  }
+                  auto const shmmax = read_macos_sysctl ("kern.sysv.shmmax");
+                  auto const shmall = read_macos_sysctl ("kern.sysv.shmall");
+                  if (shmmax)
+                    {
+                      reason += "\nshmmax=" + QString::number (shmmax)
+                        + " bytes, required=" + QString::number (sizeof (dec_data)) + " bytes";
+                      if (shmmax < sizeof (dec_data))
+                        {
+                          reason += "\nHint: kern.sysv.shmmax is too small.";
+                        }
+                    }
+                  if (shmall)
+                    {
+                      reason += "\nshmall=" + QString::number (shmall) + " pages";
+                    }
 #endif
-                LOG_ERROR ("Unable to create shared memory segment; key=" << key
-                          << ", size=" << sizeof (dec_data)
-                          << ", error=" << reason);
-                MessageBox::critical_message (nullptr, a.translate ("main", "Shared memory error"),
-                                              a.translate ("main", "Unable to create shared memory segment")
-                                              + "\n\nKey: " + key
-                                              + "\nReason: " + reason);
-                throw std::runtime_error {("Shared memory error: " + reason).toStdString ()};
-              }
+                  LOG_ERROR ("Unable to create shared memory segment; key=" << key
+                            << ", size=" << sizeof (dec_data)
+                            << ", error=" << reason);
+                  MessageBox::critical_message (nullptr, a.translate ("main", "Shared memory error"),
+                                                a.translate ("main", "Unable to create shared memory segment")
+                                                + "\n\nKey: " + key
+                                                + "\nReason: " + reason);
+                  throw std::runtime_error {("Shared memory error: " + reason).toStdString ()};
+                }
               LOG_INFO ("shmem size: " << mem_jt9.size ());
             }
           else

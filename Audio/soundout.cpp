@@ -29,8 +29,8 @@ bool SoundOutput::checkStream () const
         break;
 
       case QAudio::UnderrunError:
-        // Treat underruns as recoverable: reporting them as fatal can
-        // invalidate the selected output device on transient glitches.
+        // Keep underruns non-fatal and report status. This behavior
+        // proved more stable on macOS with repeated short FT2 cycles.
         Q_EMIT status (tr ("Audio output underrun"));
         result = true;
         break;
@@ -111,6 +111,12 @@ void SoundOutput::restart (QIODevice * source)
   if (m_framesBuffered > 0)
     {
       m_stream->setBufferSize (m_stream->format().bytesForFrames (m_framesBuffered));
+    }
+  else
+    {
+      // Default: 16384 frames (~341ms @ 48kHz) — prevents underrun
+      // on Windows where Qt's automatic buffer sizing is too small
+      m_stream->setBufferSize (m_stream->format().bytesForFrames (16384));
     }
   m_stream->setCategory ("production");
   m_stream->start (source);

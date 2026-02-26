@@ -10,7 +10,7 @@ if (APPLE)
   #
   # otool -l <binary> | grep -A3 LC_VERSION_MIN_MACOSX
   #
-  set (CMAKE_OSX_DEPLOYMENT_TARGET 11.0
+  set (CMAKE_OSX_DEPLOYMENT_TARGET 10.12
     CACHE STRING "Earliest version of macOS supported
 
 Earliest version we can support with Qt 5.12, C++11 & libc++ is 10.12.
@@ -48,9 +48,11 @@ project (wsjtx
   VERSION 3.0.0.0
   LANGUAGES C CXX Fortran
   )
-set (PROJECT_DESCRIPTION "Decodium 3 FT2: Digital Modes for Weak Signal Communications in Amateur Radio")
+set (PROJECT_DESCRIPTION "Decodium v3.0 SE Raptor: Digital Modes for Weak Signal Communications in Amateur Radio")
 set (CMAKE_PROJECT_DESCRIPTION ${PROJECT_DESCRIPTION})
 set (CMAKE_AUTOUIC ON)
+set (WSJT_APP_BUNDLE_NAME "ft2")
+set (WSJT_APP_EXECUTABLE_NAME "ft2")
 
 #
 # Local CMake modules and support files
@@ -72,28 +74,17 @@ message (STATUS "******************************************************")
 
 include (set_build_type)
 # RC 0 or omitted is a development build, GA is a General Availability release build
-set_build_type (GA)
+set_build_type (RC 1)
 set (wsjtx_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}${BUILD_TYPE_REVISION}")
 
 #
 # project information
 #
-set (PROJECT_BUNDLE_NAME "Decodium 3 FT2")
+set (PROJECT_BUNDLE_NAME "Decodium v3.0 SE")
 set (PROJECT_VENDOR "IU8LMC")
 set (PROJECT_CONTACT "IU8LMC <qrz.com/db/IU8LMC>")
 set (PROJECT_COPYRIGHT "See Help | Copyright info")
 set (PROJECT_HOMEPAGE qrz.com/db/IU8LMC)
-set (FORK_RELEASE_VERSION_DEFAULT "v1.1.0")
-# Keep explicit -DFORK_RELEASE_VERSION overrides, but auto-migrate stale cache defaults.
-if (NOT DEFINED FORK_RELEASE_VERSION
-    OR FORK_RELEASE_VERSION STREQUAL ""
-    OR FORK_RELEASE_VERSION STREQUAL "v1.0.7"
-    OR FORK_RELEASE_VERSION STREQUAL "v1.0.8"
-    OR FORK_RELEASE_VERSION STREQUAL "v1.0.9")
-  set (FORK_RELEASE_VERSION "${FORK_RELEASE_VERSION_DEFAULT}" CACHE STRING "Fork release tag shown in the UI title" FORCE)
-else ()
-  set (FORK_RELEASE_VERSION "${FORK_RELEASE_VERSION}" CACHE STRING "Fork release tag shown in the UI title")
-endif ()
 set (PROJECT_MANUAL wsjtx-main)
 set (PROJECT_MANUAL_DIRECTORY_URL https://wsjt.sourceforge.io/wsjtx-doc/)
 set (PROJECT_SAMPLES_URL http://downloads.sourceforge.net/project/wsjt/)
@@ -158,9 +149,8 @@ attach a debugger which will then receive the console output inside its console.
 #
 
 if (APPLE)
-  # Keep install layout aligned with the actual app bundle target name.
-  set (CMAKE_INSTALL_BINDIR ft2.app/Contents/MacOS)
-  set (CMAKE_INSTALL_DATAROOTDIR ft2.app/Contents/Resources)
+  set (CMAKE_INSTALL_BINDIR ${WSJT_APP_BUNDLE_NAME}.app/Contents/MacOS)
+  set (CMAKE_INSTALL_DATAROOTDIR ${WSJT_APP_BUNDLE_NAME}.app/Contents/Resources)
 endif ()
 
 include (GNUInstallDirs)
@@ -174,14 +164,8 @@ elseif (APPLE)
   set (QT_CONF_DESTINATION ${CMAKE_INSTALL_DATAROOTDIR})
 endif ()
 
-if (APPLE)
-  # Prevent stale cache values (e.g. wsjtx.app/...) from breaking bundle fixup.
-  set (WSJT_PLUGIN_DESTINATION ${PLUGIN_DESTINATION} CACHE PATH "Path for plugins" FORCE)
-  set (WSJT_QT_CONF_DESTINATION ${QT_CONF_DESTINATION} CACHE PATH "Path for the qt.conf file" FORCE)
-else ()
-  set (WSJT_PLUGIN_DESTINATION ${PLUGIN_DESTINATION} CACHE PATH "Path for plugins")
-  set (WSJT_QT_CONF_DESTINATION ${QT_CONF_DESTINATION} CACHE PATH "Path for the qt.conf file")
-endif ()
+set (WSJT_PLUGIN_DESTINATION ${PLUGIN_DESTINATION} CACHE PATH "Path for plugins")
+set (WSJT_QT_CONF_DESTINATION ${QT_CONF_DESTINATION} CACHE PATH "Path for the qt.conf file")
 
 if (WSJT_FOX_OTP)
   set (wsjt_fox_CXXSRCS
@@ -321,6 +305,7 @@ set (wsjtx_CXXSRCS
   widgets/QSYMessage.cpp 
   widgets/QSYMessageCreator.cpp
   widgets/qsymonitor.cpp
+  widgets/TimeSyncPanel.cpp
   )
 
 if (${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
@@ -814,6 +799,7 @@ set (wsjtx_UISRCS
   widgets/QSYMessage.ui
   widgets/QSYMessageCreator.ui
   widgets/qsymonitor.ui
+  widgets/TimeSyncPanel.ui
   )
 
 set (UDP_library_CXXSRCS
@@ -864,6 +850,7 @@ set (all_C_and_CXXSRCS
 
 set (TOP_LEVEL_RESOURCES
   icons/Darwin/wsjtx.iconset/icon_128x128.png
+  artwork/ft2logo.png
   contrib/gpl-v3-logo.svg
   artwork/splash.png
   artwork/maps/earth_2048x1024.jpg
@@ -893,6 +880,7 @@ set (PALETTE_FILES
   Palettes/Orange.pal
   Palettes/Pink.pal
   Palettes/Rainbow.pal
+  Palettes/Raptor.pal
   Palettes/Scope.pal
   Palettes/Sunburst.pal
   Palettes/VK4BDJ.pal
@@ -1617,7 +1605,7 @@ generate_version_info (wsjtx_VERSION_RESOURCES
   ICON ${WSJTX_ICON_FILE}
   )
 
-add_executable (ft2 MACOSX_BUNDLE
+add_executable (wsjtx MACOSX_BUNDLE
   ${wsjtx_CXXSRCS}
   ${wsjtx_GENUISRCS}
   ${WSJTX_ICON_FILE}
@@ -1626,10 +1614,11 @@ add_executable (ft2 MACOSX_BUNDLE
   )
 
 if (WSJT_CREATE_WINMAIN)
-  set_target_properties (ft2 PROPERTIES WIN32_EXECUTABLE ON)
+  set_target_properties (wsjtx PROPERTIES WIN32_EXECUTABLE ON)
 endif (WSJT_CREATE_WINMAIN)
 
-set_target_properties (ft2 PROPERTIES
+set_target_properties (wsjtx PROPERTIES
+  OUTPUT_NAME "${WSJT_APP_EXECUTABLE_NAME}"
   MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Darwin/Info.plist.in"
   MACOSX_BUNDLE_INFO_STRING "${PROJECT_DESCRIPTION}"
   MACOSX_BUNDLE_ICON_FILE "${WSJTX_ICON_FILE}"
@@ -1637,60 +1626,40 @@ set_target_properties (ft2 PROPERTIES
   MACOSX_BUNDLE_SHORT_VERSION_STRING "v${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}"
   MACOSX_BUNDLE_LONG_VERSION_STRING "Version ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}${SCS_VERSION_STR}"
   MACOSX_BUNDLE_BUNDLE_NAME "${PROJECT_BUNDLE_NAME}"
-  MACOSX_BUNDLE_BUNDLE_EXECUTABLE_NAME "ft2"
+  MACOSX_BUNDLE_BUNDLE_EXECUTABLE_NAME "${WSJT_APP_EXECUTABLE_NAME}"
   MACOSX_BUNDLE_COPYRIGHT "${PROJECT_COPYRIGHT}"
-  MACOSX_BUNDLE_GUI_IDENTIFIER "org.k1jt.wsjtx"
+  MACOSX_BUNDLE_GUI_IDENTIFIER "org.decodium.ft2"
   )
 
-target_include_directories (ft2 PRIVATE ${FFTW3_INCLUDE_DIRS})
+target_include_directories (wsjtx PRIVATE ${FFTW3_INCLUDE_DIRS})
 if ((NOT ${OPENMP_FOUND}) OR APPLE)
-  target_link_libraries (ft2 wsjt_fort)
+  target_link_libraries (wsjtx wsjt_fort)
 else ()
-  target_link_libraries (ft2 wsjt_fort_omp)
+  target_link_libraries (wsjtx wsjt_fort_omp)
   if (OpenMP_C_FLAGS)
-    set_target_properties (ft2 PROPERTIES
+    set_target_properties (wsjtx PROPERTIES
       COMPILE_FLAGS "${OpenMP_C_FLAGS}"
       LINK_FLAGS "${OpenMP_C_FLAGS}"
       )
   endif ()
-  set_target_properties (ft2 PROPERTIES
+  set_target_properties (wsjtx PROPERTIES
     Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/fortran_modules_omp
     )
   if (WIN32)
-    set_target_properties (ft2 PROPERTIES
+    set_target_properties (wsjtx PROPERTIES
       LINK_FLAGS -Wl,--stack,0x1000000,--heap,0x20000000
       )
   endif ()
 endif ()
-target_link_libraries (ft2 Qt5::SerialPort wsjt_cxx wsjt_qt wsjt_qtmm ${FFTW3_LIBRARIES} ${LIBM_LIBRARIES})
+target_link_libraries (wsjtx Qt5::SerialPort wsjt_cxx wsjt_qt wsjt_qtmm ${FFTW3_LIBRARIES} ${LIBM_LIBRARIES})
 
 if (APPLE)
-  # Keep helper decoders beside ft2 when running directly from build tree.
-  add_dependencies (ft2 jt9 wsprd)
-  add_custom_command (TARGET ft2 POST_BUILD
+  # jt9 must live next to the app executable for runtime subprocess launch.
+  add_dependencies (wsjtx jt9)
+  add_custom_command (TARGET wsjtx POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    $<TARGET_FILE:jt9>
-    $<TARGET_FILE_DIR:ft2>/jt9
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    $<TARGET_FILE:wsprd>
-    $<TARGET_FILE_DIR:ft2>/wsprd
-    COMMAND ${CMAKE_COMMAND} -E make_directory
-    $<TARGET_FILE_DIR:ft2>/../Resources/wsjtx
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${PROJECT_SOURCE_DIR}/cty.dat
-    ${PROJECT_SOURCE_DIR}/cty.dat_copyright.txt
-    ${PROJECT_SOURCE_DIR}/grid.dat
-    ${PROJECT_SOURCE_DIR}/sat.dat
-    ${PROJECT_SOURCE_DIR}/contrib/Ephemeris/JPLEPH
-    ${PROJECT_SOURCE_DIR}/eclipse.txt
-    $<TARGET_FILE_DIR:ft2>/../Resources/wsjtx
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-    ${PROJECT_SOURCE_DIR}/ALLCALL7.TXT
-    $<TARGET_FILE_DIR:ft2>/ALLCALL7.TXT
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${PROJECT_SOURCE_DIR}/sounds
-    $<TARGET_FILE_DIR:ft2>/sounds
-    VERBATIM
+      $<TARGET_FILE:jt9>
+      $<TARGET_FILE_DIR:wsjtx>/jt9
     )
 endif ()
 
@@ -1770,7 +1739,7 @@ endif (UNIX)
 #
 # installation
 #
-install (TARGETS ft2
+install (TARGETS wsjtx
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime
   BUNDLE DESTINATION . COMPONENT runtime
   )
@@ -1888,9 +1857,8 @@ endif (WIN32)
 #
 if (APPLE)
     install (FILES
-        Darwin/ReadMe_FT2.txt
-        Darwin/com.ft2.jtdx.sysctl.plist
-        Darwin/ReadMe_FT2_JTDX.txt
+        Darwin/ReadMe.txt
+        Darwin/com.wsjtx.sysctl.plist
         DESTINATION .
         #COMPONENT runtime
     )

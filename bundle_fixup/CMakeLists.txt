@@ -2,6 +2,31 @@ get_target_property (QtCore_location Qt5::Core LOCATION)
 get_filename_component (QtCore_location ${QtCore_location} PATH)
 list (APPEND fixup_library_dirs ${QtCore_location})
 
+if (APPLE)
+  # Homebrew Qt image plugins depend on webp/sharpyuv dylibs that are outside Qt's own lib dir.
+  if (EXISTS "/opt/homebrew/opt/webp/lib")
+    list (APPEND fixup_library_dirs "/opt/homebrew/opt/webp/lib")
+  endif ()
+  if (EXISTS "/usr/local/opt/webp/lib")
+    list (APPEND fixup_library_dirs "/usr/local/opt/webp/lib")
+  endif ()
+
+  # gfortran-linked binaries (jt9/wsprd/etc.) need GCC runtime libs during fixup_bundle.
+  if (CMAKE_Fortran_COMPILER MATCHES "gfortran")
+    get_filename_component (_gfortran_bin_dir "${CMAKE_Fortran_COMPILER}" DIRECTORY)
+    get_filename_component (_gcc_root "${_gfortran_bin_dir}/.." ABSOLUTE)
+    foreach (_gcc_lib_dir
+      "${_gcc_root}/lib/gcc/current"
+      "${_gcc_root}/lib/gcc/15"
+      "${_gcc_root}/lib/gcc/14"
+      "${_gcc_root}/lib")
+      if (EXISTS "${_gcc_lib_dir}")
+        list (APPEND fixup_library_dirs "${_gcc_lib_dir}")
+      endif ()
+    endforeach ()
+  endif ()
+endif ()
+
 if (APPLE OR WIN32)
   # install rules for including 3rd party libs such as Qt
 
@@ -16,24 +41,11 @@ if (APPLE OR WIN32)
     )
 
   # if a system Qt is used (e.g. installed in /usr/lib/), it will not be included in the installation
-  set (fixup_exe "\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/ft2${CMAKE_EXECUTABLE_SUFFIX}")
+  set (fixup_exe "\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/${WSJT_APP_EXECUTABLE_NAME}${CMAKE_EXECUTABLE_SUFFIX}")
 
   #get_filename_component (hamlib_lib_dir ${Hamlib_LIBRARIES} PATH)
 
   if (APPLE)
-    list (APPEND fixup_library_dirs "/opt/homebrew/lib")
-    list (APPEND fixup_library_dirs "/usr/local/lib")
-    list (APPEND fixup_library_dirs "/opt/homebrew/opt/fftw/lib")
-    list (APPEND fixup_library_dirs "/usr/local/opt/fftw/lib")
-    list (APPEND fixup_library_dirs "/opt/homebrew/opt/boost/lib")
-    list (APPEND fixup_library_dirs "/usr/local/opt/boost/lib")
-    list (APPEND fixup_library_dirs "/opt/homebrew/opt/libusb/lib")
-    list (APPEND fixup_library_dirs "/usr/local/opt/libusb/lib")
-    list (APPEND fixup_library_dirs "/opt/homebrew/opt/gcc/lib/gcc/current")
-    list (APPEND fixup_library_dirs "/usr/local/opt/gcc/lib/gcc/current")
-    # Needed by Qt imageformats plugin (qwebp) on Intel/ARM Homebrew setups.
-    list (APPEND fixup_library_dirs "/opt/homebrew/opt/webp/lib")
-    list (APPEND fixup_library_dirs "/usr/local/opt/webp/lib")
     # install required Qt plugins
     install (
       DIRECTORY

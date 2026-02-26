@@ -10,6 +10,74 @@
 #include <random>
 #include <QLocale>
 
+namespace
+{
+  bool env_flag_enabled(char const *name, bool default_value)
+  {
+    auto const raw = QString::fromLocal8Bit(qgetenv(name)).trimmed().toLower();
+    if (raw.isEmpty()) return default_value;
+    if (raw == "0" || raw == "false" || raw == "off" || raw == "no") return false;
+    if (raw == "1" || raw == "true" || raw == "on" || raw == "yes") return true;
+    return default_value;
+  }
+
+  double env_double(char const *name, double default_value, double min_value, double max_value)
+  {
+    bool ok = false;
+    auto const raw = QString::fromLocal8Bit(qgetenv(name)).trimmed();
+    auto value = raw.toDouble(&ok);
+    if (!ok) return default_value;
+    return qBound(min_value, value, max_value);
+  }
+
+  int env_int(char const *name, int default_value, int min_value, int max_value)
+  {
+    bool ok = false;
+    auto const raw = QString::fromLocal8Bit(qgetenv(name)).trimmed();
+    auto value = raw.toInt(&ok);
+    if (!ok) return default_value;
+    return qBound(min_value, value, max_value);
+  }
+
+  double median_of(QVector<double> values)
+  {
+    if (values.isEmpty()) return 0.0;
+    std::sort(values.begin(), values.end());
+    int const n = values.size();
+    if (n % 2 == 0) {
+      return (values[n/2 - 1] + values[n/2]) / 2.0;
+    }
+    return values[n/2];
+  }
+
+  QVector<double> densest_cluster(QVector<double> values, double windowMs)
+  {
+    if (values.isEmpty()) return {};
+    std::sort(values.begin(), values.end());
+
+    int bestStart = 0;
+    int bestCount = 1;
+    int start = 0;
+    for (int end = 0; end < values.size(); ++end) {
+      while (values[end] - values[start] > windowMs && start < end) {
+        ++start;
+      }
+      int count = end - start + 1;
+      if (count > bestCount) {
+        bestCount = count;
+        bestStart = start;
+      }
+    }
+
+    QVector<double> cluster;
+    cluster.reserve(bestCount);
+    for (int i = 0; i < bestCount; ++i) {
+      cluster.append(values[bestStart + i]);
+    }
+    return cluster;
+  }
+}
+
 NtpClient::NtpClient(QObject *parent)
   : QObject(parent)
   , m_servers({
@@ -48,6 +116,19 @@ NtpClient::NtpClient(QObject *parent)
       "ntp.ubuntu.com",       // Ubuntu/Canonical
     })
 {
+  m_weakSyncEnabled = env_flag_enabled("FT2_NTP_WEAK_SYNC", true);
+  m_weakDeadbandMs = env_double("FT2_NTP_WEAK_DEADBAND_MS", 20.0, 1.0, 500.0);
+  m_weakStrongStepMs = env_double("FT2_NTP_WEAK_STRONG_MS", 350.0, 5.0, 2000.0);
+  m_weakEmergencyStepMs = env_double("FT2_NTP_WEAK_EMERGENCY_MS", 2000.0, 200.0, 10000.0);
+  m_weakConfirmNeeded = env_int("FT2_NTP_WEAK_CONFIRM", 2, 1, 5);
+  m_weakStrongConfirmNeeded = env_int("FT2_NTP_WEAK_STRONG_CONFIRM", 4, 1, 10);
+  m_clusterWindowMs = env_double("FT2_NTP_CLUSTER_WINDOW_MS", 180.0, 20.0, 1000.0);
+  m_lockWindowMs = env_double("FT2_NTP_LOCK_WINDOW_MS", 180.0, 20.0, 1000.0);
+  m_httpLockToleranceMs = env_double("FT2_NTP_HTTP_LOCK_TOL_MS", 220.0, 50.0, 2000.0);
+  m_sparseJumpMs = env_double("FT2_NTP_SPARSE_JUMP_MS", 50.0, 10.0, 500.0);
+  m_sparseJumpConfirmNeeded = env_int("FT2_NTP_SPARSE_JUMP_CONFIRM", 4, 1, 10);
+  m_httpHoldoffMs = env_int("FT2_NTP_HTTP_HOLDOFF_MS", 900000, 60000, 7200000);
+
   m_refreshTimer.setInterval(REFRESH_INTERVAL_MS);
   connect(&m_refreshTimer, &QTimer::timeout, this, &NtpClient::onRefreshTimeout);
 
@@ -77,7 +158,7 @@ void NtpClient::setEnabled(bool enabled)
       m_socket.bind();  // bind to any available port
     }
     syncNow();
-    m_refreshTimer.start();
+    m_refreshTimer.start(m_refreshIntervalMs);
   } else {
     m_refreshTimer.stop();
     m_queryTimeoutTimer.stop();
@@ -90,6 +171,9 @@ void NtpClient::setEnabled(bool enabled)
     m_activeLookupIds.clear();
     m_queriedAddresses.clear();
     m_synced = false;
+    resetWeakSyncState();
+    resetSparseJumpState();
+    m_lastGoodSyncMs = 0;
     m_socket.close();
   }
 }
@@ -97,6 +181,23 @@ void NtpClient::setEnabled(bool enabled)
 void NtpClient::setInitialOffset(double offsetMs)
 {
   m_offsetMs = offsetMs;
+  // Seed from last session, but allow the first live sync sample to re-lock immediately.
+  m_hasOffsetLock = false;
+  resetWeakSyncState();
+  resetSparseJumpState();
+}
+
+void NtpClient::setCustomServer(QString const& server)
+{
+  m_customServer = server.trimmed();
+}
+
+void NtpClient::setRefreshInterval(int ms)
+{
+  m_refreshIntervalMs = qBound(10000, ms, 300000);
+  if (m_refreshTimer.isActive()) {
+    m_refreshTimer.start(m_refreshIntervalMs);
+  }
 }
 
 void NtpClient::syncNow()
@@ -117,6 +218,13 @@ void NtpClient::syncNow()
   std::random_device rd;
   std::mt19937 rng(rd());
   std::shuffle(selected.begin(), selected.end(), rng);
+
+  // Optional preferred server (queried first).
+  if (!m_customServer.isEmpty()) {
+    selected.removeAll(m_customServer);
+    selected.prepend(m_customServer);
+  }
+
   int queryCount = qMin(selected.size(), SERVERS_PER_QUERY);
 
   // Start async DNS lookup for selected servers
@@ -141,7 +249,19 @@ void NtpClient::onDnsLookupResult(QHostInfo hostInfo)
   } else {
     auto const addresses = hostInfo.addresses();
     if (!addresses.isEmpty()) {
-      sendQuery(addresses.first());
+      // Prefer IPv4 on macOS because some environments resolve many NTP hosts
+      // to IPv6 endpoints that are not reachable from the current socket path.
+      QHostAddress selectedAddress;
+      for (auto const& address : addresses) {
+        if (address.protocol() == QAbstractSocket::IPv4Protocol) {
+          selectedAddress = address;
+          break;
+        }
+      }
+      if (selectedAddress.isNull()) {
+        selectedAddress = addresses.first();
+      }
+      sendQuery(selectedAddress);
       // Start timeout timer when first query is sent
       if (!m_queryTimeoutTimer.isActive()) {
         m_queryTimeoutTimer.start();
@@ -230,6 +350,9 @@ void NtpClient::onReadyRead()
 
     // Calculate offset: ((T2-T1) + (T3-T4)) / 2
     double offset = ((t2Ms - t1Ms) + (t3Ms - t4Ms)) / 2.0;
+    double rtt = (t4Ms - t1Ms) - (t3Ms - t2Ms);
+
+    if (rtt > m_maxRttMs) continue;
 
     // Sanity gate: discard offsets > 1 hour
     if (std::abs(offset) > MAX_OFFSET_MS) continue;
@@ -258,10 +381,32 @@ void NtpClient::onQueryTimeout()
   if (m_collectedOffsets.isEmpty()) {
     // NTP failed — track consecutive failures
     ++m_ntpConsecutiveFailures;
-    Q_EMIT syncStatusChanged(false, "NTP: no response from servers");
+    if (m_ntpConsecutiveFailures >= 3) {
+      auto const nowMs = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
+      bool const holdByRecentLock =
+          m_hasOffsetLock
+          && (m_lastGoodSyncMs <= 0 || (nowMs - m_lastGoodSyncMs) < m_httpHoldoffMs);
 
-    // Try HTTP time fallback when NTP fails
-    httpTimeFallback();
+      if (holdByRecentLock) {
+        m_synced = true;
+        Q_EMIT syncStatusChanged(
+            true,
+            QString("NTP hold: no response (%1), keeping %2 ms; HTTP fallback delayed")
+                .arg(m_ntpConsecutiveFailures)
+                .arg(m_offsetMs, 0, 'f', 1));
+      } else {
+        m_synced = false;
+        Q_EMIT syncStatusChanged(false, "NTP: no response from servers");
+        // After repeated failures, try HTTP fallback as last resort.
+        httpTimeFallback();
+      }
+    } else {
+      bool const holdingLock = m_hasOffsetLock;
+      m_synced = holdingLock;
+      Q_EMIT syncStatusChanged(holdingLock, QString("NTP hold: no response this cycle (%1/3), keeping %2 ms")
+                               .arg(m_ntpConsecutiveFailures)
+                               .arg(m_offsetMs, 0, 'f', 1));
+    }
 
     // Use faster retry interval when not synced
     m_refreshTimer.setInterval(REFRESH_RETRY_MS);
@@ -271,25 +416,103 @@ void NtpClient::onQueryTimeout()
   // NTP succeeded — reset failure counter
   m_ntpConsecutiveFailures = 0;
 
-  // Compute median of collected offsets
-  std::sort(m_collectedOffsets.begin(), m_collectedOffsets.end());
-  int n = m_collectedOffsets.size();
-  double median;
-  if (n % 2 == 0) {
-    median = (m_collectedOffsets[n/2 - 1] + m_collectedOffsets[n/2]) / 2.0;
-  } else {
-    median = m_collectedOffsets[n/2];
+  QVector<double> coherent = m_collectedOffsets;
+  if (coherent.size() >= 3) {
+    auto cluster = densest_cluster(coherent, m_clusterWindowMs);
+    if (cluster.size() >= 2 && cluster.size() < coherent.size()) {
+      coherent = cluster;
+    }
   }
 
-  m_offsetMs = median;
+  if (m_hasOffsetLock && coherent.size() >= 2) {
+    QVector<double> nearLock;
+    for (auto const& v : coherent) {
+      if (std::abs(v - m_offsetMs) <= m_lockWindowMs) {
+        nearLock.append(v);
+      }
+    }
+    if (nearLock.size() >= 2) {
+      coherent = nearLock;
+    }
+  }
+
+  int n = coherent.size();
+  double median = median_of(coherent);
+
+  if (n >= 3) {
+    auto minmax = std::minmax_element(coherent.begin(), coherent.end());
+    double range = *minmax.second - *minmax.first;
+    if (range > (m_clusterWindowMs * 1.5)) {
+      Q_EMIT syncStatusChanged(true, QString("NTP hold: incoherent set (range %1 ms), keeping %2 ms")
+                               .arg(range, 0, 'f', 1)
+                               .arg(m_offsetMs, 0, 'f', 1));
+      return;
+    }
+  }
+
+  if (m_hasOffsetLock) {
+    double const deltaFromLock = std::abs(median - m_offsetMs);
+    if (deltaFromLock > (m_httpLockToleranceMs * 2.0) && n < 4) {
+      Q_EMIT syncStatusChanged(
+          true,
+          QString("NTP hold: large jump %1 ms with only %2 servers, keeping %3 ms")
+              .arg(deltaFromLock, 0, 'f', 1)
+              .arg(n)
+              .arg(m_offsetMs, 0, 'f', 1));
+      return;
+    }
+
+    // With sparse server sets (2-3), require repeated confirmations for medium jumps.
+    if (n <= 3 && deltaFromLock >= m_sparseJumpMs) {
+      int const direction = (median - m_offsetMs) > 0.0 ? 1 : -1;
+      if (direction == m_sparseJumpDirection) {
+        ++m_sparseJumpConfirmCount;
+      } else {
+        m_sparseJumpDirection = direction;
+        m_sparseJumpConfirmCount = 1;
+      }
+      if (m_sparseJumpConfirmCount < m_sparseJumpConfirmNeeded) {
+        Q_EMIT syncStatusChanged(
+            true,
+            QString("NTP hold: sparse jump pending %1/%2 (delta %3 ms, %4 srv), keeping %5 ms")
+                .arg(m_sparseJumpConfirmCount)
+                .arg(m_sparseJumpConfirmNeeded)
+                .arg(median - m_offsetMs, 0, 'f', 1)
+                .arg(n)
+                .arg(m_offsetMs, 0, 'f', 1));
+        return;
+      }
+      resetSparseJumpState();
+    } else {
+      resetSparseJumpState();
+    }
+  } else {
+    resetSparseJumpState();
+  }
+
   m_synced = true;
+  m_lastServerCount = n;
+  m_lastGoodSyncMs = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
 
   // Restore normal refresh interval after successful sync
-  m_refreshTimer.setInterval(REFRESH_INTERVAL_MS);
+  m_refreshTimer.setInterval(m_refreshIntervalMs);
 
-  Q_EMIT offsetUpdated(m_offsetMs);
-  Q_EMIT syncStatusChanged(true, QString("NTP synced: %1 servers, offset %2 ms")
-                           .arg(n).arg(median, 0, 'f', 1));
+  QString weak_reason;
+  if (weakSyncShouldApply(median, &weak_reason)) {
+    m_offsetMs = median;
+    m_hasOffsetLock = true;
+    Q_EMIT offsetUpdated(m_offsetMs);
+    Q_EMIT syncStatusChanged(true, QString("NTP synced: %1 servers, offset %2 ms%3")
+                             .arg(n)
+                             .arg(median, 0, 'f', 1)
+                             .arg(weak_reason.isEmpty() ? QString{} : QString(" [%1]").arg(weak_reason)));
+  } else {
+    Q_EMIT syncStatusChanged(true, QString("NTP weak-sync hold: %1 servers, candidate %2 ms, active %3 ms [%4]")
+                             .arg(n)
+                             .arg(median, 0, 'f', 1)
+                             .arg(m_offsetMs, 0, 'f', 1)
+                             .arg(weak_reason));
+  }
 }
 
 // ---- HTTP Time Fallback ----
@@ -362,25 +585,83 @@ void NtpClient::onHttpReply(QNetworkReply *reply)
   // All HTTP replies received — compute result
   if (m_httpPendingCount <= 0) {
     if (!m_httpOffsets.isEmpty()) {
-      std::sort(m_httpOffsets.begin(), m_httpOffsets.end());
       int n = m_httpOffsets.size();
-      double median;
-      if (n % 2 == 0) {
-        median = (m_httpOffsets[n/2 - 1] + m_httpOffsets[n/2]) / 2.0;
+      double median = median_of(m_httpOffsets);
+
+      if (m_hasOffsetLock) {
+        if (n < 3) {
+          m_synced = true;
+          Q_EMIT syncStatusChanged(
+              true,
+              QString("HTTP hold: only %1 server(s), keeping locked %2 ms")
+                  .arg(n)
+                  .arg(m_offsetMs, 0, 'f', 1));
+        } else {
+          double const deltaFromLock = std::abs(median - m_offsetMs);
+          if (deltaFromLock > m_httpLockToleranceMs) {
+            m_synced = true;
+            Q_EMIT syncStatusChanged(
+                true,
+                QString("HTTP hold: coarse jump %1 ms exceeds tolerance %2 ms, keeping %3 ms")
+                    .arg(deltaFromLock, 0, 'f', 1)
+                    .arg(m_httpLockToleranceMs, 0, 'f', 0)
+                    .arg(m_offsetMs, 0, 'f', 1));
+          } else {
+            m_synced = true;
+            m_ntpConsecutiveFailures = 0;
+            m_lastServerCount = n;
+            m_lastGoodSyncMs = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
+            m_refreshTimer.setInterval(m_refreshIntervalMs);
+            QString weak_reason;
+            if (weakSyncShouldApply(median, &weak_reason)) {
+              m_offsetMs = median;
+              m_hasOffsetLock = true;
+              Q_EMIT offsetUpdated(m_offsetMs);
+              Q_EMIT syncStatusChanged(true, QString("HTTP time sync: %1 servers, offset %2 ms%3")
+                                       .arg(n)
+                                       .arg(median, 0, 'f', 0)
+                                       .arg(weak_reason.isEmpty() ? QString{} : QString(" [%1]").arg(weak_reason)));
+            } else {
+              Q_EMIT syncStatusChanged(true, QString("HTTP weak-sync hold: %1 servers, candidate %2 ms, active %3 ms [%4]")
+                                       .arg(n)
+                                       .arg(median, 0, 'f', 0)
+                                       .arg(m_offsetMs, 0, 'f', 0)
+                                       .arg(weak_reason));
+            }
+          }
+        }
       } else {
-        median = m_httpOffsets[n/2];
+        m_synced = true;
+        m_ntpConsecutiveFailures = 0;
+        m_lastServerCount = n;
+        m_lastGoodSyncMs = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
+        m_refreshTimer.setInterval(m_refreshIntervalMs);
+        QString weak_reason;
+        if (weakSyncShouldApply(median, &weak_reason)) {
+          m_offsetMs = median;
+          m_hasOffsetLock = true;
+          Q_EMIT offsetUpdated(m_offsetMs);
+          Q_EMIT syncStatusChanged(true, QString("HTTP time sync: %1 servers, offset %2 ms%3")
+                                   .arg(n)
+                                   .arg(median, 0, 'f', 0)
+                                   .arg(weak_reason.isEmpty() ? QString{} : QString(" [%1]").arg(weak_reason)));
+        } else {
+          Q_EMIT syncStatusChanged(true, QString("HTTP weak-sync hold: %1 servers, candidate %2 ms, active %3 ms [%4]")
+                                   .arg(n)
+                                   .arg(median, 0, 'f', 0)
+                                   .arg(m_offsetMs, 0, 'f', 0)
+                                   .arg(weak_reason));
+        }
       }
-
-      m_offsetMs = median;
-      m_synced = true;
-      m_ntpConsecutiveFailures = 0;
-      m_refreshTimer.setInterval(REFRESH_INTERVAL_MS);
-
-      Q_EMIT offsetUpdated(m_offsetMs);
-      Q_EMIT syncStatusChanged(true, QString("HTTP time sync: %1 servers, offset %2 ms")
-                               .arg(n).arg(median, 0, 'f', 0));
     } else {
-      Q_EMIT syncStatusChanged(false, "HTTP time fallback failed");
+      if (m_hasOffsetLock) {
+        m_synced = true;
+        Q_EMIT syncStatusChanged(true, QString("HTTP hold: fallback failed, keeping %1 ms")
+                                 .arg(m_offsetMs, 0, 'f', 1));
+      } else {
+        m_synced = false;
+        Q_EMIT syncStatusChanged(false, "HTTP time fallback failed");
+      }
     }
     m_httpSendTimes.clear();
   }
@@ -401,4 +682,99 @@ void NtpClient::msToNtpTimestamp(qint64 msEpoch, quint32 &seconds, quint32 &frac
   qint64 ms = msEpoch % 1000;
   seconds = static_cast<quint32>(sec + static_cast<qint64>(NTP_EPOCH_OFFSET));
   fraction = static_cast<quint32>(static_cast<double>(ms) / 1000.0 * 4294967296.0);  // 2^32
+}
+
+void NtpClient::resetWeakSyncState()
+{
+  m_weakConfirmCount = 0;
+  m_weakLastDirection = 0;
+}
+
+void NtpClient::resetSparseJumpState()
+{
+  m_sparseJumpConfirmCount = 0;
+  m_sparseJumpDirection = 0;
+}
+
+bool NtpClient::weakSyncShouldApply(double candidateOffsetMs, QString *reason)
+{
+  if (reason) reason->clear();
+
+  if (!m_weakSyncEnabled) {
+    if (reason) *reason = "weak-sync disabled";
+    return true;
+  }
+
+  if (!m_hasOffsetLock) {
+    resetWeakSyncState();
+    if (reason) *reason = "bootstrap";
+    return true;
+  }
+
+  auto const delta = candidateOffsetMs - m_offsetMs;
+  auto const abs_delta = std::abs(delta);
+
+  if (abs_delta < m_weakDeadbandMs) {
+    resetWeakSyncState();
+    if (reason) *reason = QString("deadband <%1ms (delta %2ms)")
+                             .arg(m_weakDeadbandMs, 0, 'f', 1)
+                             .arg(delta, 0, 'f', 1);
+    return false;
+  }
+
+  if (abs_delta >= m_weakStrongStepMs) {
+    if (abs_delta >= m_weakEmergencyStepMs) {
+      resetWeakSyncState();
+      if (reason) *reason = QString("emergency step >=%1ms (delta %2ms)")
+                               .arg(m_weakEmergencyStepMs, 0, 'f', 1)
+                               .arg(delta, 0, 'f', 1);
+      return true;
+    }
+
+    int const direction = delta > 0.0 ? 1 : -1;
+    if (direction == m_weakLastDirection) {
+      ++m_weakConfirmCount;
+    } else {
+      m_weakLastDirection = direction;
+      m_weakConfirmCount = 1;
+    }
+    int const needed = qMax(m_weakStrongConfirmNeeded, m_weakConfirmNeeded);
+    if (m_weakConfirmCount < needed) {
+      if (reason) *reason = QString("pending strong confirm %1/%2 (delta %3ms)")
+                               .arg(m_weakConfirmCount)
+                               .arg(needed)
+                               .arg(delta, 0, 'f', 1);
+      return false;
+    }
+
+    resetWeakSyncState();
+    if (reason) *reason = QString("strong confirmed %1/%2 (delta %3ms)")
+                             .arg(needed)
+                             .arg(needed)
+                             .arg(delta, 0, 'f', 1);
+    return true;
+  }
+
+  int const direction = delta > 0.0 ? 1 : -1;
+  if (direction == m_weakLastDirection) {
+    ++m_weakConfirmCount;
+  } else {
+    m_weakLastDirection = direction;
+    m_weakConfirmCount = 1;
+  }
+
+  if (m_weakConfirmCount < m_weakConfirmNeeded) {
+    if (reason) *reason = QString("pending confirm %1/%2 (delta %3ms)")
+                             .arg(m_weakConfirmCount)
+                             .arg(m_weakConfirmNeeded)
+                             .arg(delta, 0, 'f', 1);
+    return false;
+  }
+
+  resetWeakSyncState();
+  if (reason) *reason = QString("confirmed %1/%2 (delta %3ms)")
+                           .arg(m_weakConfirmNeeded)
+                           .arg(m_weakConfirmNeeded)
+                           .arg(delta, 0, 'f', 1);
+  return true;
 }

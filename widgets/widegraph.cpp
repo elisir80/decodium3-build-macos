@@ -25,7 +25,7 @@ WideGraph::WideGraph(QSettings * settings, QWidget *parent) :
 {
   ui->setupUi(this);
 
-  setWindowTitle (QApplication::applicationName () + " - " + tr ("Wide Graph"));
+  setWindowTitle (QStringLiteral("Decodium v3.0 SE") + " - " + tr ("Wide Graph"));
   setWindowFlags (Qt::WindowCloseButtonHint | Qt::WindowMinimizeButtonHint);
   setMaximumWidth (MAX_SCREENSIZE);
   setMaximumHeight (880);
@@ -316,6 +316,16 @@ void WideGraph::setMode(QString mode)                              //setMode
   ui->labTime->setVisible(!m_mode.startsWith("FST4"));
   ui->timestampComboBox->setVisible(!m_mode.startsWith("FST4"));
   ui->widePlot->setMode(mode);
+  // Update multi-slot spacing for the new mode
+  int spacing = (m_mode=="FT2") ? 200 : 60;
+  ui->widePlot->setMultiSlot(ui->widePlot->nSlots(), spacing);
+  // FT2 optimization: no waterfall averaging (period already very short 3.75s)
+  // and boost 2D spectrum smoothing for better visibility
+  if (m_mode=="FT2") {
+    m_waterfallAvg = 1;
+    ui->waterfallAvgSpinBox->setValue(1);
+    ui->widePlot->setWaterfallAvg(1);
+  }
   ui->widePlot->DrawOverlay();
   ui->widePlot->update();
 }
@@ -537,6 +547,10 @@ void WideGraph::on_zero2dSlider_valueChanged(int value)               //Zero2
 void WideGraph::setSuperFox(bool b)
 {
   ui->widePlot->setSuperFox(b);
+}
+void WideGraph::setMultiSlot(int nslots, int spacing)
+{
+  ui->widePlot->setMultiSlot(nslots, spacing);
 }
 
 void WideGraph::setSuperHound(bool b)
