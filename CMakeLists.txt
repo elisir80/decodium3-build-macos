@@ -850,6 +850,8 @@ set (TOP_LEVEL_RESOURCES
   artwork/ft2logo.png
   contrib/gpl-v3-logo.svg
   artwork/splash.png
+  artwork/maps/earth_2048x1024.jpg
+  artwork/maps/world_overlay_2048x1024.png
   )
 
 set (PALETTE_FILES

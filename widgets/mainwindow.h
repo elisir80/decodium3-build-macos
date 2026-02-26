@@ -121,6 +121,7 @@ class MultiSettings;
 class EqualizationToolsDialog;
 class DecodedText;
 class Cloudlog;
+class WorldMapWidget;
 
 class MainWindow
   : public MultiGeometryWidget<3, QMainWindow>
@@ -532,6 +533,10 @@ private:
   bool elide_tx1_not_allowed () const;
   void readWidebandDecodes();
   void configActiveStations();
+  void updateWorldMapFromDecode(DecodedText const& decoded_text);
+  void log_audio_rebind_event (QString const& message, bool warning = false);
+  void attempt_audio_output_rebind ();
+  QAudioDeviceInfo select_audio_output_rebind_device ();
   void sfox_tx();
   bool play_DXcall = false;
   bool inSettings = false;
@@ -571,6 +576,9 @@ private:
   QScopedPointer<HelpTextWindow> m_mouseCmnds;
   QScopedPointer<MessageAveraging> m_msgAvgWidget;
   QScopedPointer<ActiveStations> m_ActiveStationsWidget;
+  WorldMapWidget * m_worldMapWidget {nullptr};
+  QHash<QString, QString> m_worldMapGridByCall;
+  bool m_worldMapCall3Loaded {false};
   QScopedPointer<FoxLogWindow> m_foxLogWindow;
   QScopedPointer<CabrilloLogWindow> m_contestLogWindow;
   QScopedPointer<ColorHighlighting> m_colorHighlighting;
@@ -589,6 +597,7 @@ private:
   SoundOutput * m_soundOutput;
   int m_rx_audio_buffer_frames;
   int m_tx_audio_buffer_frames;
+  qint64 m_last_tx_audio_rebind_ms;
   QThread m_audioThread;
 
   qint64  m_msErase;

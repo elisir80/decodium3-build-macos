@@ -53,6 +53,10 @@
 #include "widgets/SplashScreen.hpp"
 #include "widgets/MessageBox.hpp"       // last to avoid nasty MS macro definitions
 
+#if defined (Q_OS_DARWIN)
+#include <sys/sysctl.h>
+#endif
+
 extern "C" {
   // Fortran procedures we need
   void four2a_(_Complex float *, int * nfft, int * ndim, int * isign, int * iform, int len);
@@ -101,6 +105,40 @@ namespace
         os << v.toString ();
       }
   }
+
+#if defined (Q_OS_DARWIN)
+  QString make_macos_shm_key (QString app_name)
+  {
+    // macOS POSIX shared memory names are strict and short.
+    app_name = app_name.simplified ();
+    app_name.replace (QRegularExpression {R"([^A-Za-z0-9_.-])"}, "_");
+    if (app_name.isEmpty ())
+      {
+        app_name = "ft2";
+      }
+
+    constexpr int max_native_name_len {30}; // leave room for leading '/'
+    if (app_name.size () > max_native_name_len)
+      {
+        auto const utf8 = app_name.toUtf8 ();
+        auto const checksum = QString::number (qChecksum (utf8.constData (), static_cast<uint> (utf8.size ())), 16)
+          .rightJustified (4, QLatin1Char {'0'});
+        app_name = app_name.left (max_native_name_len - 5) + "_" + checksum.right (4);
+      }
+    return "/" + app_name;
+  }
+
+  quint64 read_macos_sysctl (char const * name)
+  {
+    quint64 value {};
+    size_t size {sizeof (value)};
+    if (0 == sysctlbyname (name, &value, &size, nullptr, 0) && size == sizeof (value))
+      {
+        return value;
+      }
+    return 0;
+  }
+#endif
 }
 
 int main(int argc, char *argv[])
@@ -358,7 +396,11 @@ int main(int argc, char *argv[])
 
           // Create and initialize shared memory segment
           // Multiple instances: use rig_name as shared memory key
-          mem_jt9.setKey(a.applicationName ());
+#if defined (Q_OS_DARWIN)
+          mem_jt9.setKey (make_macos_shm_key (a.applicationName ()));
+#else
+          mem_jt9.setKey (a.applicationName ());
+#endif
 
           // try and shut down any orphaned jt9 process
           for (int i = 3; i; --i) // three tries to close old jt9
@@ -381,18 +423,56 @@ int main(int argc, char *argv[])
           if (!mem_jt9.attach ())
             {
               if (!mem_jt9.create (sizeof (dec_data)))
-              {
-                MessageBox::critical_message (nullptr, a.translate ("main", "Shared memory error"),
-                                              a.translate ("main", "Unable to create shared memory segment"));
-                throw std::runtime_error {"Shared memory error"};
-              }
+                {
+                  auto const key = mem_jt9.nativeKey ().isEmpty () ? mem_jt9.key () : mem_jt9.nativeKey ();
+                  auto reason = mem_jt9.errorString ();
+#if defined (Q_OS_DARWIN)
+                  auto const shmmax = read_macos_sysctl ("kern.sysv.shmmax");
+                  auto const shmall = read_macos_sysctl ("kern.sysv.shmall");
+                  if (shmmax)
+                    {
+                      reason += "\nshmmax=" + QString::number (shmmax)
+                        + " bytes, required=" + QString::number (sizeof (dec_data)) + " bytes";
+                      if (shmmax < sizeof (dec_data))
+                        {
+                          reason += "\nHint: kern.sysv.shmmax is too small.";
+                        }
+                    }
+                  if (shmall)
+                    {
+                      reason += "\nshmall=" + QString::number (shmall) + " pages";
+                    }
+#endif
+                  LOG_ERROR ("Unable to create shared memory segment; key=" << key
+                            << ", size=" << sizeof (dec_data)
+                            << ", error=" << reason);
+                  MessageBox::critical_message (nullptr, a.translate ("main", "Shared memory error"),
+                                                a.translate ("main", "Unable to create shared memory segment")
+                                                + "\n\nKey: " + key
+                                                + "\nReason: " + reason);
+                  throw std::runtime_error {("Shared memory error: " + reason).toStdString ()};
+                }
               LOG_INFO ("shmem size: " << mem_jt9.size ());
             }
           else
             {
-              MessageBox::critical_message (nullptr, a.translate ("main", "Sub-process error"),
-                                            a.translate ("main", "Failed to close orphaned jt9 process"));
-              throw std::runtime_error {"Sub-process error"};
+              // On some systems an old shared-memory segment may persist
+              // even after jt9 has exited. Reuse it instead of aborting.
+              LOG_WARN ("Shared memory segment already present after orphan shutdown attempts; reusing existing segment");
+              if (mem_jt9.size () < static_cast<int> (sizeof (dec_data)))
+                {
+                  auto const key = mem_jt9.nativeKey ().isEmpty () ? mem_jt9.key () : mem_jt9.nativeKey ();
+                  auto reason = "Existing segment is smaller than required: size="
+                    + QString::number (mem_jt9.size ())
+                    + " bytes, required=" + QString::number (sizeof (dec_data)) + " bytes";
+                  LOG_ERROR ("Shared memory segment size mismatch; key=" << key << ", error=" << reason);
+                  MessageBox::critical_message (nullptr, a.translate ("main", "Shared memory error"),
+                                                a.translate ("main", "Unable to create shared memory segment")
+                                                + "\n\nKey: " + key
+                                                + "\nReason: " + reason);
+                  throw std::runtime_error {("Shared memory error: " + reason).toStdString ()};
+                }
+              LOG_INFO ("shmem size: " << mem_jt9.size ());
             }
           mem_jt9.lock ();
           memset(mem_jt9.data(),0,sizeof(struct dec_data)); //Zero all decoding params in shared memory
