@@ -68,10 +68,12 @@ jobs:
 
           GCC_PREFIX="$(brew --prefix gcc)"
           GFORTRAN="$(ls "${GCC_PREFIX}"/bin/gfortran-* 2>/dev/null | head -1 || true)"
-          if [[ -n "${GFORTRAN}" ]]; then
-            sudo ln -sf "${GFORTRAN}" /usr/local/bin/gfortran
+          if [[ -z "${GFORTRAN}" ]]; then
+            echo "gfortran not found under ${GCC_PREFIX}/bin"
+            exit 1
           fi
-          gfortran --version
+          echo "FC=${GFORTRAN}" >> "$GITHUB_ENV"
+          "${GFORTRAN}" --version
 
           QT5_PREFIX="$(brew --prefix qt@5)"
           echo "${QT5_PREFIX}/bin" >> "$GITHUB_PATH"

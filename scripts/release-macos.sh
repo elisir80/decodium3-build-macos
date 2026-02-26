@@ -230,6 +230,11 @@ cmake_args=(
 if [[ -n "${CMAKE_PREFIX_PATH:-}" ]]; then
   cmake_args+=("-DCMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}")
 fi
+# Ensure CMake uses the real gfortran binary path (not a generic symlink),
+# so bundle fixup can resolve the correct GCC runtime directories.
+if [[ -n "${FC:-}" ]]; then
+  cmake_args+=("-DCMAKE_Fortran_COMPILER=${FC}")
+fi
 
 cmake \
   -S "$ROOT_DIR" \
