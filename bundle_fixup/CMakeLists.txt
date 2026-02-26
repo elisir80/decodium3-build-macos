@@ -10,6 +10,21 @@ if (APPLE)
   if (EXISTS "/usr/local/opt/webp/lib")
     list (APPEND fixup_library_dirs "/usr/local/opt/webp/lib")
   endif ()
+
+  # gfortran-linked binaries (jt9/wsprd/etc.) need GCC runtime libs during fixup_bundle.
+  if (CMAKE_Fortran_COMPILER MATCHES "gfortran")
+    get_filename_component (_gfortran_bin_dir "${CMAKE_Fortran_COMPILER}" DIRECTORY)
+    get_filename_component (_gcc_root "${_gfortran_bin_dir}/.." ABSOLUTE)
+    foreach (_gcc_lib_dir
+      "${_gcc_root}/lib/gcc/current"
+      "${_gcc_root}/lib/gcc/15"
+      "${_gcc_root}/lib/gcc/14"
+      "${_gcc_root}/lib")
+      if (EXISTS "${_gcc_lib_dir}")
+        list (APPEND fixup_library_dirs "${_gcc_lib_dir}")
+      endif ()
+    endforeach ()
+  endif ()
 endif ()
 
 if (APPLE OR WIN32)

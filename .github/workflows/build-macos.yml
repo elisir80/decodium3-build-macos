@@ -39,7 +39,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew update
           brew install qt@5 gcc fftw hamlib libusb boost pkg-config create-dmg dylibbundler
 
           QT5_PREFIX=$(brew --prefix qt@5)
