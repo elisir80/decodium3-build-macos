@@ -131,6 +131,9 @@ QLabel { color: #ddd; }</string>
    </item>
    <item>
     <widget class="QGroupBox" name="groupDrift">
+     <property name="visible">
+      <bool>false</bool>
+     </property>
      <property name="title">
       <string>Soundcard Drift</string>
      </property>

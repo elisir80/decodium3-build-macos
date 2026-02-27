@@ -21,7 +21,7 @@
 
 namespace
 {
-int const kContactLifetimeSeconds = 15 * 60;
+int const kContactLifetimeSeconds = 2 * 60;
 int const kMaxContacts = 40;
 int const kRoleDowngradeHoldSeconds = 75;
 int const kPostTxQueueMs = 10 * 1000;

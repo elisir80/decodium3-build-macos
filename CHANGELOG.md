@@ -1,5 +1,35 @@
 # Changelog / Registro Modifiche
 
+## [1.2.1] - 2026-02-27
+
+### English
+
+Maintenance release focused on UI cleanliness and map accuracy.
+
+#### Changed
+
+- Removed soundcard drift display/alternation in status bar and Time Sync panel; drift measurement disabled in Detector.
+- Shortened world map contact lifetime to 2 minutes to prevent stale call popups.
+- Program title updated to fork `v1.2.1`.
+
+#### Fixed
+
+- Prevented SC drift label from reappearing via legacy code path.
+
+### Italiano
+
+Release di manutenzione focalizzata su pulizia UI e correttezza mappa.
+
+#### Modificato
+
+- Rimossa la visualizzazione/alternanza del drift scheda audio in status bar e pannello Time Sync; misura di drift disabilitata nel Detector.
+- Durata contatti mappa ridotta a 2 minuti per evitare chiamate fantasma.
+- Titolo programma aggiornato alla fork `v1.2.1`.
+
+#### Corretto
+
+- Evitata la ricomparsa dell’etichetta SC drift tramite codice legacy.
+
 ## [1.2.0] - 2026-02-26
 
 ### English

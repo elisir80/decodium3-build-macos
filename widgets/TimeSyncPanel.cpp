@@ -138,24 +138,9 @@ void TimeSyncPanel::updateNtpSyncStatus(bool synced, QString const& statusText)
 
 void TimeSyncPanel::updateSoundcardDrift(double driftMsPerPeriod, double driftPpm)
 {
-  // Drift ppm display
-  QString ppmText = QString("%1%2 ppm")
-    .arg(driftPpm > 0 ? "+" : "")
-    .arg(driftPpm, 0, 'f', 1);
-  ui->lblDriftPpm->setText(ppmText);
-
-  if (qAbs(driftPpm) < 10.0)
-    ui->lblDriftPpm->setStyleSheet("color: #00ff00; font-weight: bold;");
-  else if (qAbs(driftPpm) < 50.0)
-    ui->lblDriftPpm->setStyleSheet("color: #ffff00; font-weight: bold;");
-  else
-    ui->lblDriftPpm->setStyleSheet("color: #ff4444; font-weight: bold;");
-
-  // Drift per period display
-  QString periodText = QString("%1%2 ms/period")
-    .arg(driftMsPerPeriod > 0 ? "+" : "")
-    .arg(driftMsPerPeriod, 0, 'f', 2);
-  ui->lblDriftPerPeriod->setText(periodText);
+  // UI updates removed per user request
+  (void)driftMsPerPeriod;
+  (void)driftPpm;
 }
 
 void TimeSyncPanel::updateDecodeTiming(QVector<double> const& dtSamples,
@@ -167,6 +152,7 @@ void TimeSyncPanel::updateDecodeTiming(QVector<double> const& dtSamples,
                                         int ntpDtDivergence,
                                         double emaFactor)
 {
+  (void)driftPpm;
   lastAvgDt_ = avgDt;
   lastDtCorrection_ = dtCorrectionMs;
   lastDecodeLatency_ = decodeLatencyMs;
@@ -243,7 +229,8 @@ void TimeSyncPanel::updateDecodeTiming(QVector<double> const& dtSamples,
   else emaState = " (tracking)";
   ui->lblEmaFactor->setText(QString::number(emaFactor, 'f', 2) + emaState);
 
-  // #8: Soundcard drift compensation display
+  // #8: Soundcard drift compensation display - Removed per user request
+  /*
   if (qAbs(driftPpm) > 0.1) {
     ui->lblDriftApplied->setText(QString("%1%2 ppm (active)")
       .arg(driftPpm > 0 ? "+" : "").arg(driftPpm, 0, 'f', 1));
@@ -252,6 +239,7 @@ void TimeSyncPanel::updateDecodeTiming(QVector<double> const& dtSamples,
     ui->lblDriftApplied->setText("< 0.1 ppm (idle)");
     ui->lblDriftApplied->setStyleSheet("color:#888;");
   }
+  */
 
   // #8: Warning display for NTP vs DT divergence
   if (ntpDtDivergence >= 5) {

@@ -1,10 +1,10 @@
-# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.2.0 (Italiano)
+# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.2.1 (Italiano)
 
 Per la versione bilingue completa (English + Italiano), vedere [README.md](README.md).
 
 ## Sintesi italiana
 
-Questa release fork (`v1.2.0`) e' basata su Decodium v3.0 SE Raptor upstream e introduce hardening operativo specifico per macOS:
+Questa release fork (`v1.2.1`) e' basata su Decodium v3.0 SE Raptor upstream e introduce hardening operativo specifico per macOS:
 
 - migrazione runtime stabile su `ft2.app` / `ft2`;
 - fix path sottoprocessi (`jt9`) nel bundle;
@@ -20,7 +20,7 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ## Documentazione
 
-- [RELEASE_NOTES_v1.2.0.md](RELEASE_NOTES_v1.2.0.md)
+- [RELEASE_NOTES_v1.2.1.md](RELEASE_NOTES_v1.2.1.md)
 - [CHANGELOG.md](CHANGELOG.md)
 - [doc/MACOS_PORTING_v1.2.0.md](doc/MACOS_PORTING_v1.2.0.md)
 - [doc/DT_NTP_ROBUST_SYNC_v1.2.0.md](doc/DT_NTP_ROBUST_SYNC_v1.2.0.md)

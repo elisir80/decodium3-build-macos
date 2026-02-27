@@ -692,7 +692,7 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   // hook up the detector signals, slots and disposal
   connect (this, &MainWindow::FFTSize, m_detector, &Detector::setBlockSize);
   connect(m_detector, &Detector::framesWritten, this, &MainWindow::dataSink);
-  connect(m_detector, &Detector::soundcardDriftUpdated, this, &MainWindow::onSoundcardDriftUpdated);
+  // connect(m_detector, &Detector::soundcardDriftUpdated, this, &MainWindow::onSoundcardDriftUpdated);
   // NTP offset is displayed in TimeSyncPanel but NOT injected into Detector
   // (shifting period boundary corrupts audio window and degrades decoding)
   connect (&m_audioThread, &QThread::finished, m_detector, &QObject::deleteLater);
@@ -19930,6 +19930,8 @@ void MainWindow::onSoundcardDriftUpdated(double driftMsPerPeriod, double driftPp
   m_soundcardDriftPpm = driftPpm;
   m_soundcardDriftMsPerPeriod = driftMsPerPeriod;
 
+  // Soundcard drift display removed per user request (was alternating with DT)
+  /*
   // Update the DT label with soundcard drift info
   QString text = QString("SC:%1%2ppm")
     .arg(driftPpm > 0 ? "+" : "")
@@ -19948,6 +19950,7 @@ void MainWindow::onSoundcardDriftUpdated(double driftMsPerPeriod, double driftPp
     dt_correction_label.setStyleSheet("QLabel{color:#000;background:#ffff00}");
   else
     dt_correction_label.setStyleSheet("QLabel{color:#fff;background:#ff0000}");
+  */
 
   if (m_timeSyncPanel) m_timeSyncPanel->updateSoundcardDrift(driftMsPerPeriod, driftPpm);
 }
