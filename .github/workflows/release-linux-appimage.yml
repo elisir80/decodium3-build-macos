@@ -136,6 +136,10 @@ jobs:
           export QMAKE=/usr/lib/qt5/bin/qmake
           export ARCH=x86_64
 
+          # linuxdeploy-plugin-qt expects this directory on some Ubuntu images.
+          # When missing, the plugin aborts with std::filesystem_error.
+          sudo mkdir -p /usr/lib/x86_64-linux-gnu/qt5/plugins/mediaservice
+
           mkdir -p tools
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -O tools/linuxdeploy-x86_64.AppImage
           wget -q https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage -O tools/linuxdeploy-plugin-qt-x86_64.AppImage
