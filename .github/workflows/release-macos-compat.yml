@@ -35,7 +35,7 @@ jobs:
           # Keep ARM build target for Sequoia (15.x) and Tahoe.
           - runner: macos-26
             arch_label: arm64
-            compat_macos: "15.0"
+            compat_macos: "26.0"
             asset_suffix: "macos-tahoe-arm64"
           - runner: macos-15
             arch_label: arm64
