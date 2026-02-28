@@ -1,5 +1,51 @@
 # Changelog / Registro Modifiche
 
+## [1.3.3] - 2026-02-28
+
+### English
+
+Release focused on upstream feature import from the original Raptor repository plus fork UI/runtime refinements.
+
+#### Changed
+
+- Imported upstream Raptor feature set:
+  - B4 strikethrough in Band Activity for worked-on-band stations.
+  - Auto CQ caller FIFO queue (max 20) with automatic next-caller processing after QSO completion.
+  - TX slot red bracket overlay (`[ ]`) on waterfall for FT2/FT8/FT4.
+  - Automatic `cty.dat` refresh/download at startup when missing or older than 30 days.
+  - FT2 decoder tuning updates (`syncmin` adaptive profile, extended AP types for Tx3/Tx4, deep-search threshold relaxations).
+- Added responsive top-controls layout for small displays with automatic 2-row split.
+- Updated release/build metadata to installer build tag `2602281900`.
+- Release artifacts remain DMG/ZIP/SHA256 for macOS and AppImage/SHA256 for Linux (no `.pkg`).
+
+#### Fixed
+
+- Startup mode/frequency mismatch on CAT initialization by using full-list mode auto-alignment.
+- Light-theme progress/seconds bar visibility in status area.
+- Small-screen control overlap/truncation in top action row.
+
+### Italiano
+
+Release focalizzata su import feature upstream dal repository Raptor originale e rifiniture UI/runtime del fork.
+
+#### Modificato
+
+- Importato il set feature upstream Raptor:
+  - Testo barrato B4 in Band Activity per stazioni gia' lavorate in banda.
+  - Coda FIFO Auto CQ chiamanti (max 20) con passaggio automatico al prossimo chiamante a fine QSO.
+  - Overlay waterfall con parentesi rosse (`[ ]`) sullo slot TX per FT2/FT8/FT4.
+  - Refresh/download automatico `cty.dat` all'avvio se mancante o piu' vecchio di 30 giorni.
+  - Tuning decoder FT2 (`syncmin` adattivo, AP esteso su Tx3/Tx4, soglie deep-search rilassate).
+- Aggiunto layout controlli top responsivo per schermi piccoli con split automatico su 2 righe.
+- Aggiornati metadati build/release al build tag installer `2602281900`.
+- Artifact release invariati: DMG/ZIP/SHA256 su macOS e AppImage/SHA256 su Linux (nessun `.pkg`).
+
+#### Corretto
+
+- Mismatch modalita'/frequenza all'avvio con CAT tramite auto-allineamento modalita' su lista completa frequenze.
+- Visibilita' barra progressi/secondi nel tema chiaro in status bar.
+- Sovrapposizioni/troncamenti controlli su display piccoli nella riga azioni superiore.
+
 ## [1.3.2] - 2026-02-28
 
 ### English

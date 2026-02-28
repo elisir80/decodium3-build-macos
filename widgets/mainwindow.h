@@ -17,6 +17,7 @@
 #include <QList>
 #include <QAudioDeviceInfo>
 #include <QStringList>
+#include <QResizeEvent>
 #include <QScopedPointer>
 #include <QDir>
 #include <QProgressDialog>
@@ -57,6 +58,8 @@
 #include "MessageBox.hpp"
 #include "Network/NetworkAccessManager.hpp"
 #include "Network/NtpClient.hpp"
+
+class QHBoxLayout;
 
 #define NUM_JT4_SYMBOLS 206                //(72+31)*2, embedded sync
 #define NUM_JT65_SYMBOLS 126               //63 data + 63 sync
@@ -167,6 +170,7 @@ public slots:
 private:
   void change_layout (std::size_t) override;
   void keyPressEvent (QKeyEvent *) override;
+  void resizeEvent (QResizeEvent *) override;
   void closeEvent(QCloseEvent *) override;
   void childEvent(QChildEvent *) override;
   bool eventFilter(QObject *, QEvent *) override;
@@ -1064,6 +1068,11 @@ private:
   bool m_useDarkStyle;
   bool m_externalCtrl;         //avt  10/1/25
   bool m_autoButtonState;     //avt 10/2/25
+  bool m_startupModeAutoAligned {false};
+  bool m_compactTopControls {false};
+  bool m_topControlsTwoRows {false};
+  QWidget * m_topControlsSecondRowWidget {nullptr};
+  QHBoxLayout * m_topControlsSecondRowLayout {nullptr};
 
   //---- DT Feedback Loop ----
   QVector<double> m_dtSamples;        // DT values collected in current period
@@ -1165,6 +1174,9 @@ private:
   void on_the_minute ();
   void add_child_to_event_filter (QObject *);
   void remove_child_from_event_filter (QObject *);
+  void updateCompactTopControls ();
+  void setTopControlsTwoRows (bool enabled);
+  void applyCompactTopControls (bool compact);
   void setup_status_bar (bool vhf);
   void tx_watchdog (bool triggered);
   qint64  nWidgets(QString t);

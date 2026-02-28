@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. v1.3.2)"
+        description: "Release version (e.g. v1.3.3)"
         required: true
-        default: "v1.3.2"
+        default: "v1.3.3"
       publish_release:
         description: "Upload AppImage to GitHub release"
         required: true
@@ -221,9 +221,9 @@ jobs:
             {
               echo "# Decodium 3 FT2 ${VERSION} (Linux AppImage)"
               echo
-              echo "Linux x86_64 AppImage release."
+              echo "Linux x86_64 AppImage release for fork ${VERSION}."
               echo
-              echo "Includes startup I/O hardening work from ${VERSION}."
+              echo "Includes upstream Raptor feature import and fork UI/runtime fixes from ${VERSION}."
               echo
               echo "Linux minimum requirements:"
               echo "- x86_64 CPU, 4 GB RAM minimum"

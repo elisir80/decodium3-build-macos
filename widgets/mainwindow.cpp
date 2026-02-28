@@ -30,6 +30,7 @@
 #include <QTextBlock>
 #include <QProgressBar>
 #include <QLineEdit>
+#include <QHBoxLayout>
 #include <QRegExpValidator>
 #include <QRegExp>
 #include <QRegularExpression>
@@ -1666,6 +1667,9 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   ui->lh_decodes_headings_label->setText(t);
   ui->rh_decodes_headings_label->setText(t);
   readSettings();            //Restore user's setup parameters
+  QTimer::singleShot (0, this, [this] {
+      updateCompactTopControls ();
+    });
 
   // Start NTP sync after settings are loaded
   if (!m_ntpCustomServer.isEmpty()) {
@@ -5451,7 +5455,9 @@ void MainWindow::createStatusBar()                           //createStatusBar
   band_hopping_label.setFrameStyle (QFrame::Panel | QFrame::Sunken);
 
   statusBar()->addPermanentWidget(&progressBar);
-  progressBar.setMinimumSize (QSize {150, 18});
+  progressBar.setMinimumSize (QSize {170, 22});
+  progressBar.setMaximumHeight (22);
+  statusBar ()->setMinimumHeight (24);
 
   statusBar ()->addPermanentWidget (&watchdog_label);
   update_watchdog_label ();
@@ -5872,6 +5878,7 @@ void MainWindow::trim_view (bool checked)
   ui->verticalLayout_7->layout()->setSpacing(spacing);
   ui->verticalLayout_8->layout()->setSpacing(spacing);
   ui->tab->layout()->setSpacing(spacing);
+  applyCompactTopControls (m_compactTopControls);
 }
 
 void MainWindow::on_actionAstronomical_data_toggled (bool checked)
@@ -9830,32 +9837,38 @@ void MainWindow::guiUpdate()
     }
 
     progressBar.setVisible(true);
-    // turn the progressbar red during transmission
-    if(m_config.progressBar_red()) {
-      if(m_transmitting) {
-        if (m_useDarkStyle) {
-          progressBar.setStyleSheet(QString("QProgressBar {color: #ffffff; text-align: center;} QProgressBar::chunk {background-color: #ff0000;}"));
-          progressBar.setFormat ("%v/%m");
-          } else {
-#ifdef WIN32
-            if(m_TRperiod > 99) {
-              progressBar.setStyleSheet(QString("QProgressBar {color: #000000; text-align: right; margin-right: 4em;} QProgressBar::chunk {background-color: #ff0000;}"));
-              progressBar.setFormat ("%v/%m ");
-            } else {
-              progressBar.setStyleSheet(QString("QProgressBar {color: #000000; text-align: right; margin-right: 3em;} QProgressBar::chunk {background-color: #ff0000;}"));
-              progressBar.setFormat ("%v/%m  ");
-            }
-#else
-            progressBar.setStyleSheet(QString("QProgressBar {color: #000000; text-align: center;} QProgressBar::chunk {background-color: #ff4141;}"));
-            progressBar.setFormat ("%v/%m");
-#endif
-          }
-      } else {
-          progressBar.setStyleSheet("");
-          progressBar.setFormat ("%v/%m");			  
-      }
-    } else {
-      progressBar.setStyleSheet("");
+    {
+      QString text_color;
+      QString background_color;
+      QString border_color;
+      QString chunk_color;
+
+      if (m_useDarkStyle)
+        {
+          text_color = "#9de3ff";
+          background_color = "#0b1220";
+          border_color = "#1f3558";
+          chunk_color = (m_transmitting && m_config.progressBar_red ()) ? "#ff3b30" : "#1f9bd1";
+        }
+      else
+        {
+          text_color = "#111111";
+          background_color = "#f3f3f3";
+          border_color = "#8a8a8a";
+          chunk_color = (m_transmitting && m_config.progressBar_red ()) ? "#ff5555" : "#7da8ff";
+        }
+
+      progressBar.setStyleSheet (QString {
+          "QProgressBar {"
+          "color: %1;"
+          "text-align: center;"
+          "border: 1px solid %2;"
+          "background-color: %3;"
+          "}"
+          "QProgressBar::chunk {"
+          "background-color: %4;"
+          "}"
+        }.arg (text_color, border_color, background_color, chunk_color));
       progressBar.setFormat ("%v/%m");
     }
     if(m_mode=="Echo") {
@@ -14359,26 +14372,28 @@ void MainWindow::handle_transceiver_update (Transceiver::TransceiverState const&
       // always take initial rig frequency to avoid start up problems
       // with bogus Tx frequencies
       m_freqNominal = s.frequency ();
-      // Startup alignment: if CAT starts on a known working frequency,
-      // select the matching mode instead of keeping a stale saved mode.
+    }
+
+  // Startup alignment: if CAT starts on a known working frequency,
+  // select the matching mode instead of keeping a stale saved mode.
+  if (!m_startupModeAutoAligned)
+    {
       auto const dial_frequency = s.frequency ();
-      if (dial_frequency > 0 && !m_transmitting && !m_tune)
+      if (dial_frequency > 0 && s.online () && !m_transmitting && !m_tune)
         {
           auto const * frequencies = m_config.frequencies ();
           auto const current_band = m_config.bands ()->find (dial_frequency);
           if (frequencies && !current_band.isEmpty ())
             {
-              int best_row {-1};
+              m_startupModeAutoAligned = true;
+
               quint64 best_offset {std::numeric_limits<quint64>::max ()};
               FrequencyList_v2_101::Item best_item {};
-              for (int row = 0; row < frequencies->rowCount (); ++row)
+              bool found_match {false};
+              auto const& all_items = frequencies->frequency_list ();
+              for (int source_row = 0; source_row < all_items.size (); ++source_row)
                 {
-                  auto const source = frequencies->mapToSource (frequencies->index (row, 0));
-                  if (!source.isValid ())
-                    {
-                      continue;
-                    }
-                  auto const& item = frequencies->frequency_list ()[source.row ()];
+                  auto const& item = all_items[source_row];
                   if (m_config.bands ()->find (item.frequency_) != current_band)
                     {
                       continue;
@@ -14389,13 +14404,13 @@ void MainWindow::handle_transceiver_update (Transceiver::TransceiverState const&
                   if (offset < best_offset)
                     {
                       best_offset = offset;
-                      best_row = row;
                       best_item = item;
+                      found_match = true;
                     }
                 }
 
               auto const tolerance = dial_frequency >= 50000000u ? 25000u : 2000u;
-              if (best_row >= 0 && best_offset <= tolerance)
+              if (found_match && best_offset <= tolerance)
                 {
                   auto const target_mode = QString::fromLatin1 (Modes::name (best_item.mode_));
                   if (!target_mode.isEmpty () && target_mode != m_mode)
@@ -14406,7 +14421,9 @@ void MainWindow::handle_transceiver_update (Transceiver::TransceiverState const&
                         .arg (best_offset).toStdString ());
                       set_mode (target_mode);
                     }
-                  if (ui->bandComboBox->currentIndex () != best_row)
+
+                  auto const best_row = frequencies->best_working_frequency (best_item.frequency_);
+                  if (best_row >= 0 && ui->bandComboBox->currentIndex () != best_row)
                     {
                       QSignalBlocker blocker {ui->bandComboBox};
                       ui->bandComboBox->setCurrentIndex (best_row);
@@ -16366,6 +16383,166 @@ void MainWindow::childEvent (QChildEvent * e)
         }
     }
   QMainWindow::childEvent (e);
+}
+
+void MainWindow::resizeEvent (QResizeEvent * e)
+{
+  QMainWindow::resizeEvent (e);
+  updateCompactTopControls ();
+}
+
+void MainWindow::updateCompactTopControls ()
+{
+  auto const compact = width () < 1320;
+  if (compact == m_compactTopControls)
+    {
+      return;
+    }
+  m_compactTopControls = compact;
+  applyCompactTopControls (compact);
+}
+
+void MainWindow::setTopControlsTwoRows (bool enabled)
+{
+  if (enabled && !m_topControlsSecondRowWidget)
+    {
+      m_topControlsSecondRowWidget = new QWidget {ui->lower_panel_widget};
+      m_topControlsSecondRowWidget->setObjectName ("top_controls_second_row");
+      m_topControlsSecondRowLayout = new QHBoxLayout {m_topControlsSecondRowWidget};
+      m_topControlsSecondRowLayout->setContentsMargins (0, 0, 0, 0);
+      m_topControlsSecondRowLayout->setSpacing (ui->horizontalLayout_2->spacing ());
+
+      int insert_index {-1};
+      for (int i = 0; i < ui->verticalLayout_4->count (); ++i)
+        {
+          auto * item = ui->verticalLayout_4->itemAt (i);
+          if (item && item->layout () == ui->horizontalLayout_2)
+            {
+              insert_index = i + 1;
+              break;
+            }
+        }
+      if (insert_index >= 0)
+        {
+          ui->verticalLayout_4->insertWidget (insert_index, m_topControlsSecondRowWidget);
+        }
+      else
+        {
+          ui->verticalLayout_4->addWidget (m_topControlsSecondRowWidget);
+        }
+      m_topControlsSecondRowWidget->hide ();
+    }
+
+  if (!m_topControlsSecondRowLayout)
+    {
+      m_topControlsTwoRows = false;
+      return;
+    }
+
+  if (enabled == m_topControlsTwoRows)
+    {
+      return;
+    }
+
+  QWidget * const row1_widgets[] = {
+    ui->cbCQonly, ui->cbBypass, ui->logQSOButton, ui->stopButton, ui->monitorButton,
+    ui->EraseButton, ui->ClrAvgButton, ui->sbEchoAvg, ui->DecodeButton
+  };
+  QWidget * const row2_widgets[] = {
+    ui->autoButton, ui->autoCQButton, ui->cbAutoTogglePeriod,
+    ui->stopTxButton, ui->tuneButton, ui->cbMenus
+  };
+  QWidget * const all_widgets[] = {
+    ui->cbCQonly, ui->cbBypass, ui->logQSOButton, ui->stopButton, ui->monitorButton,
+    ui->EraseButton, ui->ClrAvgButton, ui->sbEchoAvg, ui->DecodeButton,
+    ui->autoButton, ui->autoCQButton, ui->cbAutoTogglePeriod,
+    ui->stopTxButton, ui->tuneButton, ui->cbMenus
+  };
+
+  for (auto * widget : all_widgets)
+    {
+      ui->horizontalLayout_2->removeWidget (widget);
+      m_topControlsSecondRowLayout->removeWidget (widget);
+    }
+
+  if (enabled)
+    {
+      for (auto * widget : row1_widgets)
+        {
+          ui->horizontalLayout_2->addWidget (widget);
+        }
+      for (auto * widget : row2_widgets)
+        {
+          m_topControlsSecondRowLayout->addWidget (widget);
+        }
+      m_topControlsSecondRowWidget->show ();
+    }
+  else
+    {
+      for (auto * widget : all_widgets)
+        {
+          ui->horizontalLayout_2->addWidget (widget);
+        }
+      m_topControlsSecondRowWidget->hide ();
+    }
+
+  m_topControlsTwoRows = enabled;
+}
+
+void MainWindow::applyCompactTopControls (bool compact)
+{
+  setTopControlsTwoRows (compact);
+
+  auto adjust_font = [compact] (QWidget * widget) {
+      if (!widget)
+        {
+          return;
+        }
+
+      bool ok {false};
+      auto base_size = widget->property ("_ft2_basePointSize").toDouble (&ok);
+      if (!ok || base_size <= 0.0)
+        {
+          base_size = widget->font ().pointSizeF ();
+          if (base_size <= 0.0)
+            {
+              base_size = 10.0;
+            }
+          widget->setProperty ("_ft2_basePointSize", base_size);
+        }
+
+      auto const target_size = compact ? qMax (8.0, base_size - 1.0) : base_size;
+      QFont f {widget->font ()};
+      if (qAbs (f.pointSizeF () - target_size) > 0.05)
+        {
+          f.setPointSizeF (target_size);
+          widget->setFont (f);
+        }
+    };
+
+  adjust_font (ui->cbCQonly);
+  adjust_font (ui->cbBypass);
+  adjust_font (ui->logQSOButton);
+  adjust_font (ui->stopButton);
+  adjust_font (ui->monitorButton);
+  adjust_font (ui->EraseButton);
+  adjust_font (ui->ClrAvgButton);
+  adjust_font (ui->DecodeButton);
+  adjust_font (ui->autoButton);
+  adjust_font (ui->autoCQButton);
+  adjust_font (ui->cbAutoTogglePeriod);
+  adjust_font (ui->stopTxButton);
+  adjust_font (ui->tuneButton);
+  adjust_font (ui->cbMenus);
+
+  ui->cbAutoTogglePeriod->setStyleSheet (compact
+                                         ? QStringLiteral ("QCheckBox { margin-left: 4px; }")
+                                         : QStringLiteral ("QCheckBox { margin-left: 8px; }"));
+  ui->horizontalLayout_2->setSpacing (compact ? 2 : (ui->cbMenus->isChecked () ? 6 : 1));
+  if (m_topControlsSecondRowLayout)
+    {
+      m_topControlsSecondRowLayout->setSpacing (ui->horizontalLayout_2->spacing ());
+    }
 }
 
 // add widget and any child widgets to our event filter so that we can

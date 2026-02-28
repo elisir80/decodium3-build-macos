@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. v1.3.2)"
+        description: "Release version (e.g. v1.3.3)"
         required: true
-        default: "v1.3.2"
+        default: "v1.3.3"
       publish_release:
         description: "Publish GitHub release"
         required: true
@@ -151,11 +151,11 @@ jobs:
             echo
             echo "## English (UK)"
             echo "This release includes:"
-            echo "- Program title/version alignment to fork release ${VERSION}."
-            echo "- Startup freeze/hang mitigation by moving expensive file I/O off the main UI thread."
-            echo "- Async/safe loading for wsjtx.log, ignore.list, ALLCALL7.TXT, and old-file cleanup."
-            echo "- CTY.DAT loader hardening with fallback recovery, size guards, and parser validation."
-            echo "- Additional startup file hardening for grid.dat, sat.dat, and comments.txt."
+            echo "- Upstream Raptor feature import: B4 strikethrough, Auto CQ caller FIFO queue, TX bracket waterfall, and auto CTY.DAT refresh."
+            echo "- FT2 decoder tuning updates: adaptive syncmin, extended AP types, relaxed deep-search thresholds."
+            echo "- Startup mode/frequency auto-alignment fixes and small-display responsive UI refinements."
+            echo "- Light-theme seconds/progress visibility fix."
+            echo "- macOS shared-memory mmap flow retained (no .pkg required)."
             echo "- Apple Silicon build for macOS Tahoe."
             echo "- Apple Silicon build for macOS Sequoia."
             echo "- Apple Intel build for macOS Sequoia."
@@ -173,11 +173,11 @@ jobs:
             echo
             echo "## Italiano"
             echo "Questa release include:"
-            echo "- Allineamento titolo/versione programma alla release fork ${VERSION}."
-            echo "- Mitigazione freeze/hang in avvio spostando I/O pesante fuori dal thread UI."
-            echo "- Caricamento asincrono/sicuro per wsjtx.log, ignore.list, ALLCALL7.TXT e pulizia file vecchi."
-            echo "- Hardening loader CTY.DAT con recovery fallback, limiti dimensione e validazione parser."
-            echo "- Hardening file di startup aggiuntivi: grid.dat, sat.dat e comments.txt."
+            echo "- Import feature upstream Raptor: B4 barrato, coda FIFO Auto CQ, bracket TX waterfall e refresh automatico CTY.DAT."
+            echo "- Aggiornamenti tuning decoder FT2: syncmin adattivo, AP esteso, soglie deep-search rilassate."
+            echo "- Correzioni auto-allineamento modalita'/frequenza all'avvio e rifiniture UI responsive per display piccoli."
+            echo "- Correzione visibilita' barra secondi/progressi nel tema chiaro."
+            echo "- Flusso shared-memory macOS su mmap confermato (nessun .pkg richiesto)."
             echo "- Build Apple Silicon per macOS Tahoe."
             echo "- Build Apple Silicon per macOS Sequoia."
             echo "- Build Apple Intel per macOS Sequoia."
