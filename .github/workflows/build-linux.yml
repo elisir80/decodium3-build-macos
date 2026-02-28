@@ -33,6 +33,7 @@ jobs:
             libhamlib-dev \
             libhamlib-utils \
             libusb-1.0-0-dev \
+            libudev-dev \
             libboost-log-dev \
             libboost-filesystem-dev \
             libboost-thread-dev \
@@ -107,6 +108,7 @@ jobs:
               libfftw3-single3 \
               libhamlib4 \
               libusb-1.0-0 \
+              libudev1 \
               libboost-log1.74.0 \
               libboost-filesystem1.74.0 \
               libportaudio2 \
