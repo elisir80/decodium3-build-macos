@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iostream>
 #include <cmath>
+#include <cstdlib>
 #include <QObject>
 #include <QString>
 #include <QDateTime>
@@ -71,7 +72,7 @@ public:
     , prog_id_ {program_info}
   {
 #if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
-    observation_id_ = qrand();
+    observation_id_ = static_cast<quint32>(std::rand());
 #else
     observation_id_ = QRandomGenerator::global ()->generate ();
 #endif

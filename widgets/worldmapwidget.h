@@ -46,7 +46,7 @@ private:
     QString destinationGrid;
     QPointF sourceLonLat;
     QPointF destinationLonLat;
-    QDateTime lastSeenUtc;
+    qint64 lastSeenMonotonicMs {0};
     PathRole role {PathRole::Generic};
     bool queuedDuringTx {false};
   };

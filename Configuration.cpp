@@ -488,7 +488,7 @@ public:
                  , QWidget * parent);
   ~impl ();
 
-  bool have_rig ();
+  bool have_rig (bool show_error = true);
 
   void transceiver_frequency (Frequency);
   void transceiver_tx_frequency (Frequency);
@@ -1197,10 +1197,10 @@ bool Configuration::is_tci () const
   return m_->is_tci_;
 }
 
-bool Configuration::transceiver_online ()
+bool Configuration::transceiver_online (bool show_error)
 {
   LOG_TRACE (m_->cached_rig_state_);
-  return m_->have_rig ();
+  return m_->have_rig (show_error);
 }
 
 int Configuration::transceiver_resolution () const
@@ -5081,12 +5081,15 @@ void Configuration::impl::on_highlight_blue_callsigns_editingFinished ()
   ui_->highlight_blue_callsigns->setText (ui_->highlight_blue_callsigns->text ().toUpper ());
 }
 
-bool Configuration::impl::have_rig ()
+bool Configuration::impl::have_rig (bool show_error)
 {
   if (!open_rig ())
     {
-      MessageBox::critical_message (this, tr ("Rig control error")
-                                    , tr ("Failed to open connection to rig"));
+      if (show_error)
+        {
+          MessageBox::critical_message (this, tr ("Rig control error")
+                                        , tr ("Failed to open connection to rig"));
+        }
     }
   return rig_active_;
 }

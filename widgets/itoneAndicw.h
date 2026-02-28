@@ -5,8 +5,8 @@
 #define MAX_NUM_SYMBOLS 250
 #define NUM_CW_SYMBOLS 250
 
-extern int volatile itone[MAX_NUM_SYMBOLS];   //Audio tones for all Tx symbols
-extern int volatile icw[NUM_CW_SYMBOLS];	    //Dits for CW ID
+extern int itone[MAX_NUM_SYMBOLS];   // Audio tones for all Tx symbols
+extern int icw[NUM_CW_SYMBOLS];      // Dits for CW ID
 
 //--------------------------------------------------------------- MainWindow
 namespace Ui {

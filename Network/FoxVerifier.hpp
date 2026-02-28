@@ -26,8 +26,8 @@ public:
     static QString default_url();
 
 private:
-    QNetworkAccessManager* manager_;
-    QNetworkReply* reply_;
+    QPointer<QNetworkAccessManager> manager_;
+    QPointer<QNetworkReply> reply_;
     QNetworkRequest request_;
     QUrl q_url_;
     bool finished_;

@@ -9,6 +9,7 @@
 #include <cinttypes>
 #include <cstring>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 #include <functional>
 #include <fstream>
@@ -22,8 +23,10 @@
 #include <QKeyEvent>
 #include <QWheelEvent>
 #include <QProcessEnvironment>
-#include <QSharedMemory>
+#include <QFile>
 #include <QFileDialog>
+#include <QElapsedTimer>
+#include <QTextStream>
 #include <QTextBlock>
 #include <QProgressBar>
 #include <QLineEdit>
@@ -54,12 +57,18 @@
 #include <QInputDialog>
 #include <QSound> // TCI
 #include <QtMath> // TCI
+#include <QEventLoop>
+#include <QSignalBlocker>
+#include <QMutex>
+#include <QMutexLocker>
+#include <QHash>
 #if QT_VERSION >= QT_VERSION_CHECK (5, 15, 0)
 #include <QRandomGenerator>
 #endif
 
 #include "itoneAndicw.h" // TCI
 #include "PrecisionTime.hpp"
+#include "SharedMemorySegment.hpp"
 
 #include "helper_functions.h"
 #include "revision_utils.hpp"
@@ -86,6 +95,7 @@
 #include "Decoder/decodedtext.h"
 #include "Radio.hpp"
 #include "models/Bands.hpp"
+#include "models/Modes.hpp"
 #include "Transceiver/TransceiverFactory.hpp"
 #include "models/StationList.hpp"
 #include "validators/LiveFrequencyValidator.hpp"
@@ -235,9 +245,9 @@ extern "C" {
   void jpl_setup_(char* fname, FCL len);
 }
 QList<FoxVerifier *> m_verifications;
-int volatile itone[MAX_NUM_SYMBOLS];   //Audio tones for all Tx symbols
-int volatile itone0[MAX_NUM_SYMBOLS];  //Dummy array, data not actually used
-int volatile icw[NUM_CW_SYMBOLS];      //Dits for CW ID
+int itone[MAX_NUM_SYMBOLS];            // Audio tones for all Tx symbols
+int itone0[MAX_NUM_SYMBOLS];           // Dummy array, data not actually used
+int icw[NUM_CW_SYMBOLS];               // Dits for CW ID
 dec_data_t dec_data;                   //For sharing with Fortran
 int outBufSize;
 int rc;
@@ -297,7 +307,7 @@ QString ALLCALL7 = "";
 QString m_hisCall0 = "";
 QString earlyDecodes = "";  //ft8md
 
-QSharedMemory mem_qmap("mem_qmap");         //Memory segment to be shared (optionally) with QMAP
+SharedMemorySegment mem_qmap("mem_qmap");         //Memory segment to be shared (optionally) with QMAP
 struct {
   int ndecodes;          //Number of QMAP decodes available (so far)
   int ncand;             //Number of QMAP candidates considered for decoding
@@ -320,6 +330,23 @@ namespace
   constexpr int N_WIDGETS {38};
   constexpr int default_rx_audio_buffer_frames {-1}; // lets Qt decide
   constexpr int default_tx_audio_buffer_frames {16384}; // ~341ms @ 48kHz, prevents underrun on Windows
+  constexpr int kDecDataSampleCount {NTMAX * RX_SAMPLE_RATE};
+  constexpr int kMaxCwSymbols {NUM_CW_SYMBOLS - 1};
+  constexpr int kFastGreenSize {static_cast<int> (sizeof (fast_green) / sizeof (fast_green[0]))};
+  constexpr int kFoxWaveSampleCount {static_cast<int> (sizeof (foxcom_.wave) / sizeof (foxcom_.wave[0]))};
+
+  struct AllTxtWriterState
+  {
+    QMutex mutex;
+    QHash<QString, QStringList> pending_by_file;
+    bool worker_active {false};
+  };
+
+  AllTxtWriterState& all_txt_writer_state ()
+  {
+    static AllTxtWriterState state;
+    return state;
+  }
 
   bool tx_support_verbose_enabled ()
   {
@@ -345,11 +372,182 @@ namespace
     auto second = time.second ();
     return now.msecsTo (now.addSecs (second > 30 ? 60 - second : -second)) - time.msec ();
   }
+
+  void process_events_no_user_input ()
+  {
+    QCoreApplication::processEvents (QEventLoop::ExcludeUserInputEvents);
+  }
+
+  int clamp_frames_to_d2 (qint64 frames, char const * context)
+  {
+    if (frames <= 0)
+      {
+        return 0;
+      }
+    auto const clamped = frames > kDecDataSampleCount ? kDecDataSampleCount : static_cast<int> (frames);
+    if (clamped != frames)
+      {
+        LOG_WARN (QString {"%1: clamped frames from %2 to %3 (d2 size %4)"}
+                    .arg (context)
+                    .arg (frames)
+                    .arg (clamped)
+                    .arg (kDecDataSampleCount)
+                    .toStdString ());
+      }
+    return clamped;
+  }
+
+  int clamp_cw_symbols (int ncw, char const * context)
+  {
+    auto const clamped = qBound (0, ncw, kMaxCwSymbols);
+    if (clamped != ncw)
+      {
+        LOG_WARN (QString {"%1: clamped CW symbols from %2 to %3"}
+                    .arg (context)
+                    .arg (ncw)
+                    .arg (clamped)
+                    .toStdString ());
+      }
+    return clamped;
+  }
+
+  bool wait_for_process_exit_no_input (QProcess& process, int timeout_ms)
+  {
+    if (QProcess::NotRunning == process.state ())
+      {
+        return true;
+      }
+    QElapsedTimer timer;
+    timer.start ();
+    while (QProcess::NotRunning != process.state ())
+      {
+        if (process.waitForFinished (50))
+          {
+            return true;
+          }
+        process_events_no_user_input ();
+        if (timer.elapsed () >= timeout_ms)
+          {
+            return false;
+          }
+      }
+    return true;
+  }
+
+  void clamp_wave_arguments (int& nsym, int& nsps, int extra_symbols, int& nwave, char const * context)
+  {
+    if (nsps <= 0)
+      {
+        LOG_WARN (QString {"%1: invalid nsps=%2, forcing 1"}.arg (context).arg (nsps).toStdString ());
+        nsps = 1;
+      }
+    if (nsym <= 0)
+      {
+        LOG_WARN (QString {"%1: invalid nsym=%2, forcing 1"}.arg (context).arg (nsym).toStdString ());
+        nsym = 1;
+      }
+    if (nsym > MAX_NUM_SYMBOLS)
+      {
+        LOG_WARN (QString {"%1: clamped nsym from %2 to %3"}
+                    .arg (context)
+                    .arg (nsym)
+                    .arg (MAX_NUM_SYMBOLS)
+                    .toStdString ());
+        nsym = MAX_NUM_SYMBOLS;
+      }
+
+    auto requested = static_cast<qint64> (nsym + extra_symbols) * nsps;
+    if (requested <= 0)
+      {
+        requested = 1;
+      }
+    if (requested > kFoxWaveSampleCount)
+      {
+        auto max_nsym = (kFoxWaveSampleCount / nsps) - extra_symbols;
+        if (max_nsym < 1)
+          {
+            max_nsym = 1;
+          }
+        if (max_nsym < nsym)
+          {
+            LOG_WARN (QString {"%1: clamped nsym from %2 to %3 to fit wave buffer (%4 samples)"}
+                        .arg (context)
+                        .arg (nsym)
+                        .arg (max_nsym)
+                        .arg (kFoxWaveSampleCount)
+                        .toStdString ());
+            nsym = max_nsym;
+          }
+        requested = static_cast<qint64> (nsym + extra_symbols) * nsps;
+      }
+
+    nwave = static_cast<int> (qMax<qint64> (1, requested));
+  }
+
+  void queue_all_txt_line (QString const& file_path, QString const& line)
+  {
+    auto& state = all_txt_writer_state ();
+    bool launch_worker {false};
+    {
+      QMutexLocker lock {&state.mutex};
+      state.pending_by_file[file_path].append (line);
+      if (!state.worker_active)
+        {
+          state.worker_active = true;
+          launch_worker = true;
+        }
+    }
+
+    if (!launch_worker)
+      {
+        return;
+      }
+
+    QtConcurrent::run ([&state] {
+      for (;;)
+        {
+          QHash<QString, QStringList> batch;
+          {
+            QMutexLocker lock {&state.mutex};
+            if (state.pending_by_file.isEmpty ())
+              {
+                state.worker_active = false;
+                break;
+              }
+            batch.swap (state.pending_by_file);
+          }
+
+          for (auto it = batch.cbegin (); it != batch.cend (); ++it)
+            {
+              QFile file {it.key ()};
+              if (!file.open (QIODevice::WriteOnly | QIODevice::Text | QIODevice::Append))
+                {
+                  LOG_ERROR ("Failed to append " << it.key ().toStdString ()
+                             << ": " << file.errorString ().toStdString ());
+                  continue;
+                }
+              QTextStream out {&file};
+              for (auto const& one_line : it.value ())
+                {
+                  out << one_line
+#if QT_VERSION >= QT_VERSION_CHECK (5, 15, 0)
+                      << Qt::endl
+#else
+                      << endl
+#endif
+                    ;
+                }
+              file.close ();
+            }
+        }
+    });
+  }
+
 }
 
 //--------------------------------------------------- MainWindow constructor
 MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
-                       MultiSettings * multi_settings, QSharedMemory *shdmem,
+                       MultiSettings * multi_settings, SharedMemorySegment *shdmem,
                        unsigned downSampleFactor,
                        QSplashScreen * splash, QProcessEnvironment const& env, QWidget *parent) :
   MultiGeometryWidget {parent},
@@ -614,9 +812,15 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   int memSize=4096;
   if(!mem_qmap.attach()) mem_qmap.create(memSize);
   ipc_qmap = (int*)mem_qmap.data();
-  mem_qmap.lock();
-  memset(ipc_qmap,0,memSize);         //Zero all of QMAP shared memory
-  mem_qmap.unlock();
+  if (mem_qmap.lock (100))
+    {
+      memset(ipc_qmap,0,memSize);         //Zero all of QMAP shared memory
+      mem_qmap.unlock();
+    }
+  else
+    {
+      qWarning() << "Unable to lock mem_qmap during initialization";
+    }
 
   // Closedown.
   connect (ui->actionExit, &QAction::triggered, this, &QMainWindow::close);
@@ -657,6 +861,7 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   connect (this, &MainWindow::transmitFrequency, m_modulator, &Modulator::setFrequency);
   connect (this, &MainWindow::endTransmitMessage, m_modulator, &Modulator::stop);
   connect (this, &MainWindow::tune, m_modulator, &Modulator::tune);
+  connect (this, &MainWindow::sendSymbolTables, m_modulator, &Modulator::setSymbolTables);
   connect (this, &MainWindow::sendMessage, m_modulator, &Modulator::start);
   connect (m_modulator, &Modulator::stateChanged, this, [this] (Modulator::ModulatorState s) {
       if (!tx_support_verbose_enabled ())
@@ -1283,6 +1488,10 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   externalCtrlTimer.setSingleShot(true);      //avt 12/16/21
   connect(&externalCtrlTimer, &QTimer::timeout, this, &MainWindow::externalCtrlDisconnected);      //avt 12/16/21
 
+  m_rigReconnectTimer.setInterval (3000);
+  m_rigReconnectTimer.setSingleShot (false);
+  connect (&m_rigReconnectTimer, &QTimer::timeout, this, &MainWindow::attemptRigReconnect);
+
   m_decoderWatchdog.setSingleShot(true);
   connect(&m_decoderWatchdog, &QTimer::timeout, this, [this]() {
     if (m_decoderBusy) {
@@ -1436,6 +1645,7 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   ui->txFirstCheckBox->setChecked(m_txFirst);
   morse_(const_cast<char *> (m_config.my_callsign ().toLatin1().constData()),
          const_cast<int *> (icw), &m_ncw, (FCL)m_config.my_callsign().length());
+  m_ncw = clamp_cw_symbols (m_ncw, "morse/init");
   on_actionWide_Waterfall_triggered();
   ui->cbShMsgs->setChecked(m_bShMsgs);
   ui->cbSWL->setChecked(m_bSWL);
@@ -1678,6 +1888,9 @@ void MainWindow::on_the_minute ()
 //--------------------------------------------------- MainWindow destructor
 MainWindow::~MainWindow()
 {
+#ifdef FOX_OTP
+  m_verifications.clear ();
+#endif
   if(m_astroWidget) m_astroWidget.reset ();
   if(m_QSYMessageCreatorWidget) m_QSYMessageCreatorWidget.reset ();
   if(m_QSYMessageWidget) m_QSYMessageWidget.reset ();
@@ -2536,7 +2749,11 @@ void MainWindow::dataSink(qint64 frames)
 {
   static float s[NSMAX];
   char line[80];
-  int k(frames);
+  int k = clamp_frames_to_d2 (frames, "dataSink");
+  if (k <= 0)
+    {
+      return;
+    }
   auto fname {QDir::toNativeSeparators(m_config.writeable_data_dir ().absoluteFilePath ("refspec.dat")).toLocal8Bit ()};
 
   if(m_diskData) {
@@ -2548,13 +2765,15 @@ void MainWindow::dataSink(qint64 frames)
 
   m_bUseRef=m_wideGraph->useRef();
   if(!m_diskData) {
-    refspectrum_(&dec_data.d2[k-m_nsps/2],&m_bClearRefSpec,&m_bRefSpec,
+    auto ref_index = std::max (0, k - m_nsps / 2);
+    ref_index = std::min (ref_index, kDecDataSampleCount - 1);
+    refspectrum_(&dec_data.d2[ref_index],&m_bClearRefSpec,&m_bRefSpec,
                  &m_bUseRef, fname.constData (), (FCL)fname.size ());
   }
   m_bClearRefSpec=false;
 
   if(m_mode=="MSK144" or m_bFast9) {
-    fastSink(frames);
+    fastSink(k);
     if(m_bFastMode) return;
   }
 
@@ -2567,13 +2786,16 @@ void MainWindow::dataSink(qint64 frames)
   }
   int nsps=m_nsps;
   if(m_bFastMode) nsps=6912;
+  nsps = qBound (1, nsps, kDecDataSampleCount);
   int nsmo=m_wideGraph->smoothYellow()-1;
+  nsmo = qMax (0, nsmo);
   bool bLowSidelobes=m_config.lowSidelobes();
   int npct=0;
   if(m_mode.startsWith("FST4")) npct=ui->sbNB->value();
   symspec_(&dec_data,&k,&m_TRperiod,&nsps,&m_inGain,&bLowSidelobes,&nsmo,&m_px,s,
            &m_df3,&m_ihsym,&m_npts8,&m_pxmax,&npct);
-  if(m_mode=="WSPR" or m_mode=="FST4W") wspr_downsample_(dec_data.d2,&k);
+  k = clamp_frames_to_d2 (k, "dataSink/post_symspec");
+  if((m_mode=="WSPR" or m_mode=="FST4W") && k > 0) wspr_downsample_(dec_data.d2,&k);
   if(m_ihsym <=0) return;
   if(ui) ui->signal_meter_widget->setValue(m_px,m_pxmax); // Update thermometer
   if(m_monitoring || m_diskData) {
@@ -2589,7 +2811,8 @@ void MainWindow::dataSink(qint64 frames)
     int RxFreq=ui->RxFreqSpinBox->value ();
     int nkhz=(m_freqNominal+RxFreq)/1000;
     int ftol = ui->sbFtol->value ();
-    freqcal_(&dec_data.d2[0], &k, &nkhz, &RxFreq, &ftol, &line[0], (FCL)80);
+    int bounded_k = clamp_frames_to_d2 (k, "dataSink/freqcal");
+    freqcal_(&dec_data.d2[0], &bounded_k, &nkhz, &RxFreq, &ftol, &line[0], (FCL)80);
     QString t=QString::fromLatin1(line);
     DecodedText decodedtext {t};
     ui->decodedTextBrowser->displayDecodedText (decodedtext, m_config.my_callsign(),
@@ -2889,7 +3112,11 @@ QString MainWindow::save_wave_file (QString const& name, short const * data, int
 //-------------------------------------------------------------- fastSink()
 void MainWindow::fastSink(qint64 frames)
 {
-  int k (frames);
+  int k = clamp_frames_to_d2 (frames, "fastSink");
+  if (k <= 0)
+    {
+      return;
+    }
   bool decodeNow=false;
   filtered = false;
   ignored = false;
@@ -2898,7 +3125,7 @@ void MainWindow::fastSink(qint64 frames)
     memcpy(fast_green2,fast_green,4*703);        //Copy fast_green[] to fast_green2[]
     memcpy(fast_s2,fast_s,4*703*64);             //Copy fast_s[] into fast_s2[]
     fast_jh2=fast_jh;
-    if(!m_diskData) memset(dec_data.d2,0,2*30*12000);   //Zero the d2[] array
+    if(!m_diskData) memset(dec_data.d2,0,sizeof (dec_data.d2));   //Zero the d2[] array
     m_bFastDecodeCalled=false;
     m_bDecoded=false;
   }
@@ -2934,6 +3161,15 @@ void MainWindow::fastSink(qint64 frames)
       &dec_data.params.hiscall[0],&bshmsg,&bswl,
       data_dir.constData (),fast_green,fast_s,&fast_jh,&pxmax,&rmsNoGain,&line[0],(FCL)12,
       (FCL)12,(FCL)data_dir.size (),(FCL)80);
+  if (fast_jh < 0 || fast_jh >= kFastGreenSize)
+    {
+      LOG_WARN (QString {"fastSink: clamped fast_jh from %1 to [%2,%3]"}
+                  .arg (fast_jh)
+                  .arg (0)
+                  .arg (kFastGreenSize - 1)
+                  .toStdString ());
+      fast_jh = qBound (0, fast_jh, kFastGreenSize - 1);
+    }
   float px = fast_green[fast_jh];
   QString t;
   t = t.asprintf(" Rx noise: %5.1f ",px);
@@ -4072,6 +4308,7 @@ void MainWindow::on_actionSettings_triggered()           // Setup Dialog (Settin
       ui->tx1->setEnabled (elide_tx1_not_allowed () || ui->tx1->isEnabled ());
       morse_(const_cast<char *> (m_config.my_callsign ().toLatin1().constData()),
              const_cast<int *> (icw), &m_ncw, (FCL)m_config.my_callsign().length());
+      m_ncw = clamp_cw_symbols (m_ncw, "morse/settings");
     }
     if (m_config.my_callsign () != callsign || m_config.my_grid () != my_grid) {
       statusUpdate ();
@@ -5217,7 +5454,7 @@ void MainWindow::closeEvent(QCloseEvent * e)
   int irow=-99;
   plotsave_(&sw,&nw,&nh,&irow);
   to_jt9(m_ihsym,999,-1);          //Tell jt9 to terminate
-  if (!proc_jt9.waitForFinished(1000)) proc_jt9.close();
+  if (!wait_for_process_exit_no_input (proc_jt9, 1000)) proc_jt9.close();
   mem_jt9->detach();
   Q_EMIT finished ();
   QMainWindow::closeEvent (e);
@@ -5775,14 +6012,29 @@ void MainWindow::read_wav_file (QString const& fname)
     bool ok=file.open (BWFFile::ReadOnly);
     if(ok) {
       auto bytes_per_frame = file.format ().bytesPerFrame ();
+      if (bytes_per_frame <= 0)
+        {
+          dec_data.params.kin = 0;
+          dec_data.params.newdat = 0;
+          LOG_ERROR ("diskDat: invalid bytesPerFrame=" << bytes_per_frame);
+          return;
+        }
       int nsamples=m_TRperiod * RX_SAMPLE_RATE;
       qint64 max_bytes = std::min (std::size_t (nsamples),
           sizeof (dec_data.d2) / sizeof (dec_data.d2[0]))* bytes_per_frame;
       auto n = file.read (reinterpret_cast<char *> (dec_data.d2),
-                        std::min (max_bytes, file.size ()));
-      int frames_read = n / bytes_per_frame;
-    // zero unfilled remaining sample space
-      std::memset(&dec_data.d2[frames_read],0,max_bytes - n);
+                          std::min (max_bytes, file.size ()));
+      if (n < 0)
+        {
+          n = 0;
+        }
+      int frames_read = static_cast<int> (n / bytes_per_frame);
+      auto bytes_to_zero = qMax<qint64> (0, max_bytes - n);
+      if (frames_read < kDecDataSampleCount && bytes_to_zero > 0)
+        {
+          // Zero remaining sample space to keep Fortran decoders bounded on short reads.
+          std::memset (&dec_data.d2[frames_read], 0, static_cast<size_t> (bytes_to_zero));
+        }
       if (11025 == file.format ().sampleRate ()) {
         short sample_size = file.format ().sampleSize ();
         wav12_ (dec_data.d2, dec_data.d2, &frames_read, &sample_size);
@@ -5841,16 +6093,18 @@ void MainWindow::diskDat()                                   //diskDat()
     int k;
     int kstep=m_FFTSize;
     m_diskData=true;
+    int kin = clamp_frames_to_d2 (dec_data.params.kin, "diskDat/kin");
+    dec_data.params.kin = kin;
     float db=m_config.degrade();
     float bw=m_config.RxBandwidth();
-    if(db > 0.0) degrade_snr_(dec_data.d2,&dec_data.params.kin,&db,&bw);
+    if(db > 0.0 && kin > 0) degrade_snr_(dec_data.d2,&kin,&db,&bw);
     for(int n=1; n<=m_hsymStop; n++) {                      // Do the waterfall spectra
 //      k=(n+1)*kstep;           //### Why was this (n+1) ??? ###
       k=n*kstep;
-      if(k > dec_data.params.kin) break;
+      if(k > kin) break;
       dec_data.params.npts8=k/8;
       dataSink(k);
-      qApp->processEvents();                                //Update the waterfall
+      process_events_no_user_input();                       // Update waterfall without re-entering input handling.
     }
   } else {
     MessageBox::information_message(this, tr("No data read from disk. Wrong file format?"));
@@ -6352,7 +6606,7 @@ void MainWindow::decode()                                       //decode()
       if(m_mode=="MSK144" or m_bFast9) {
         float t0=m_t0;
         float t1=m_t1;
-        qApp->processEvents();                                //Update the waterfall
+        process_events_no_user_input();                       // Update waterfall without re-entering input handling.
         if(m_nPick > 0) {
           t0=m_t0Pick;
           t1=m_t1Pick;
@@ -6378,17 +6632,27 @@ void MainWindow::decode()                                       //decode()
         narg[12]=0;
         narg[13]=-1;
         narg[14]=m_config.aggressive();
-        memcpy(d2b,dec_data.d2,2*360000);
+        memcpy(d2b,dec_data.d2,sizeof (d2b));
         watcher3.setFuture (QtConcurrent::run (std::bind (fast_decode_, &d2b[0],
             &narg[0],&m_TRperiod, &m_msg[0][0], dec_data.params.mycall,
             dec_data.params.hiscall, (FCL)8000, (FCL)12, (FCL)12)));
       } else {
-        mem_jt9->lock ();
-        memcpy(to, from, qMin(mem_jt9->size(), size));
-        mem_jt9->unlock ();
-        to_jt9(m_ihsym,1,-1);                //Send m_ihsym to jt9[.exe] and start decoding
-        m_decodeStartMs = QDateTime::currentMSecsSinceEpoch();
-        decodeBusy(true);
+        if (mem_jt9->lock (100))
+          {
+            auto const bytes_to_copy = qMin(mem_jt9->size(), size);
+            if (bytes_to_copy > 0)
+              {
+                memcpy(to, from, bytes_to_copy);
+              }
+            mem_jt9->unlock ();
+            to_jt9(m_ihsym,1,-1);                //Send m_ihsym to jt9[.exe] and start decoding
+            m_decodeStartMs = QDateTime::currentMSecsSinceEpoch();
+            decodeBusy(true);
+          }
+        else
+          {
+            LOG_WARN ("to_jt9: lock timeout while copying decode buffer");
+          }
       }
     }
   if((m_mode=="FT2" or m_mode=="FT4" or (m_mode=="FT8" and m_ihsym==41) or m_diskData) and
@@ -6443,13 +6707,25 @@ void::MainWindow::fast_decode_done()
 
 void MainWindow::to_jt9(qint32 n, qint32 istart, qint32 idone)
 {
+  if (mem_jt9->size () < static_cast<int> (sizeof (dec_data_t)))
+    {
+      LOG_ERROR ("to_jt9: shared segment too small: " << mem_jt9->size ()
+                 << " < " << sizeof (dec_data_t));
+      return;
+    }
   if (auto * dd = reinterpret_cast<dec_data_t *> (mem_jt9->data()))
     {
-      mem_jt9->lock ();
-      dd->ipc[0]=n;
-      if(istart>=0) dd->ipc[1]=istart;
-      if(idone>=0)  dd->ipc[2]=idone;
-      mem_jt9->unlock ();
+      if (mem_jt9->lock (100))
+        {
+          dd->ipc[0]=n;
+          if(istart>=0) dd->ipc[1]=istart;
+          if(idone>=0)  dd->ipc[2]=idone;
+          mem_jt9->unlock ();
+        }
+      else
+        {
+          LOG_WARN ("to_jt9: lock timeout for IPC update");
+        }
     }
 }
 
@@ -6463,7 +6739,7 @@ void MainWindow::decodeDone ()
 #if QT_VERSION >= QT_VERSION_CHECK (5, 15, 0)
         uploadTimer.start(QRandomGenerator::global ()->bounded (0, 20000)); // Upload delay
 #else
-        uploadTimer.start(20000 * qrand()/((double)RAND_MAX + 1.0)); // Upload delay
+        uploadTimer.start(static_cast<int>(20000.0 * std::rand() / (static_cast<double>(RAND_MAX) + 1.0))); // Upload delay
 #endif
       }
     }
@@ -6642,22 +6918,36 @@ void MainWindow::applyDtFeedback()
       m_dtSmoothFactor);
   }
 
-  // Update status bar DT label.
-  // Color now reflects both instantaneous DT quality and accumulated correction.
+  // Show effective DT in the status bar: raw decode DT compensated by NTP offset
+  // when NTP is synced. This better reflects net slot timing error.
+  double const rawDtMs = m_avgDtValue * 1000.0;
+  bool const ntpSyncedForDisplay =
+      m_ntpEnabled
+      && m_ntpClient
+      && m_ntpClient->isSynced();
+  double const dtDisplayMs = ntpSyncedForDisplay ? (rawDtMs + m_ntpOffset_ms) : rawDtMs;
   QString text = QString("DT:%1%2ms(%3)")
-    .arg(m_dtCorrection_ms > 0 ? "+" : "")
-    .arg(m_dtCorrection_ms, 0, 'f', 1)
+    .arg(dtDisplayMs > 0 ? "+" : "")
+    .arg(dtDisplayMs, 0, 'f', 1)
     .arg(m_dtLastSampleCount);
   dt_correction_label.setText(text);
+  dt_correction_label.setToolTip(
+      QString("Effective DT: %1%2 ms\nRaw decode DT: %3%4 ms\nNTP offset: %5%6 ms\nInternal correction: %7%8 ms")
+          .arg(dtDisplayMs > 0 ? "+" : "")
+          .arg(dtDisplayMs, 0, 'f', 1)
+          .arg(rawDtMs > 0 ? "+" : "")
+          .arg(rawDtMs, 0, 'f', 1)
+          .arg(m_ntpOffset_ms > 0 ? "+" : "")
+          .arg(m_ntpOffset_ms, 0, 'f', 1)
+          .arg(m_dtCorrection_ms > 0 ? "+" : "")
+          .arg(m_dtCorrection_ms, 0, 'f', 1));
 
-  double absAvgDt = qAbs(m_avgDtValue);
-  double absCorr = qAbs(m_dtCorrection_ms);
-  bool corrLarge = absCorr >= 220.0;
-  bool corrMedium = absCorr >= 120.0;
-
-  if (!corrLarge && absAvgDt < 0.1 && absCorr < 80.0) {
+  double const absDisplayDtMs = qAbs(dtDisplayMs);
+  if (m_dtLastSampleCount <= 0) {
+    dt_correction_label.setStyleSheet("QLabel{color:#888;background:#333}");
+  } else if (absDisplayDtMs < 80.0) {
     dt_correction_label.setStyleSheet("QLabel{color:#000;background:#00ff00}");
-  } else if (!corrLarge && !corrMedium && absAvgDt < 0.3) {
+  } else if (absDisplayDtMs < 180.0) {
     dt_correction_label.setStyleSheet("QLabel{color:#000;background:#ffff00}");
   } else {
     dt_correction_label.setStyleSheet("QLabel{color:#fff;background:#ff0000}");
@@ -6797,12 +7087,17 @@ void MainWindow::ARRL_Digi_Display()
   QMutableMapIterator<QString,RecentCall> icall(m_recentCall);
   QString deCall,deGrid;
   int age=0;
-  int i=0;
   int maxAge=m_ActiveStationsWidget->maxAge();
   int points=0;
   int maxPoints=0;
-  int indx[1000];
-  float pts[1000];
+  constexpr int ready2call_capacity = static_cast<int>(sizeof(m_ready2call) / sizeof(m_ready2call[0]));
+  for (auto& entry : m_ready2call)
+    {
+      entry.clear();
+    }
+  QVector<int> indx;
+  QVector<float> pts;
+  pts.reserve(m_recentCall.size());
   QStringList list;
 
   while (icall.hasNext()) {
@@ -6831,14 +7126,13 @@ void MainWindow::ARRL_Digi_Display()
       if(m_currentBand=="6m"   and bands.mid(6,1)!=".") bWorkedOnBand=true;
 
       if((bReady or !m_ActiveStationsWidget->readyOnly()) and !bWorkedOnBand) {
-        i++;
         int az=m_activeCall[deCall].az;
         deGrid=m_activeCall[deCall].grid4;
         points=m_activeCall[deCall].points;
         if(points>maxPoints) maxPoints=points;
         float x=float(age)/(maxAge+1);
         if(x>1.0) x=0;
-        pts[i-1]=points - x;
+        pts.append(points - x);
         QString t1;
         if(!bReady) t1 = t1.asprintf("  %3d  %+2.2d  %4d  %1d %2d %4d",az,snr,freq,itx,age,points);
         if(bReady)  t1 = t1.asprintf("  %3d  %+2.2d  %4d  %1d %2d*%4d",az,snr,freq,itx,age,points);
@@ -6848,21 +7142,33 @@ void MainWindow::ARRL_Digi_Display()
       }
     }
   }
-  if(i==0) return;
-  int jz=i;
+  int item_count = list.size();
+  if(item_count==0) return;
+  int jz=item_count;
   m_ActiveStationsWidget->setClickOK(false);
-  int maxRecent=qMin(i,m_ActiveStationsWidget->maxRecent());
-  indexx_(pts,&jz,indx);
+  int maxRecent=qMin(item_count,m_ActiveStationsWidget->maxRecent());
+  maxRecent=qMin(maxRecent,ready2call_capacity);
+  if (maxRecent <= 0)
+    {
+      m_ActiveStationsWidget->setClickOK(true);
+      return;
+    }
+  indx.resize(item_count);
+  indexx_(pts.data(),&jz,indx.data());
   QString t;
-  i=0;
+  int shown=0;
   for(int j=jz-1; j>=0; j--) {
     int k=indx[j]-1;
-    m_ready2call[i]=list[k];
-    i++;
-    QString t1=QString::number(i) + ".  ";
-    if(i<10) t1=" " + t1;
+    if (k < 0 || k >= list.size())
+      {
+        continue;
+      }
+    m_ready2call[shown]=list[k];
+    shown++;
+    QString t1=QString::number(shown) + ".  ";
+    if(shown<10) t1=" " + t1;
     t += (t1 + list[k] + "\n");
-    if(i>=maxRecent) break;
+    if(shown>=maxRecent) break;
   }
   bool is_fox_mode = ((m_mode=="FT8" or m_mode=="FT2") && m_specOp == SpecOp::FOX);
   if(m_ActiveStationsWidget!=NULL && !is_fox_mode) m_ActiveStationsWidget->displayRecentStations(m_mode,t);
@@ -6923,7 +7229,9 @@ void MainWindow::callSandP2(int n)
   m_specOp=m_config.special_op_id();
   bool bCtrl = (n<0);
   n=qAbs(n)-1;
-  if(m_mode!="Q65" and m_ready2call[n]=="") return;
+  constexpr int ready2call_capacity = static_cast<int>(sizeof(m_ready2call) / sizeof(m_ready2call[0]));
+  if (n < 0 || n >= ready2call_capacity) return;
+  if(m_mode!="Q65" and m_ready2call[n].isEmpty()) return;
   QStringList w=m_ready2call[n].split(' ', SkipEmptyParts);
   if(m_mode=="Q65" and m_specOp==SpecOp::Q65_PILEUP and n < 40) {
     // This code is for 6m EME DXpedition operator
@@ -7120,13 +7428,16 @@ void MainWindow::readFromStdout()                             //readFromStdout
       // Exclude low-confidence AP decodes ("?" marker) — DT less reliable
       if(!decodedtext.isLowConfidence()) {
         int snr = decodedtext.snr();
-        // #7: FT2 uses lower SNR threshold (-20) to collect more DT samples
-        // FT2 has 6.67x better DT precision so even weaker signals give usable DT
-        int snrThreshold = (m_mode=="FT2") ? -20 : -18;
+        int snrThreshold = -18;
+        if (m_mode=="FT2") snrThreshold = -16;
+        if (m_mode=="FT8") snrThreshold = -15;  // FT8: reduce weak-signal DT bias
+        if (m_mode=="FT4") snrThreshold = -16;  // FT4: reduce weak-signal DT bias
         if(snr >= snrThreshold) {
           float dt_val = decodedtext.dt();
-          // #7: FT2 tighter outlier rejection (±0.5s) due to higher DT precision
-          float dtLimit = (m_mode=="FT2") ? 0.5f : 2.0f;
+          float dtLimit = 2.0f;
+          if (m_mode=="FT2") dtLimit = 0.35f;
+          if (m_mode=="FT8") dtLimit = 0.60f;   // FT8: reject broad outliers
+          if (m_mode=="FT4") dtLimit = 0.80f;   // FT4: reject broad outliers
           if(qAbs(dt_val) < dtLimit) {
             m_dtSamples.append(dt_val);
           }
@@ -7198,8 +7509,9 @@ void MainWindow::readFromStdout()                             //readFromStdout
         QString deCall;
         QString deGrid;
         decodedtext.deCallAndGrid(/*out*/deCall,deGrid);
-        QStringList word;
-        word=decodedtext.string().mid(24).replace("<","").replace(">","").replace("/P","").replace("/R","").replace("/QRP","").replace("/5W","").split(" ",SkipEmptyParts);
+	        QStringList word;
+	        word=decodedtext.string().mid(24).replace("<","").replace(">","").replace("/P","").replace("/R","").replace("/QRP","").replace("/5W","").split(" ",SkipEmptyParts);
+	        QString const firstWord = word.isEmpty() ? QString {} : word.at(0);
 
         // check file ALLCALL7.TXT
         if (deCall!="TNX" && deCall!="73" && deCall!="GL" && deCall!="HNY" && deCall!="TU" && !deCall.left(4).contains("/")
@@ -7207,13 +7519,13 @@ void MainWindow::readFromStdout()                             //readFromStdout
           notInALLCALL7 = true;
 //          ui->decodedTextBrowser->insertText("deCall not in ALLCALL7.TXT");
         }
-        if (!ALLCALL7.contains(word[0]) && !(decodedtext.string().contains(" CQ ") or decodedtext.string().contains("TNX")
-            or decodedtext.string().contains("...") or decodedtext.string().contains("HNY") or decodedtext.string().contains("QSY")
-            or decodedtext.string().contains("73 ") or decodedtext.string().contains("GL ") or decodedtext.string().contains("PSE")
-            or decodedtext.string().contains("/") or decodedtext.string().contains("<...>"))) {
-          notInALLCALL7 = true;
+	        if (!firstWord.isEmpty() && !ALLCALL7.contains(firstWord) && !(decodedtext.string().contains(" CQ ") or decodedtext.string().contains("TNX")
+	            or decodedtext.string().contains("...") or decodedtext.string().contains("HNY") or decodedtext.string().contains("QSY")
+	            or decodedtext.string().contains("73 ") or decodedtext.string().contains("GL ") or decodedtext.string().contains("PSE")
+	            or decodedtext.string().contains("/") or decodedtext.string().contains("<...>"))) {
+	          notInALLCALL7 = true;
 //          ui->decodedTextBrowser->insertText("word0 not in ALLCALL7.TXT");
-        }
+	        }
 
         // check syntax of the two callsigns before we hide such messages
         if (notInALLCALL7) {
@@ -7226,14 +7538,15 @@ void MainWindow::readFromStdout()                             //readFromStdout
 //            ui->decodedTextBrowser->insertText("deCall has false syntax");
             filtered = true;
           }
-          if (word[0]!="CQ" && word[0]!="TNX" && word[0]!="73 " && word[0]!="HNY" && word[0]!="QSY" && word[0]!="PSE" &&
-              !(word[0].left(3).contains(QRegularExpression {"\\w\\d\\w"}) or
-                word[0].left(3).contains(QRegularExpression {"\\d\\w\\d"}) or
-                word[0].left(3).contains(QRegularExpression {"\\w\\w\\d"}) or
-                decodedtext.string().contains("/")or decodedtext.string().contains("<...>"))) {
+	          if (!firstWord.isEmpty() &&
+	              firstWord!="CQ" && firstWord!="TNX" && firstWord!="73 " && firstWord!="HNY" && firstWord!="QSY" && firstWord!="PSE" &&
+	              !(firstWord.left(3).contains(QRegularExpression {"\\w\\d\\w"}) or
+	                firstWord.left(3).contains(QRegularExpression {"\\d\\w\\d"}) or
+	                firstWord.left(3).contains(QRegularExpression {"\\w\\w\\d"}) or
+	                decodedtext.string().contains("/")or decodedtext.string().contains("<...>"))) {
 //            ui->decodedTextBrowser->insertText("word0 has false syntax");
-            filtered = true;
-          }
+	            filtered = true;
+	          }
         }
         notInALLCALL7 = false;
       }
@@ -7265,13 +7578,19 @@ void MainWindow::readFromStdout()                             //readFromStdout
         } else {
 
 #ifdef FOX_OTP
-          // remove verifications that are done
-          QMutableListIterator < FoxVerifier * > it(m_verifications);
-          while (it.hasNext()) {
-            if (it.next()->finished()) {
-              it.remove();
-            }
-          }
+	          // remove verifications that are done
+	          QMutableListIterator < FoxVerifier * > it(m_verifications);
+	          while (it.hasNext()) {
+	            auto * verifier = it.next ();
+	            if (!verifier) {
+	              it.remove();
+	              continue;
+	            }
+	            if (verifier->finished()) {
+	              verifier->deleteLater();
+	              it.remove();
+	            }
+	          }
 #endif
           DecodedText decodedtext1=decodedtext0;
           if ((m_mode=="FT2" or m_mode=="FT4" or m_mode=="FT8") and bDisplayPoints and decodedtext1.isStandardMessage()) {
@@ -7279,52 +7598,70 @@ void MainWindow::readFromStdout()                             //readFromStdout
           }
 
 #ifdef FOX_OTP
-          if ((SpecOp::HOUND == m_specOp) &&
-               ((m_config.superFox() && (decodedtext0.mid(24, 8) == "$VERIFY$")) || // $VERIFY$ K8R 920749
-               (decodedtext0.mid(24,-1).contains(QRegularExpression{"^[A-Z0-9]{2,6}\\.[0-9]{6}"})))) // K8R.920749
-          {
-            // two cases:
-            // QString test_return = QString{"203630 -12  0.1  775 ~  K8R.920749"};
-            // $VERIFY$ foxcall otp
-            // QString test_return = QString{"203630 -12  0.1  775 ~  $VERIFY$ K8R 920749"};
-            QStringList lineparts;
-            QString callsign, otp;
-            unsigned int hz;
-            lineparts = decodedtext0.string().split(' ', SkipEmptyParts);
-            if (lineparts.length() <= 6) {
-              QStringList otp_parts;
-              // split K8.V920749 into K8R and 920749
-              otp_parts = lineparts[5].split('.', SkipEmptyParts);
-              callsign = otp_parts[0];
-              otp = otp_parts[1];
-              hz = lineparts[3].toInt();
-              if (!m_config.ShowOTP() or decodedtext0.mid(24,-1).contains(" 000000")) filtered = true;
-            } else {
-              // split $VERIFY$ K8R 920749 into K8R and 920749
-              callsign = lineparts[6];
-              otp = lineparts[7];
-              hz = 750; // SF is 750
-              if (!m_config.ShowOTP() or decodedtext0.mid(24,-1).contains(" 000000")) filtered = true;
-            }
-            QDateTime verifyDateTime;
-            if (m_diskData) {
-              verifyDateTime = m_UTCdiskDateTime; // get the date set from reading the wav file
-            } else {
-              verifyDateTime = QDateTime(QDateTime::currentDateTimeUtc().date(),
-                                         QTime::fromString(lineparts[0], "hhmmss"));
-            }
-            if (!decodedtext0.mid(24,-1).contains(" 000000")) {
-              FoxVerifier *fv = new FoxVerifier(MainWindow::userAgent(),
-                                                &m_network_manager,
-                                                m_config.OTPUrl(),
-                                                callsign, // foxcall
-                                                verifyDateTime,
-                                                otp,
-                                                hz); // freq
-              connect(fv, &FoxVerifier::verifyComplete, this, &MainWindow::handleVerifyMsg);
-              m_verifications << fv;
-            }
-          }
+	          if ((SpecOp::HOUND == m_specOp) &&
+	               ((m_config.superFox() && (decodedtext0.mid(24, 8) == "$VERIFY$")) || // $VERIFY$ K8R 920749
+	               (decodedtext0.mid(24,-1).contains(QRegularExpression{"^[A-Z0-9]{2,6}\\.[0-9]{6}"})))) // K8R.920749
+	          {
+	            QStringList const lineparts = decodedtext0.string().split(' ', SkipEmptyParts);
+	            QString callsign;
+	            QString otp;
+	            unsigned int hz = 750;
+	            bool parsed_payload = false;
+
+	            if (lineparts.size() >= 6 && lineparts.value(5).contains('.')) {
+	              // Compact format: "... ~ K8R.920749"
+	              QStringList const otp_parts = lineparts.value(5).split('.', SkipEmptyParts);
+	              bool hz_ok = false;
+	              auto const parsed_hz = lineparts.value(3).toInt(&hz_ok);
+	              if (otp_parts.size() >= 2) {
+	                callsign = otp_parts.at(0);
+	                otp = otp_parts.at(1);
+	                if (hz_ok && parsed_hz >= 0) hz = static_cast<unsigned int>(parsed_hz);
+	                parsed_payload = !callsign.isEmpty() && !otp.isEmpty();
+	              }
+	            } else if (lineparts.size() >= 8 && "$VERIFY$" == lineparts.value(5)) {
+	              // Expanded format: "... ~ $VERIFY$ K8R 920749"
+	              callsign = lineparts.value(6);
+	              otp = lineparts.value(7);
+	              parsed_payload = !callsign.isEmpty() && !otp.isEmpty();
+	            }
+
+	            if (!parsed_payload) {
+	              LOG_WARN(QString("FoxVerifier: malformed verification payload ignored [%1]")
+	                        .arg(decodedtext0.string()).toStdString());
+	            } else {
+	              bool block_otp = (!m_config.ShowOTP() || decodedtext0.mid(24,-1).contains(" 000000"));
+	              if (block_otp) {
+	                filtered = true;
+	              } else {
+	                QDateTime verifyDateTime;
+	                if (m_diskData) {
+	                  verifyDateTime = m_UTCdiskDateTime; // date from loaded wav file
+	                } else {
+	                  auto const verifyTime = QTime::fromString(lineparts.value(0), "hhmmss");
+	                  if (!verifyTime.isValid()) {
+	                    LOG_WARN(QString("FoxVerifier: invalid UTC token in payload [%1]")
+	                              .arg(decodedtext0.string()).toStdString());
+	                    parsed_payload = false;
+	                  } else {
+	                    verifyDateTime = QDateTime(QDateTime::currentDateTimeUtc().date(), verifyTime);
+	                  }
+	                }
+	                if (parsed_payload) {
+	                  FoxVerifier *fv = new FoxVerifier(MainWindow::userAgent(),
+	                                                    &m_network_manager,
+	                                                    m_config.OTPUrl(),
+	                                                    callsign, // foxcall
+	                                                    verifyDateTime,
+	                                                    otp,
+	                                                    hz); // freq
+	                  fv->setParent(this);
+	                  connect(fv, &FoxVerifier::verifyComplete, this, &MainWindow::handleVerifyMsg);
+	                  m_verifications << fv;
+	                }
+	              }
+	            }
+	          }
 #endif
 
         QString text = decodedtext.string().replace("<","").replace(">","");   // for Wait & Reply/Call and filtering
@@ -8684,7 +9021,7 @@ void MainWindow::guiUpdate()
 
     if(g_iptt==0 and ((m_bTxTime and (fTR < 0.75) and (msgLength>0)) or m_tune)) {
       //### Allow late starts
-      icw[0]=m_ncw;
+      icw[0]=clamp_cw_symbols (m_ncw, "cw/tx-start");
       g_iptt = 1;
       setRig ();
       if(m_mode=="FT8" or m_mode=="FT2") {
@@ -8705,7 +9042,7 @@ void MainWindow::guiUpdate()
 #if QT_VERSION >= QT_VERSION_CHECK (5, 15, 0)
               ui->TxFreqSpinBox->setValue (QRandomGenerator::global ()->bounded (1000, 2999));
 #else
-              ui->TxFreqSpinBox->setValue ((qrand () % 2000) + 1000);
+              ui->TxFreqSpinBox->setValue ((std::rand () % 2000) + 1000);
 #endif
             }
           }
@@ -8728,7 +9065,7 @@ void MainWindow::guiUpdate()
 #if QT_VERSION >= QT_VERSION_CHECK (5, 15, 0)
         ui->TxFreqSpinBox->setValue (QRandomGenerator::global ()->bounded (300, 599));
 #else
-        ui->TxFreqSpinBox->setValue(300.0 + 300.0*double(qrand())/RAND_MAX);
+        ui->TxFreqSpinBox->setValue(300.0 + 300.0 * static_cast<double>(std::rand()) / static_cast<double>(RAND_MAX));
 #endif
       }
 
@@ -8864,7 +9201,8 @@ void MainWindow::guiUpdate()
               float bt=2.0;
               float f0=ui->TxFreqSpinBox->value() - m_XIT;
               int icmplx=0;
-              int nwave=nsym*nsps;
+              int nwave=0;
+              clamp_wave_arguments (nsym, nsps, 0, nwave, "FT8/Fox");
               gen_ft8wave_(const_cast<int *>(itone),&nsym,&nsps,&bt,&fsample,&f0,foxcom_.wave,
                            foxcom_.wave,&icmplx,&nwave);
               //Fox must generate the full Tx waveform, not just an itone[] array.
@@ -8893,7 +9231,8 @@ void MainWindow::guiUpdate()
               float bt=2.0;
               float f0=ui->TxFreqSpinBox->value() - m_XIT;
               int icmplx=0;
-              int nwave=nsym*nsps;
+              int nwave=0;
+              clamp_wave_arguments (nsym, nsps, 0, nwave, "FT8");
               gen_ft8wave_(const_cast<int *>(itone),&nsym,&nsps,&bt,&fsample,&f0,foxcom_.wave,
                            foxcom_.wave,&icmplx,&nwave);
             }
@@ -8912,8 +9251,9 @@ void MainWindow::guiUpdate()
               int nsps=4*288;    // 1152 at 48000 Hz TX
               float fsample=48000.0;
               float f0=ui->TxFreqSpinBox->value() - m_XIT;
-              int nwave=(nsym+2)*nsps;
+              int nwave=0;
               int icmplx=0;
+              clamp_wave_arguments (nsym, nsps, 2, nwave, "FT2/Fox");
               gen_ft2wave_(const_cast<int *>(itone),&nsym,&nsps,&fsample,&f0,foxcom_.wave,
                            foxcom_.wave,&icmplx,&nwave);
               //Fox must generate the full Tx waveform, not just an itone[] array.
@@ -8934,8 +9274,9 @@ void MainWindow::guiUpdate()
               int nsps=4*288;    // 1152 at 48000 Hz TX
               float fsample=48000.0;
               float f0=ui->TxFreqSpinBox->value() - m_XIT;
-              int nwave=(nsym+2)*nsps;
+              int nwave=0;
               int icmplx=0;
+              clamp_wave_arguments (nsym, nsps, 2, nwave, "FT2");
               gen_ft2wave_(const_cast<int *>(itone),&nsym,&nsps,&fsample,&f0,foxcom_.wave,
                            foxcom_.wave,&icmplx,&nwave);
             }
@@ -8950,8 +9291,9 @@ void MainWindow::guiUpdate()
           int nsps=4*576;
           float fsample=48000.0;
           float f0=ui->TxFreqSpinBox->value() - m_XIT;
-          int nwave=(nsym+2)*nsps;
+          int nwave=0;
           int icmplx=0;
+          clamp_wave_arguments (nsym, nsps, 2, nwave, "FT4");
           gen_ft4wave_(const_cast<int *>(itone),&nsym,&nsps,&fsample,&f0,foxcom_.wave,
                        foxcom_.wave,&icmplx,&nwave);
         }
@@ -8984,8 +9326,9 @@ void MainWindow::guiUpdate()
           float dfreq=hmod*fsample/nsps;
           float f0=ui->TxFreqSpinBox->value() - m_XIT + 1.5*dfreq;
           if(m_mode=="FST4W") f0=ui->WSPRfreqSpinBox->value() - m_XIT + 1.5*dfreq;
-          int nwave=(nsym+2)*nsps;
+          int nwave=0;
           int icmplx=0;
+          clamp_wave_arguments (nsym, nsps, 2, nwave, "FST4/FST4W");
           gen_fst4wave_(const_cast<int *>(itone),&nsym,&nsps,&nwave,
                         &fsample,&hmod,&f0,&icmplx,foxcom_.wave,foxcom_.wave);
 
@@ -9003,10 +9346,11 @@ void MainWindow::guiUpdate()
           int nsps4=4*nsps;                           //48000 Hz sampling
           int nsym=85;
           float fsample=48000.0;
-          int nwave=(nsym+2)*nsps4;
+          int nwave=0;
           int icmplx=0;
           float f0=ui->TxFreqSpinBox->value()-m_XIT;
           double toneSpacing=fsample/nsps4;
+          clamp_wave_arguments (nsym, nsps4, 2, nwave, "Q65");
           genwave_(const_cast<int *>(itone),&nsym,&nsps4,&nwave,
                    &fsample,&toneSpacing,&f0,&icmplx,foxcom_.wave,foxcom_.wave);
         }
@@ -9067,7 +9411,7 @@ void MainWindow::guiUpdate()
     if (m_sentFirst73 || (is_73 && CALLING == m_QSOProgress)) {
       m_qsoStop=t2;
       if(m_config.id_after_73 ()) {
-        icw[0] = m_ncw;
+        icw[0] = clamp_cw_symbols (m_ncw, "cw/id-after-73");
       }
       if((m_config.prompt_to_log() or m_config.autoLog()) && !m_tune && CALLING != m_QSOProgress)
         {
@@ -9108,7 +9452,7 @@ void MainWindow::guiUpdate()
       int nmin=(m_sec0-m_secID)/60;
       if(m_sec0<m_secID) nmin=m_config.id_interval();
       if(nmin >= m_config.id_interval()) {
-        icw[0]=m_ncw;
+        icw[0]=clamp_cw_symbols (m_ncw, "cw/id-interval");
         m_secID=m_sec0;
       }
     }
@@ -9256,22 +9600,23 @@ void MainWindow::guiUpdate()
   if(m_mode=="Echo" and !m_monitoring and !m_auto and !m_diskData) m_echoRunning=false;
 
   if(m_mode=="Q65") {
-    mem_qmap.lock();
-    int n=0;
-    if(m_decoderBusy) n=1;
-    ipc_qmap[3]=n;
-    n=0;
-    if(m_transmitting) n=m_TRperiod;
-    ipc_qmap[4]=n;
-    if(ipc_qmap[0] > 0) {             //ndecodes
-      memcpy(&qmapcom, (char*)ipc_qmap, sizeof(qmapcom));  //Fetch the new decode(s)
-      readWidebandDecodes();
+    if (mem_qmap.lock (50)) {
+      int n=0;
+      if(m_decoderBusy) n=1;
+      ipc_qmap[3]=n;
+      n=0;
+      if(m_transmitting) n=m_TRperiod;
+      ipc_qmap[4]=n;
+      if(ipc_qmap[0] > 0) {             //ndecodes
+        memcpy(&qmapcom, (char*)ipc_qmap, sizeof(qmapcom));  //Fetch the new decode(s)
+        readWidebandDecodes();
+      }
+      if(ipc_qmap[5]>0) {
+        setRig((m_freqNominal/1000000)*1000000 + 1000*ipc_qmap[5]);
+        ipc_qmap[5]=0;
+      }
+      mem_qmap.unlock();
     }
-    if(ipc_qmap[5]>0) {
-      setRig((m_freqNominal/1000000)*1000000 + 1000*ipc_qmap[5]);
-      ipc_qmap[5]=0;
-    }
-    mem_qmap.unlock();
   }
 
 //Once per second (onesec)
@@ -12165,7 +12510,7 @@ void MainWindow::on_actionFT2_triggered()
   // Decodium FT2: faster NTP refresh and tighter RTT filter
   if (m_ntpClient) {
     m_ntpClient->setRefreshInterval(60000);  // 60s for FT2 (was 30s — too frequent destabilizes DT)
-    m_ntpClient->setMaxRtt(100.0);           // default RTT filter (50ms rejected too many servers)
+    m_ntpClient->setMaxRtt(70.0);            // FT2: stricter RTT gate to reduce offset bias
   }
   initExternalCtrl();
   statusChanged();
@@ -12197,6 +12542,11 @@ void MainWindow::on_actionFT4_triggered()
   else Q_EMIT FFTSize (m_FFTSize);
   m_hsymStop=21;
   setup_status_bar (bVHF);
+  if (m_ntpClient) {
+    m_ntpClient->setRefreshInterval(60000);  // FT4: keep NTP cadence responsive
+    m_ntpClient->setMaxRtt(65.0);            // FT4: tighter RTT gate
+    if (m_ntpEnabled) m_ntpClient->syncNow();
+  }
   m_toneSpacing=12000.0/576.0;
   ui->actionFT4->setChecked(true);
   m_wideGraph->setMode(m_mode);
@@ -12265,6 +12615,11 @@ void MainWindow::on_actionFT8_triggered()
     m_earlyDecode2=47;
   }
   setup_status_bar (bVHF);
+  if (m_ntpClient) {
+    m_ntpClient->setRefreshInterval(60000);  // FT8: keep NTP cadence responsive
+    m_ntpClient->setMaxRtt(60.0);            // FT8: tighter RTT gate
+    if (m_ntpEnabled) m_ntpClient->syncNow();
+  }
   m_toneSpacing=0.0;                   //???
   ui->actionFT8->setChecked(true);     //???
   m_wideGraph->setMode(m_mode);
@@ -13609,8 +13964,32 @@ void MainWindow::rigOpen ()
   update_dynamic_property (ui->readFreq, "state", "warning");
   ui->readFreq->setText ("");
   ui->readFreq->setEnabled (true);
-  m_config.transceiver_online ();
+  m_rigReconnectTimer.stop ();
+  m_config.transceiver_online (true);
   m_config.sync_transceiver (true, true);
+}
+
+void MainWindow::attemptRigReconnect ()
+{
+  if (m_transmitting) return;
+
+  if (m_config.is_transceiver_online ())
+    {
+      m_rigReconnectTimer.stop ();
+      return;
+    }
+
+  update_dynamic_property (ui->readFreq, "state", "warning");
+  ui->readFreq->setEnabled (true);
+
+  if (m_config.transceiver_online (false))
+    {
+      m_config.sync_transceiver (true, true);
+      m_rigReconnectTimer.stop ();
+      m_first_error = true;
+      rigFailed = false;
+      showStatusMessage (tr ("CAT reconnected"));
+    }
 }
 
 void MainWindow::on_pbR2T_clicked()
@@ -13631,7 +14010,8 @@ void MainWindow::on_readFreq_clicked()
 {
   if (m_transmitting) return;
 
-  if (m_config.transceiver_online ())
+  m_rigReconnectTimer.stop ();
+  if (m_config.transceiver_online (true))
     {
       m_config.sync_transceiver (true, true);
     }
@@ -13720,6 +14100,17 @@ void MainWindow::setFreq4(int rxFreq, int txFreq)
 
 void MainWindow::handle_transceiver_update (Transceiver::TransceiverState const& s)
 {
+  if (s.online ())
+    {
+      if (m_rigReconnectTimer.isActive ())
+        {
+          m_rigReconnectTimer.stop ();
+          showStatusMessage (tr ("CAT reconnected"));
+        }
+      m_first_error = true;
+      rigFailed = false;
+    }
+
   Transceiver::TransceiverState old_state {m_rigState};
   //transmitDisplay (s.ptt ());
   if (s.ptt () // && !m_rigState.ptt ()
@@ -13793,6 +14184,61 @@ void MainWindow::handle_transceiver_update (Transceiver::TransceiverState const&
       // always take initial rig frequency to avoid start up problems
       // with bogus Tx frequencies
       m_freqNominal = s.frequency ();
+      // Startup alignment: if CAT starts on a known working frequency,
+      // select the matching mode instead of keeping a stale saved mode.
+      auto const dial_frequency = s.frequency ();
+      if (dial_frequency > 0 && !m_transmitting && !m_tune)
+        {
+          auto const * frequencies = m_config.frequencies ();
+          auto const current_band = m_config.bands ()->find (dial_frequency);
+          if (frequencies && !current_band.isEmpty ())
+            {
+              int best_row {-1};
+              quint64 best_offset {std::numeric_limits<quint64>::max ()};
+              FrequencyList_v2_101::Item best_item {};
+              for (int row = 0; row < frequencies->rowCount (); ++row)
+                {
+                  auto const source = frequencies->mapToSource (frequencies->index (row, 0));
+                  if (!source.isValid ())
+                    {
+                      continue;
+                    }
+                  auto const& item = frequencies->frequency_list ()[source.row ()];
+                  if (m_config.bands ()->find (item.frequency_) != current_band)
+                    {
+                      continue;
+                    }
+                  auto const offset = dial_frequency > item.frequency_
+                    ? dial_frequency - item.frequency_
+                    : item.frequency_ - dial_frequency;
+                  if (offset < best_offset)
+                    {
+                      best_offset = offset;
+                      best_row = row;
+                      best_item = item;
+                    }
+                }
+
+              auto const tolerance = dial_frequency >= 50000000u ? 25000u : 2000u;
+              if (best_row >= 0 && best_offset <= tolerance)
+                {
+                  auto const target_mode = QString::fromLatin1 (Modes::name (best_item.mode_));
+                  if (!target_mode.isEmpty () && target_mode != m_mode)
+                    {
+                      LOG_INFO (QString {"Startup mode auto-select: dial=%1 target=%2 offset=%3Hz"}
+                        .arg (Radio::pretty_frequency_MHz_string (dial_frequency))
+                        .arg (target_mode)
+                        .arg (best_offset).toStdString ());
+                      set_mode (target_mode);
+                    }
+                  if (ui->bandComboBox->currentIndex () != best_row)
+                    {
+                      QSignalBlocker blocker {ui->bandComboBox};
+                      ui->bandComboBox->setCurrentIndex (best_row);
+                    }
+                }
+            }
+        }
     }
   if (old_state.online () == false && s.online () == true)
     {
@@ -13848,10 +14294,22 @@ void MainWindow::handle_transceiver_failure (QString const& reason)
 {
   update_dynamic_property (ui->readFreq, "state", "error");
   ui->readFreq->setEnabled (true);
-  on_stopTxButton_clicked ();
+  if (m_transmitting || g_iptt) on_stopTxButton_clicked ();
   qDebug() << "MainWindow::handle_transceiver_failure fired";
-  rigFailure (reason);
   rigFailed = true;
+
+  if (!m_rigReconnectTimer.isActive ())
+    {
+      m_rigReconnectTimer.start ();
+      showStatusMessage (tr ("CAT offline: retrying connection..."));
+    }
+
+  if (!m_transmitting)
+    {
+      return;
+    }
+
+  rigFailure (reason);
 }
 
 void MainWindow::rigFailure (QString const& reason)
@@ -13907,6 +14365,12 @@ void MainWindow::rigFailure (QString const& reason)
 void MainWindow::transmit (double snr)
 {
   double toneSpacing=0.0;
+  QVector<int> tone_values (MAX_NUM_SYMBOLS);
+  QVector<int> cw_values (NUM_CW_SYMBOLS);
+  for (int i = 0; i < MAX_NUM_SYMBOLS; ++i) tone_values[i] = itone[i];
+  for (int i = 0; i < NUM_CW_SYMBOLS; ++i) cw_values[i] = icw[i];
+  Q_EMIT sendSymbolTables (tone_values, cw_values);
+
   if (m_mode == "JT65") {
     if(m_nSubMode==0) toneSpacing=11025.0/4096.0;
     if(m_nSubMode==1) toneSpacing=2*11025.0/4096.0;
@@ -14130,7 +14594,7 @@ void MainWindow::transmit (double snr)
 #if QT_VERSION >= QT_VERSION_CHECK (5, 15, 0)
     if(m_astroWidget && m_astroWidget->bDither()) m_fDither = QRandomGenerator::global()->bounded(20.0) - 10.0; //Dither by +/- 10 Hz
 #else
-    if(m_astroWidget && m_astroWidget->bDither()) m_fDither = 20.0*(double(qrand())/RAND_MAX) - 10.0; //Dither by +/- 10 Hz
+    if(m_astroWidget && m_astroWidget->bDither()) m_fDither = 20.0 * (static_cast<double>(std::rand()) / static_cast<double>(RAND_MAX)) - 10.0; //Dither by +/- 10 Hz
 #endif
 
     unsigned int numEchoSymbols=6;
@@ -14151,9 +14615,10 @@ void MainWindow::transmit (double snr)
         int nsps4=4*framesPerSymbol;                           //48000 Hz sampling
         int nsym=numEchoSymbols;
         float fsample=48000.0;
-        int nwave=nsym*nsps4;
+        int nwave=0;
         int icmplx=0;
         float f0=freq;
+        clamp_wave_arguments (nsym, nsps4, 0, nwave, "Echo");
         genwave_(const_cast<int *>(itone),&nsym,&nsps4,&nwave,
              &fsample,&toneSpacing,&f0,&icmplx,foxcom_.wave,foxcom_.wave);
       }
@@ -15214,7 +15679,7 @@ void MainWindow::p1ReadFromStdout()                        //p1readFromStdout
 #if QT_VERSION >= QT_VERSION_CHECK (5, 15, 0)
         uploadTimer.start(QRandomGenerator::global ()->bounded (0, 20000)); // Upload delay
 #else
-        uploadTimer.start(20000 * qrand()/((double)RAND_MAX + 1.0)); // Upload delay
+        uploadTimer.start(static_cast<int>(20000.0 * std::rand() / (static_cast<double>(RAND_MAX) + 1.0))); // Upload delay
 #endif
       } else {
         QFile f {QDir::toNativeSeparators (m_config.writeable_data_dir ().absoluteFilePath ("wspr_spots.txt"))};
@@ -15585,7 +16050,7 @@ void MainWindow::setRig (Frequency f)
     m_freqNominal = m_frequency_list_fcal_iter->frequency_ - ui->RxFreqSpinBox->value ();
   }
   if(m_transmitting && !m_config.tx_QSY_allowed ()) return;
-  if ((m_monitoring || m_transmitting) && m_config.transceiver_online ())
+  if ((m_monitoring || m_transmitting) && m_config.is_transceiver_online ())
     {
       if (m_transmitting && m_config.split_mode () && !(m_config.superFox() && m_specOp==SpecOp::FOX))
         {
@@ -15914,12 +16379,15 @@ void MainWindow::readWidebandDecodes()
   QString dxcall;
   QString dxgrid4;
   QStringList list;
-  float f[100];
-  int indx[100];
+  QVector<float> sort_keys;
   int maxAge=m_ActiveStationsWidget->maxAge();
+  constexpr int ready2call_capacity = static_cast<int>(sizeof(m_ready2call) / sizeof(m_ready2call[0]));
+  for (auto& entry : m_ready2call)
+    {
+      entry.clear();
+    }
 
   m_ActiveStationsWidget->setClickOK(false);
-  int k=0;
 
   for(i=m_EMECall.begin(); i!=m_EMECall.end(); i++) {
     bool bSkip=false;
@@ -15942,23 +16410,31 @@ void MainWindow::readWidebandDecodes()
         t1=t1.asprintf("%7.3f %5.1f  %+03d  %3s  %8s %4s %3d %3d %2s\n",i->frx,i->fsked,snr,
                        submode.toLatin1().constData(),dxcall.toLatin1().constData(),
                        dxgrid4.toLatin1().constData(),odd,age,c2);
-        f[k]=i->fsked;
+        sort_keys.append(i->fsked);
         list.append(t1);
-        k++;
       }
       m_ActiveStationsWidget->setClickOK(true);
     }
   }
 
-  if(k>0) {
+  int list_size = list.size();
+  if(list_size>0) {
     t1="";
-    int kz=k;
-    indexx_(f,&kz,indx);
+    int kz=list_size;
+    QVector<int> indx(kz);
+    indexx_(sort_keys.data(),&kz,indx.data());
     for(int k=0; k<kz; k++) {
       int j=indx[k]-1;
+      if (j < 0 || j >= list.size())
+        {
+          continue;
+        }
       t1=t1.asprintf("%2d. ",k+1);
       t1+=list[j];
-      m_ready2call[k]=list[j];
+      if (k < ready2call_capacity)
+        {
+          m_ready2call[k]=list[j];
+        }
       t+=t1;
     }
   }
@@ -16073,9 +16549,12 @@ QString MainWindow::foxOTPcode()
   QString code;
   if (!m_config.OTPSeed().isEmpty())
   {
-
     OTPGenerator totp;
-    QDateTime dateTime = dateTime.currentDateTime();
+    QDateTime dateTime = QDateTime::currentDateTimeUtc();
+    if (m_ntpEnabled && m_ntpClient && m_ntpClient->isSynced())
+      {
+        dateTime = dateTime.addMSecs (qRound64 (m_ntpOffset_ms));
+      }
     code = totp.generateTOTP(m_config.OTPSeed(), dateTime, 6);
     LOG_INFO(QString("foxOTPcode: code is %1").arg(code));
   } else
@@ -16219,7 +16698,7 @@ QString MainWindow::sortHoundCalls(QString t, int isort, int max_dB)
 #if QT_VERSION >= QT_VERSION_CHECK (5, 15, 0)
       j = (i + 1) * QRandomGenerator::global ()->generateDouble ();
 #else
-      j=(i+1)*double(qrand())/RAND_MAX;
+      j = static_cast<int>((i + 1) * (static_cast<double>(std::rand()) / (static_cast<double>(RAND_MAX) + 1.0)));
 #endif
       std::swap (a[j], a[i]);
       t += lines2.at(a[i]) + "\n";
@@ -17006,23 +17485,8 @@ void MainWindow::write_all(QString txRx, QString message)
     line=message;
   }
 
-  QFile f{m_config.writeable_data_dir().absoluteFilePath(file_name)};
-  if (f.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Append)) {
-    QTextStream out(&f);
-    out << line.trimmed()
-#if QT_VERSION >= QT_VERSION_CHECK (5, 15, 0)
-        << Qt::endl
-#else
-        << endl
-#endif
-      ;
-    f.close();
-  } else {
-    auto const& message2 = tr ("Cannot open \"%1\" for append: %2")
-        .arg (f.fileName ()).arg (f.errorString ());
-    QTimer::singleShot (0, [=] {                   // don't block guiUpdate
-      MessageBox::warning_message(this, tr ("Log File Error"), message2); });
-  }
+  auto const file_path = m_config.writeable_data_dir().absoluteFilePath(file_name);
+  queue_all_txt_line (file_path, line.trimmed ());
  }
 }
 
@@ -17071,14 +17535,26 @@ void MainWindow::on_pbBestSP_clicked()
 
 void MainWindow::set_mode (QString const& mode)
 {
-    if ("FT2" == mode) {
-      on_actionFT2_triggered ();
-    } else if ("FT2" != m_mode) {
-      on_actionFT2_triggered ();
-    } else {
-      ui->actionFT2->setChecked(true);
+  auto const target = mode.trimmed ().toUpper ();
+  if ("FT2" == target) on_actionFT2_triggered ();
+  else if ("FT8" == target) on_actionFT8_triggered ();
+  else if ("FT4" == target) on_actionFT4_triggered ();
+  else if ("FST4" == target) on_actionFST4_triggered ();
+  else if ("FST4W" == target) on_actionFST4W_triggered ();
+  else if ("Q65" == target) on_actionQ65_triggered ();
+  else if ("MSK144" == target) on_actionMSK144_triggered ();
+  else if ("JT4" == target) on_actionJT4_triggered ();
+  else if ("JT9" == target) on_actionJT9_triggered ();
+  else if ("JT65" == target) on_actionJT65_triggered ();
+  else if ("WSPR" == target) on_actionWSPR_triggered ();
+  else if ("ECHO" == target) on_actionEcho_triggered ();
+  else if ("FREQCAL" == target) on_actionFreqCal_triggered ();
+  else if (!target.isEmpty ())
+    {
+      LOG_WARN (QString {"set_mode: unsupported mode \"%1\""}
+        .arg (mode).toStdString ());
     }
-    initExternalCtrl();    //avt 12/5/20
+  initExternalCtrl();    //avt 12/5/20
 }
 
 void MainWindow::configActiveStations()
@@ -19560,7 +20036,8 @@ void MainWindow::on_actionUpload_to_LOTW_triggered()
   QFile::copy(adiFilePathName, adiTmpFilePathName);
   debugToFile("actionUpl    copied " + adiFilePathName + " to " + adiTmpFilePathName);
  
-  upLotw = new QProcess(this);
+  auto * lotw_process = new QProcess (this);
+  upLotw = lotw_process;
 #ifdef WIN32
   QString program = "C:/Program Files (x86)/TrustedQSL/tqsl.exe";   //spaces in file/path name OK here
   //debugToFile("actionUpl    program:" + program);
@@ -19572,33 +20049,32 @@ void MainWindow::on_actionUpload_to_LOTW_triggered()
   QStringList arguments;
   arguments << "-d" << "--action=compliant" << "-q" << "-u" << adiTmpFilePathName;
   debugToFile("actionUpl    program:" + program + " arguments:" + arguments.join(","));
-  upLotw->setWorkingDirectory(m_config.writeable_data_dir().absolutePath());
-  upLotw->start(program, arguments);
-  
-  if (!upLotw->waitForStarted()) {
-    // Handle error, process couldn't start
-    debugToFile("actionUpl    Error starting process: " + upLotw->errorString());
-    MessageBox::warning_message (this, tr ("Upload to LOTW Error"), upLotw->errorString());
-
-    delete upLotw;
-    upLotw = nullptr;
-    updateLotwCtrls();
-    return;
-  }
+  lotw_process->setWorkingDirectory(m_config.writeable_data_dir().absolutePath());
   
   last_tx_label.setText(tr ("Uploading to LOTW..."));
   
-  connect(upLotw, static_cast<void (QProcess::*) (int, QProcess::ExitStatus)> (&QProcess::finished),   //avt 4/1/25
+  connect(lotw_process, static_cast<void (QProcess::*) (int, QProcess::ExitStatus)> (&QProcess::finished),   //avt 4/1/25
           [this] (int exitCode, QProcess::ExitStatus status) {
             MainWindow::uploadLotwFinished (exitCode, status);
           });
-  connect(upLotw, static_cast<void (QProcess::*) (QProcess::ProcessError)> (&QProcess::errorOccurred),
-          [this] (QProcess::ProcessError error) {
-            MainWindow::lotwError (upLotw, error);
+  connect(lotw_process, static_cast<void (QProcess::*) (QProcess::ProcessError)> (&QProcess::errorOccurred),
+          [this, lotw_process] (QProcess::ProcessError error) {
+            MainWindow::lotwError (lotw_process, error);
           });
   
   m_logbookRead = false;    //avt 9/23/25 block settings changes and requesting up/download
   updateLotwCtrls();
+  lotw_process->start(program, arguments);
+  if (QProcess::NotRunning == lotw_process->state () && QProcess::UnknownError != lotw_process->error ())
+    {
+      debugToFile("actionUpl    Error starting process: " + lotw_process->errorString());
+      MessageBox::warning_message (this, tr ("Upload to LOTW Error"), lotw_process->errorString());
+      lotw_process->deleteLater ();
+      upLotw = nullptr;
+      m_logbookRead = true;
+      updateLotwCtrls();
+      return;
+    }
 }
 
 //avt
@@ -19616,12 +20092,21 @@ void MainWindow::uploadLotwFinished(int exitCode, QProcess::ExitStatus exitStatu
       debugToFile("actionUpl    removed " + adiTmpFilePathName);
     }
     MessageBox::information_message (this, "TQSL stopped unexpectedly");
-    delete upLotw;
+    if (upLotw)
+      {
+        upLotw->deleteLater ();
+      }
     upLotw = nullptr;
     updateLotwCtrls();
     return;
   }
   
+  if (!upLotw)
+    {
+      updateLotwCtrls();
+      return;
+    }
+
   //get std output text
   QByteArray output = upLotw->readAllStandardOutput();
   QString outStr = QString{"Exit code:%1, %2"}.arg(exitCode).arg(QString::fromUtf8(output));
@@ -19672,7 +20157,7 @@ void MainWindow::uploadLotwFinished(int exitCode, QProcess::ExitStatus exitStatu
     QFile::remove(adiTmpFilePathName);
     debugToFile("actionUpl    removed " + adiTmpFilePathName);
   }
-  delete upLotw;
+  upLotw->deleteLater ();
   upLotw = nullptr;
   updateLotwCtrls();
   cleanupAdiBackupFiles();
@@ -19684,8 +20169,14 @@ void MainWindow::lotwError (QProcess * process, QProcess::ProcessError)
   m_logbookRead = true;
   debugToFile("lotwError    error");
   MessageBox::warning_message (this, tr ("LOTW process error"));
-  delete process;
-  process = nullptr;  
+  if (process)
+    {
+      process->deleteLater ();
+    }
+  if (process == upLotw)
+    {
+      upLotw = nullptr;
+    }
   updateLotwCtrls();
 }
 
@@ -19907,18 +20398,8 @@ void MainWindow::onNtpOffsetUpdated(double offsetMs)
 void MainWindow::onNtpSyncStatusChanged(bool synced, QString const& statusText)
 {
   if(!synced) {
-    if (m_ntpEnabled && qAbs(m_ntpOffset_ms) > 1.0) {
-      int rounded = qRound(m_ntpOffset_ms);
-      int srvCount = m_ntpClient ? m_ntpClient->lastServerCount() : 0;
-      ntp_status_label.setText(QString("NTP:hold %1%2ms(%3srv)")
-                               .arg(rounded > 0 ? "+" : "")
-                               .arg(rounded)
-                               .arg(srvCount));
-      ntp_status_label.setStyleSheet("QLabel{color:#000;background:#ffff00}");
-    } else {
-      ntp_status_label.setText("NTP: no sync");
-      ntp_status_label.setStyleSheet("QLabel{color:#888;background:#333}");
-    }
+    ntp_status_label.setText("NTP: no sync");
+    ntp_status_label.setStyleSheet("QLabel{color:#888;background:#333}");
   }
   ntp_status_label.setToolTip(statusText);
 

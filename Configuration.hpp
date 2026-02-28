@@ -350,7 +350,7 @@ public:
 
   // Start the rig connection, safe and normal to call when rig is
   // already open.
-  bool transceiver_online ();
+  bool transceiver_online (bool show_error = true);
 
   // check if a real rig is configured
   bool is_dummy_rig () const;

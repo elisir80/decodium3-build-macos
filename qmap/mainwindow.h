@@ -25,6 +25,7 @@ namespace Ui {
 class QTimer;
 class Astro;
 class WideGraph;
+class QNetworkAccessManager;
 
 class MainWindow : public QMainWindow
 {
@@ -94,7 +95,7 @@ private slots:
   void handleReply(); //liveCQ
 
 private:
-  Ui::MainWindow *ui;
+  QScopedPointer<Ui::MainWindow> ui;
   QString m_appDir;
   QString m_settings_filename;
   QScopedPointer<Astro> m_astro_window;
@@ -190,7 +191,7 @@ private:
   SignalMeter *xSignalMeter;
   SoundInThread soundInThread;             //Instantiate the audio threads
   bool doLiveCQ = true;  //liveCQ
-  QFile *cqlfi;          //liveCQ
+  QScopedPointer<QNetworkAccessManager> m_liveCqManager;
 
   //---------------------------------------------------- private functions
   void readSettings();

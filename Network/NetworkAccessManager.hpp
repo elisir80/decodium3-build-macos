@@ -3,6 +3,7 @@
 
 #include <QNetworkAccessManager>
 #include <QList>
+#include <QSet>
 #include <QSslError>
 
 #include "widgets/MessageBox.hpp"
@@ -11,8 +12,7 @@ class QNetworkRequest;
 class QIODevice;
 class QWidget;
 
-// sub-class QNAM to keep a list of accepted SSL errors and allow
-// them in future replies
+  // sub-class QNAM to surface SSL errors and enforce strict TLS validation
 class NetworkAccessManager
   : public QNetworkAccessManager
 {
@@ -28,7 +28,7 @@ private:
   void filter_SSL_errors (QNetworkReply * reply, QList<QSslError> const& errors);
 
   QWidget * parent_widget_;
-  QList<QSslError> allowed_ssl_errors_;
+  QSet<QString> reported_ssl_error_keys_;
 };
 
 #endif

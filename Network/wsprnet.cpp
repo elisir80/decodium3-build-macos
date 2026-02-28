@@ -20,7 +20,7 @@
 
 namespace
 {
-  char const * const wsprNetUrl = "http://wsprnet.org/post/";
+  char const * const wsprNetUrl = "https://wsprnet.org/post/";
   //char const * const wsprNetUrl = "http://127.0.0.1:5000/post/";
 
   //

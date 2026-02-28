@@ -1,5 +1,6 @@
 #include "Modulator.hpp"
 #include <limits>
+#include <cstdlib>
 #include <qmath.h>
 #include <QDateTime>
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
@@ -44,6 +45,29 @@ Modulator::Modulator (unsigned frameRate, double periodLengthInSeconds,
   , m_j0 {-1}
   , m_toneFrequency0 {1500.0}
 {
+}
+
+void Modulator::setSymbolTables (QVector<int> const& itone_values, QVector<int> const& icw_values)
+{
+  int const n_tones = qMin (itone_values.size (), static_cast<int> (m_itone.size ()));
+  for (int i = 0; i < n_tones; ++i)
+    {
+      m_itone[static_cast<size_t> (i)] = itone_values.at (i);
+    }
+  for (int i = n_tones; i < static_cast<int> (m_itone.size ()); ++i)
+    {
+      m_itone[static_cast<size_t> (i)] = 0;
+    }
+
+  int const n_cw = qMin (icw_values.size (), static_cast<int> (m_icw.size ()));
+  for (int i = 0; i < n_cw; ++i)
+    {
+      m_icw[static_cast<size_t> (i)] = icw_values.at (i);
+    }
+  for (int i = n_cw; i < static_cast<int> (m_icw.size ()); ++i)
+    {
+      m_icw[static_cast<size_t> (i)] = 0;
+    }
 }
 
 void Modulator::start (QString mode, unsigned symbolsLength, double framesPerSymbol,
@@ -210,13 +234,13 @@ qint64 Modulator::readData (char * data, qint64 maxSize)
         unsigned int isym=0;
 
         if(!m_tuning) isym=m_ic/(4.0*m_nsps);            // Actual fsample=48000
-        bool slowCwId=((isym >= m_symbolsLength) && (icw[0] > 0)) && (!m_bFastMode);
+        bool slowCwId=((isym >= m_symbolsLength) && (m_icw[0] > 0)) && (!m_bFastMode);
         if(m_TRperiod==3.0) slowCwId=false;
         bool fastCwId=false;
         static bool bCwId=false;
         qint64 ms = QDateTime::currentMSecsSinceEpoch();
         float tsec=0.001*(ms % int(1000*m_TRperiod));
-        if(m_bFastMode and (icw[0]>0) and (tsec > (m_TRperiod-5.0))) fastCwId=true;
+        if(m_bFastMode and (m_icw[0]>0) and (tsec > (m_TRperiod-5.0))) fastCwId=true;
         if(!m_bFastMode) m_nspd=2560;                 // 22.5 WPM
 
 
@@ -229,7 +253,7 @@ qint64 Modulator::readData (char * data, qint64 maxSize)
             m_nsps=4096.0*12000.0/11025.0;
             m_ic=2246949;
             m_nspd=2560;               // 22.5 WPM
-            if(icw[0]*m_nspd/48000.0 > 4.0) m_nspd=4.0*48000.0/icw[0];  //Faster CW for long calls
+            if(m_icw[0]*m_nspd/48000.0 > 4.0) m_nspd=4.0*48000.0/m_icw[0];  //Faster CW for long calls
           }
           bCwId=true;
           unsigned ic0 = m_symbolsLength * 4 * m_nsps;
@@ -237,7 +261,7 @@ qint64 Modulator::readData (char * data, qint64 maxSize)
 
           while (samples != end) {
             j = (m_ic - ic0)/m_nspd + 1; // symbol of this sample
-            bool level {bool (icw[j])};
+            bool level {bool (m_icw[j])};
             m_phi += m_dphi;
             if (m_phi > m_twoPi) m_phi -= m_twoPi;
             qint16 sample=0;
@@ -255,7 +279,7 @@ qint64 Modulator::readData (char * data, qint64 maxSize)
               sample=0;
               if(level) sample=32767.0*x;
             }
-            if (int (j) <= icw[0] && j < NUM_CW_SYMBOLS) { // stop condition
+            if (int (j) <= m_icw[0] && j < NUM_CW_SYMBOLS) { // stop condition
               samples = load (postProcessSample (sample), samples);
               ++framesGenerated;
               ++m_ic;
@@ -297,13 +321,13 @@ qint64 Modulator::readData (char * data, qint64 maxSize)
           if(!m_tuning and m_TRperiod!=3.0) isym=m_ic/(4.0*m_nsps);   //Actual fsample=48000
           if(m_bFastMode) isym=isym%m_symbolsLength;
           if (isym != m_isym0 || m_frequency != m_frequency0) {
-            if(itone[0]>=100) {
-              m_toneFrequency0=itone[0];
+            if(m_itone[0]>=100) {
+              m_toneFrequency0=m_itone[0];
             } else {
               if(m_toneSpacing==0.0) {
-                m_toneFrequency0=m_frequency + itone[isym]*baud;
+                m_toneFrequency0=m_frequency + m_itone[isym]*baud;
               } else {
-                m_toneFrequency0=m_frequency + itone[isym]*m_toneSpacing;
+                m_toneFrequency0=m_frequency + m_itone[isym]*m_toneSpacing;
               }
             }
             m_dphi = m_twoPi * m_toneFrequency0 / m_frameRate;
@@ -317,8 +341,8 @@ qint64 Modulator::readData (char * data, qint64 maxSize)
             float x1=QRandomGenerator::global ()->generateDouble ();
             float x2=QRandomGenerator::global ()->generateDouble ();
 #else
-            float x1=(float)qrand()/RAND_MAX;
-            float x2=(float)qrand()/RAND_MAX;
+            float x1=static_cast<float>(std::rand())/static_cast<float>(RAND_MAX);
+            float x2=static_cast<float>(std::rand())/static_cast<float>(RAND_MAX);
 #endif
             toneFrequency = m_toneFrequency0 + 0.5*m_fSpread*(x1+x2-1.0);
             m_dphi = m_twoPi * toneFrequency / m_frameRate;
@@ -333,7 +357,7 @@ qint64 Modulator::readData (char * data, qint64 maxSize)
           sample=qRound(m_amp*qSin(m_phi));
 
 //Here's where we transmit from a precomputed wave[] array:
-          if(!m_tuning and (m_toneSpacing < 0) and (itone[0]<100)) {
+          if(!m_tuning and (m_toneSpacing < 0) and (m_itone[0]<100)) {
             m_amp=32767.0;
             sample=qRound(m_amp*foxcom_.wave[m_ic]);
             m_icmin=qMin(m_ic,m_icmin);
@@ -358,7 +382,7 @@ qint64 Modulator::readData (char * data, qint64 maxSize)
 //                 << tsec << m_ic << i1;
 
         if (m_amp == 0.0) { // TODO G4WJS: compare double with zero might not be wise
-          if (icw[0] == 0) {
+          if (m_icw[0] == 0) {
             // no CW ID to send
             Q_EMIT stateChanged ((m_state = Idle));
             return framesGenerated * bytesPerFrame ();

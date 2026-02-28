@@ -39,15 +39,8 @@ OTPGenerator::OTPGenerator(QObject *parent)
 
 QByteArray OTPGenerator::generateHOTP(const QByteArray &rawSecret, quint64 counter, int length)
 {
-#if Q_BYTE_ORDER == Q_LITTLE_ENDIAN
-  counter = qToBigEndian(counter);
-#endif
-  QByteArray data;
-  data.reserve(8);
-  for (int i = 7; i >= 0; --i) {
-    data.append(counter & 0xff);
-    counter >>= 8;
-  }
+  quint64 const beCounter = qToBigEndian(counter);
+  QByteArray data(reinterpret_cast<char const *>(&beCounter), sizeof(beCounter));
   QMessageAuthenticationCode mac(QCryptographicHash::Sha1);
   mac.setKey(rawSecret);
   mac.addData(data);
@@ -68,7 +61,7 @@ QString OTPGenerator::generateHOTP(const QString &secret, quint64 counter, int l
 
 QByteArray OTPGenerator::generateTOTP(const QByteArray &rawSecret, int length)
 {
-  const qint64 counter = QDateTime::currentDateTime().toMSecsSinceEpoch() / 30000;
+  const qint64 counter = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch() / 30000;
   return generateHOTP(rawSecret, counter, length);
 }
 

@@ -7,6 +7,7 @@
 #include <QToolTip>
 #include "revision_utils.hpp"
 #include "qt_helpers.hpp"
+#include "SharedMemorySegment.hpp"
 #include "SettingsGroup.hpp"
 #include "widgets/MessageBox.hpp"
 #include "ui_mainwindow.h"
@@ -23,16 +24,37 @@
 #include <QNetworkReply>
 #include <QUrl>
 #include <QUrlQuery>
+#include <QElapsedTimer>
 #include <QEventLoop>
 
 #define NFFT 32768
 
 qint16 id[2*60*96000];
 
-QSharedMemory mem_qmap("mem_qmap");            //Memory segment to be shared (optionally) with WSJT-X
+SharedMemorySegment mem_qmap("mem_qmap");      //Memory segment to be shared (optionally) with WSJT-X
 int* ipc_wsjtx;
 
 extern const int RxDataFrequency = 96000;
+
+namespace
+{
+  constexpr int kQmapD4SampleCount {static_cast<int> (sizeof (datcom_.d4) / sizeof (datcom_.d4[0]))};
+
+  void process_events_no_user_input ()
+  {
+    QCoreApplication::processEvents (QEventLoop::ExcludeUserInputEvents);
+  }
+
+  int clamp_d4_index (int value, char const * context)
+  {
+    auto const clamped = qBound (0, value, kQmapD4SampleCount);
+    if (clamped != value)
+      {
+        qWarning () << context << "clamped sample index from" << value << "to" << clamped;
+      }
+    return clamped;
+  }
+}
 
 //-------------------------------------------------- MainWindow constructor
 MainWindow::MainWindow(QWidget *parent) :
@@ -42,7 +64,8 @@ MainWindow::MainWindow(QWidget *parent) :
   m_settings_filename {m_appDir + "/qmap.ini"},
   m_astro_window {new Astro {m_settings_filename}},
   m_wide_graph_window {new WideGraph {m_settings_filename}},
-  m_gui_timer {new QTimer {this}}
+  m_gui_timer {new QTimer {this}},
+  m_liveCqManager {new QNetworkAccessManager {this}}
 {
   ui->setupUi(this);
 //  ui->decodedTextBrowser->clear();
@@ -113,9 +136,12 @@ MainWindow::MainWindow(QWidget *parent) :
     }
   }
   ipc_wsjtx = (int*)mem_qmap.data();
-  mem_qmap.lock();
-  memset(ipc_wsjtx,0,memSize);         //Zero all of shared memory
-  mem_qmap.unlock();
+  if (mem_qmap.lock (100)) {
+    memset(ipc_wsjtx,0,memSize);         //Zero all of shared memory
+    mem_qmap.unlock();
+  } else {
+    qWarning() << "qmap: unable to lock shared memory during initialization";
+  }
 
 //  fftwf_import_wisdom_from_filename (QDir {m_appDir}.absoluteFilePath ("qmap_wisdom.dat").toLocal8Bit ());
   readSettings();		             //Restore user's setup params
@@ -217,7 +243,6 @@ MainWindow::~MainWindow()
     soundInThread.quit();
     soundInThread.wait(3000);
   }
-  delete ui;
 }
 
 //-------------------------------------------------------- writeSettings()
@@ -367,12 +392,18 @@ void MainWindow::dataSink(int k)
     ndiskdat=0;
     datcom_.ndiskdat=0;
   }
+  k = clamp_d4_index(k, "qmap dataSink");
+  if (k <= 0)
+    {
+      return;
+    }
 // Get power, spectrum, nkhz, and ihsym
   nb=0;
   if(m_NB) nb=1;
   nfsample=96000;
 
   if(m_bWTransmitting) zaptx_(datcom_.d4, &k0, &k);
+  k = clamp_d4_index(k, "qmap dataSink/post_zaptx");
   k0=k;
 
   symspec_(&k, &ndiskdat, &nb, &m_NBslider, &nfsample,
@@ -613,32 +644,32 @@ bool MainWindow::eventFilter(QObject *object, QEvent *event)  //eventFilter()
 
 void MainWindow::createStatusBar()                           //createStatusBar
 {
-  lab1 = new QLabel("Receiving");
+  lab1 = new QLabel("Receiving", statusBar());
   lab1->setAlignment(Qt::AlignHCenter);
   lab1->setMinimumSize(QSize(80,10));
   lab1->setStyleSheet("QLabel{background-color: #00ff00}");
   lab1->setFrameStyle(QFrame::Panel | QFrame::Sunken);
   statusBar()->addWidget(lab1);
 
-  lab2 = new QLabel("");
+  lab2 = new QLabel("", statusBar());
   lab2->setAlignment(Qt::AlignHCenter);
   lab2->setMinimumSize(QSize(80,10));
   lab2->setFrameStyle(QFrame::Panel | QFrame::Sunken);
   statusBar()->addWidget(lab2);
 
-  lab3 = new QLabel("");
+  lab3 = new QLabel("", statusBar());
   lab3->setAlignment(Qt::AlignHCenter);
   lab3->setMinimumSize(QSize(50,10));
   lab3->setFrameStyle(QFrame::Panel | QFrame::Sunken);
   statusBar()->addWidget(lab3);
 
-  lab4 = new QLabel("");
+  lab4 = new QLabel("", statusBar());
   lab4->setAlignment(Qt::AlignHCenter);
   lab4->setMinimumSize(QSize(80,10));
   lab4->setFrameStyle(QFrame::Panel | QFrame::Sunken);
   statusBar()->addWidget(lab4);
 
-  lab5 = new QLabel("");
+  lab5 = new QLabel("", statusBar());
   lab5->setAlignment(Qt::AlignHCenter);
   lab5->setMinimumSize(QSize(100,10));
   lab5->setFrameStyle(QFrame::Panel | QFrame::Sunken);
@@ -772,9 +803,16 @@ void MainWindow::diskDat(int iret)                                   //diskDat()
     int k = i*hsym + 0.5;
     if(k > 60*96000) break;
     dataSink(k);
-    qApp->processEvents();             // Allow the waterfall to update
-    while(m_decoderBusy) {
-      qApp->processEvents();           // Wait for an early decode to finish
+    process_events_no_user_input();    // Allow waterfall update without re-entrancy
+    if (m_decoderBusy) {
+      QElapsedTimer wait_timer;
+      wait_timer.start();
+      while(m_decoderBusy && wait_timer.elapsed() < 1500) {
+        process_events_no_user_input();
+      }
+      if (m_decoderBusy) {
+        qWarning() << "qmap diskDat: decoder still busy after timeout, continuing";
+      }
     }
   }
   m_bDiskDatBusy=false;
@@ -786,12 +824,15 @@ void MainWindow::decoderFinished()
   decodes_.nQDecoderDone=1;
   decodes_.kHzRequested=0;
   if(m_diskData) decodes_.nQDecoderDone=2;
-  mem_qmap.lock();
-  decodes_.nWDecoderBusy=ipc_wsjtx[3];                   //Prevent overwriting values
-  decodes_.nWTransmitting=ipc_wsjtx[4];                  //written here by WSJT-X
-  m_bWTransmitting=decodes_.nWTransmitting>0;
-  memcpy((char*)ipc_wsjtx, &decodes_, sizeof(decodes_)); //Send decodes and flags to WSJT-X
-  mem_qmap.unlock();
+  if (mem_qmap.lock (50)) {
+    decodes_.nWDecoderBusy=ipc_wsjtx[3];                   //Prevent overwriting values
+    decodes_.nWTransmitting=ipc_wsjtx[4];                  //written here by WSJT-X
+    m_bWTransmitting=decodes_.nWTransmitting>0;
+    memcpy((char*)ipc_wsjtx, &decodes_, sizeof(decodes_)); //Send decodes and flags to WSJT-X
+    mem_qmap.unlock();
+  } else {
+    qWarning() << "qmap: lock timeout while publishing decoder state";
+  }
   QString t1;
   t1=t1.asprintf(" %.1f s  %d/%d ", 0.15*datcom2_.nhsym, decodes_.ndecodes, decodes_.ncand);
   lab4->setText(t1);
@@ -868,9 +909,10 @@ void MainWindow::freezeDecode(int n)                          //freezeDecode()
 {
   if(n==3) {
     decodes_.kHzRequested=m_wide_graph_window->QSOfreq();
-    mem_qmap.lock();
-    ipc_wsjtx[5]=decodes_.kHzRequested;
-    mem_qmap.unlock();
+    if (mem_qmap.lock (50)) {
+      ipc_wsjtx[5]=decodes_.kHzRequested;
+      mem_qmap.unlock();
+    }
     return;
   }
   if(n==2) {
@@ -1123,7 +1165,6 @@ void MainWindow::sendLiveCQData(QList<QStringList>decodeList)
     theUrl = m_otherUrl;
   }
 
-  QNetworkAccessManager *manager = new QNetworkAccessManager(this);
   QUrl url(theUrl);
   QNetworkRequest request(url);
   request.setRawHeader("User-Agent", "QMAP v0.5");
@@ -1144,12 +1185,9 @@ void MainWindow::sendLiveCQData(QList<QStringList>decodeList)
     request.setRawHeader("Content-Length",QByteArray::number(postByteArray.size()));
 
 
-    try {
-	  QNetworkReply *reply = manager->post(request,postByteArray);		
-	  QObject::connect(reply, &QNetworkReply::finished, this, &MainWindow::handleReply);
-    }
-    catch(...)
-    {
+    if (m_liveCqManager) {
+      QNetworkReply *reply = m_liveCqManager->post(request,postByteArray);
+      QObject::connect(reply, &QNetworkReply::finished, this, &MainWindow::handleReply);
     }
   }
 }
@@ -1157,11 +1195,13 @@ void MainWindow::sendLiveCQData(QList<QStringList>decodeList)
 void MainWindow::handleReply()
 {
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    if (!reply) return;
     if (reply->error() == QNetworkReply::NoError) {
-		qDebug() << reply->readAll();
+			qDebug() << reply->readAll();
     } else {
-		qDebug() << reply->errorString();
+			qDebug() << reply->errorString();
     }
+    reply->deleteLater();
 }
 
 
@@ -1243,9 +1283,12 @@ void MainWindow::guiUpdate()
 
 // See if WSJT-X is transmitting
     int itest[5];
-    mem_qmap.lock();
-    memcpy(&itest, (char*)ipc_wsjtx, 20);
-    mem_qmap.unlock();
+    if (mem_qmap.lock (50)) {
+      memcpy(&itest, (char*)ipc_wsjtx, 20);
+      mem_qmap.unlock();
+    } else {
+      memset(&itest, 0, sizeof itest);
+    }
     if(itest[4]>0) {
       m_WSJTX_TRperiod=itest[4];
       m_bWTransmitting=true;

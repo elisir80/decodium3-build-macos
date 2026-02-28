@@ -1,8 +1,7 @@
-#include <QSharedMemory>
-#include <QLatin1String>
+#include "SharedMemorySegment.hpp"
 
 // Multiple instances: KK1D, 17 Jul 2013
-QSharedMemory shmem;
+SharedMemorySegment shmem;
 
 struct jt9com;
 
@@ -10,7 +9,7 @@ struct jt9com;
 extern "C"
 {
   bool shmem_create (int nsize) {return shmem.create(nsize);}
-  void shmem_setkey (char * const mykey) {shmem.setKey(QLatin1String{mykey});}
+  void shmem_setkey (char * const mykey) {shmem.setKey(QString::fromLatin1(mykey));}
   bool shmem_attach () {return shmem.attach();}
   int shmem_size () {return static_cast<int> (shmem.size());}
   struct jt9com * shmem_address () {return reinterpret_cast<struct jt9com *>(shmem.data());}

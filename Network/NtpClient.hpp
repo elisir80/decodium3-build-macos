@@ -60,6 +60,11 @@ private:
     quint32 t1Frac;
   };
 
+  struct OffsetSample {
+    double offsetMs {0.0};
+    double rttMs {0.0};
+  };
+
   void sendQuery(QHostAddress const& address);
   void httpTimeFallback();
   bool weakSyncShouldApply(double candidateOffsetMs, QString *reason);
@@ -74,7 +79,7 @@ private:
 
   QStringList m_servers;
   QHash<QString, PendingQuery> m_pendingQueries;  // key = address.toString()
-  QVector<double> m_collectedOffsets;
+  QVector<OffsetSample> m_collectedOffsets;
 
   // HTTP time fallback
   QNetworkAccessManager *m_nam {nullptr};

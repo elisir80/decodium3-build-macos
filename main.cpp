@@ -5,11 +5,11 @@
 #include <iterator>
 #include <algorithm>
 #include <ios>
+#include <cstdlib>
 #include <locale>
 #include <fftw3.h>
 
 #include <QApplication>
-#include <QSharedMemory>
 #include <QProcessEnvironment>
 #include <QTemporaryFile>
 #include <QDateTime>
@@ -34,12 +34,15 @@
 #include <QByteArray>
 #include <QBitArray>
 #include <QMetaType>
+#include <QElapsedTimer>
+#include <QThread>
 
 #include "ExceptionCatchingApplication.hpp"
 #include "Logger.hpp"
 #include "revision_utils.hpp"
 #include "MetaDataRegistry.hpp"
 #include "qt_helpers.hpp"
+#include "SharedMemorySegment.hpp"
 #include "L10nLoader.hpp"
 #include "SettingsGroup.hpp"
 //#include "TraceFile.hpp"
@@ -52,10 +55,6 @@
 #include "models/FrequencyList.hpp"
 #include "widgets/SplashScreen.hpp"
 #include "widgets/MessageBox.hpp"       // last to avoid nasty MS macro definitions
-
-#if defined (Q_OS_DARWIN)
-#include <sys/sysctl.h>
-#endif
 
 extern "C" {
   // Fortran procedures we need
@@ -71,7 +70,7 @@ namespace
     {
       // one time seed of pseudo RNGs from current time
       auto seed = QDateTime::currentMSecsSinceEpoch ();
-      qsrand (seed);            // this is good for rand() as well
+      std::srand (static_cast<unsigned int>(seed)); // seed std::rand fallback paths
     }
   } seeding;
 #endif
@@ -109,7 +108,7 @@ namespace
 #if defined (Q_OS_DARWIN)
   QString make_macos_shm_key (QString app_name)
   {
-    // macOS POSIX shared memory names are strict and short.
+    // Keep a short, stable per-instance key for IPC.
     app_name = app_name.simplified ();
     app_name.replace (QRegularExpression {R"([^A-Za-z0-9_.-])"}, "_");
     if (app_name.isEmpty ())
@@ -127,18 +126,8 @@ namespace
       }
     return "/" + app_name;
   }
-
-  quint64 read_macos_sysctl (char const * name)
-  {
-    quint64 value {};
-    size_t size {sizeof (value)};
-    if (0 == sysctlbyname (name, &value, &size, nullptr, 0) && size == sizeof (value))
-      {
-        return value;
-      }
-    return 0;
-  }
 #endif
+
 }
 
 int main(int argc, char *argv[])
@@ -150,7 +139,7 @@ int main(int argc, char *argv[])
   register_types ();
 
   // Multiple instances communicate with jt9 via this
-  QSharedMemory mem_jt9;
+  SharedMemorySegment mem_jt9;
 
   // Read optional file to disable highDPI scaling
   QFile f("DisableHighDpiScaling");
@@ -266,22 +255,18 @@ int main(int argc, char *argv[])
       // disallow multiple instances with same instance key
       QLockFile instance_lock {temp_dir.absoluteFilePath (a.applicationName () + ".lock")};
       instance_lock.setStaleLockTime (0);
-      while (!instance_lock.tryLock ())
+      while (!instance_lock.tryLock (250))
         {
           if (QLockFile::LockFailedError == instance_lock.error ())
             {
               auto button = MessageBox::query_message (nullptr
                                                        , "Another instance may be running"
-                                                       , "try to remove stale lock file?"
+                                                       , "Another instance is still locking this rig profile. Retry?"
                                                        , QString {}
-                                                       , MessageBox::Yes | MessageBox::Retry | MessageBox::No
-                                                       , MessageBox::Yes);
+                                                       , MessageBox::Retry | MessageBox::No
+                                                       , MessageBox::Retry);
               switch (button)
                 {
-                case MessageBox::Yes:
-                  instance_lock.removeStaleLockFile ();
-                  break;
-
                 case MessageBox::Retry:
                   break;
 
@@ -348,11 +333,16 @@ int main(int argc, char *argv[])
           throw std::runtime_error {("Database Error: " + db.lastError ().text ()).toStdString ()};
         }
 
-      // better performance traded for a risk of d/b corruption
-      // on system crash or application crash
-      // db.exec ("PRAGMA synchronous=OFF"); // system crash risk
-      // db.exec ("PRAGMA journal_mode=MEMORY"); // application crash risk
-      db.exec ("PRAGMA locking_mode=EXCLUSIVE");
+      auto apply_pragma = [&db] (char const * pragma) {
+        auto query = db.exec (pragma);
+        if (query.lastError ().isValid ())
+          {
+            throw std::runtime_error {("Database Error: " + query.lastError ().text ()).toStdString ()};
+          }
+      };
+      apply_pragma ("PRAGMA journal_mode=WAL");
+      apply_pragma ("PRAGMA synchronous=NORMAL");
+      apply_pragma ("PRAGMA busy_timeout=5000");
 
       int result;
       auto const& original_style_sheet = a.styleSheet ();
@@ -411,16 +401,29 @@ int main(int argc, char *argv[])
                                      // orphaned jt9 sub-process
                 {
                   dec_data_t * dd = reinterpret_cast<dec_data_t *> (mem_jt9.data());
-                  mem_jt9.lock ();
-                  dd->ipc[1] = 999; // tell jt9 to shut down
-                  mem_jt9.unlock ();
+                  if (mem_jt9.lock (200))
+                    {
+                      dd->ipc[1] = 999; // tell jt9 to shut down
+                      mem_jt9.unlock ();
+                    }
                   mem_jt9.detach (); // start again
                 }
               else
                 {
                   break;        // good to go
                 }
-              QThread::sleep (1); // wait for jt9 to end
+              // Poll briefly for shutdown so we can proceed as soon as IPC is released.
+              QElapsedTimer wait_timer;
+              wait_timer.start ();
+              while (wait_timer.elapsed () < 1000)
+                {
+                  if (!mem_jt9.attach ())
+                    {
+                      break;
+                    }
+                  mem_jt9.detach ();
+                  QThread::msleep (25);
+                }
             }
           if (!mem_jt9.attach ())
             {
@@ -428,23 +431,6 @@ int main(int argc, char *argv[])
                 {
                   auto const key = mem_jt9.nativeKey ().isEmpty () ? mem_jt9.key () : mem_jt9.nativeKey ();
                   auto reason = mem_jt9.errorString ();
-#if defined (Q_OS_DARWIN)
-                  auto const shmmax = read_macos_sysctl ("kern.sysv.shmmax");
-                  auto const shmall = read_macos_sysctl ("kern.sysv.shmall");
-                  if (shmmax)
-                    {
-                      reason += "\nshmmax=" + QString::number (shmmax)
-                        + " bytes, required=" + QString::number (sizeof (dec_data)) + " bytes";
-                      if (shmmax < sizeof (dec_data))
-                        {
-                          reason += "\nHint: kern.sysv.shmmax is too small.";
-                        }
-                    }
-                  if (shmall)
-                    {
-                      reason += "\nshmall=" + QString::number (shmall) + " pages";
-                    }
-#endif
                   LOG_ERROR ("Unable to create shared memory segment; key=" << key
                             << ", size=" << sizeof (dec_data)
                             << ", error=" << reason);
@@ -476,8 +462,14 @@ int main(int argc, char *argv[])
                 }
               LOG_INFO ("shmem size: " << mem_jt9.size ());
             }
-          mem_jt9.lock ();
-          memset(mem_jt9.data(),0,sizeof(struct dec_data)); //Zero all decoding params in shared memory
+          if (!mem_jt9.lock (500))
+            {
+              throw std::runtime_error {"Shared memory error: unable to lock IPC segment"};
+            }
+          if (auto * shared = reinterpret_cast<dec_data_t *> (mem_jt9.data ()))
+            {
+              *shared = dec_data_t {};
+            }
           mem_jt9.unlock ();
 
           unsigned downSampleFactor;

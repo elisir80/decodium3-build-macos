@@ -1,5 +1,51 @@
 # Changelog / Registro Modifiche
 
+## [1.3.0] - 2026-02-28
+
+### English
+
+Release focused on security hardening, macOS shared-memory stability, CAT resilience,
+and DT/NTP behavior tuning.
+
+#### Changed
+
+- macOS shared memory migrated to `SharedMemorySegment` with Darwin `mmap` backend.
+- Release flow updated to generate platform-specific DMG/ZIP/SHA256 assets:
+  - Tahoe arm64
+  - Sequoia arm64
+  - Sequoia x86_64
+- `.pkg` generation removed from standard release path (no longer required for shm sysctl bootstrap).
+- FT2/FT4/FT8 mode-specific NTP and DT sampling tuning refined.
+
+#### Fixed
+
+- CAT reconnect instability when external bridge/logger state changed at runtime.
+- Startup mode mismatch when rig frequency implied a different digital mode.
+- Multiple NTP edge cases (sample quality filtering, sparse-set handling, fallback coherence).
+- DT status presentation now aligned with effective timing context.
+
+### Italiano
+
+Release focalizzata su hardening sicurezza, stabilita' shared memory su macOS, resilienza CAT
+e tuning del comportamento DT/NTP.
+
+#### Modificato
+
+- Memoria condivisa macOS migrata a `SharedMemorySegment` con backend Darwin `mmap`.
+- Flusso release aggiornato con asset DMG/ZIP/SHA256 specifici per piattaforma:
+  - Tahoe arm64
+  - Sequoia arm64
+  - Sequoia x86_64
+- Generazione `.pkg` rimossa dal percorso release standard (non piu' necessaria per bootstrap sysctl shm).
+- Rifinito il tuning NTP e campionamento DT per FT2/FT4/FT8.
+
+#### Corretto
+
+- Instabilita' CAT in riconnessione quando lo stato del bridge/logger esterno cambiava a runtime.
+- Mismatch modalita' all'avvio quando la frequenza radio implicava un modo digitale differente.
+- Diversi edge case NTP (filtro qualita' campioni, gestione set server sparsi, coerenza fallback).
+- Presentazione DT in status bar allineata al contesto temporale effettivo.
+
 ## [1.2.1] - 2026-02-27
 
 ### English

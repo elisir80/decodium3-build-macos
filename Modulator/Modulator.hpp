@@ -1,10 +1,14 @@
 #ifndef MODULATOR_HPP__
 #define MODULATOR_HPP__
 
+#include <array>
+
 #include <QAudio>
 #include <QPointer>
+#include <QVector>
 
 #include "Audio/AudioDevice.hpp"
+#include "widgets/itoneAndicw.h"
 
 class SoundOutput;
 
@@ -42,6 +46,7 @@ public:
   Q_SLOT void stop (bool quick = false);
   Q_SLOT void tune (bool newState = true);
   Q_SLOT void setFrequency (double newFrequency) {m_frequency = newFrequency;}
+  Q_SLOT void setSymbolTables (QVector<int> const& itone_values, QVector<int> const& icw_values);
   Q_SIGNAL void stateChanged (ModulatorState) const;
 
 protected:
@@ -94,6 +99,8 @@ private:
   unsigned m_isym0;
   int m_j0;
   double m_toneFrequency0;
+  std::array<int, MAX_NUM_SYMBOLS> m_itone {};
+  std::array<int, NUM_CW_SYMBOLS> m_icw {};
 };
 
 #endif

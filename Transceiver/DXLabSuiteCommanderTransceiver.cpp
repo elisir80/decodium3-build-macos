@@ -69,7 +69,7 @@ int DXLabSuiteCommanderTransceiver::do_start ()
     }
 
   commander_->connectToHost (std::get<0> (server_details), std::get<1> (server_details));
-  if (!commander_->waitForConnected ())
+  if (!commander_->waitForConnected (2000))
     {
       CAT_ERROR ("failed to connect" << commander_->errorString ());
       throw error {tr ("Failed to connect to DX Lab Suite Commander\n") + commander_->errorString ()};
@@ -81,7 +81,7 @@ int DXLabSuiteCommanderTransceiver::do_start ()
   // arbitrary but hopefully enough as the actual time required is rig
   // and Commander setting dependent
   int resolution {0};
-  QThread::msleep (2000);
+  QThread::msleep (250);
   auto reply = command_with_reply ("<command:10>CmdGetFreq<parameters:0>");
   if (0 == reply.indexOf ("<CmdFreq:"))
     {
@@ -92,7 +92,7 @@ int DXLabSuiteCommanderTransceiver::do_start ()
           auto f_string = frequency_to_string (test_frequency);
           auto params =  ("<xcvrfreq:%1>" + f_string).arg (f_string.size ());
           simple_command (("<command:10>CmdSetFreq<parameters:%1>" + params).arg (params.size ()));
-          QThread::msleep (2000);
+          QThread::msleep (250);
           reply = command_with_reply ("<command:10>CmdGetFreq<parameters:0>");
           if (0 == reply.indexOf ("<CmdFreq:"))
             {
@@ -127,11 +127,19 @@ int DXLabSuiteCommanderTransceiver::do_start ()
     }
   else
     {
-      CAT_ERROR ("get frequency unexpected response" << reply);
-      throw error {tr ("DX Lab Suite Commander didn't respond correctly reading frequency: ") + reply};
+      // Commander can be reachable while no rig is yet active.
+      // Keep interface alive and let periodic polls recover automatically.
+      CAT_WARNING ("startup frequency reply not ready, keeping connection alive:" << reply);
     }
 
-  do_poll ();
+  try
+    {
+      do_poll ();
+    }
+  catch (std::exception const& e)
+    {
+      CAT_WARNING ("startup poll deferred:" << e.what ());
+    }
   return resolution;
 }
 
@@ -270,8 +278,8 @@ void DXLabSuiteCommanderTransceiver::do_poll ()
     }
   else
     {
-      CAT_ERROR ("get frequency unexpected response" << reply);
-      throw error {tr ("DX Lab Suite Commander didn't respond correctly polling frequency: ") + reply};
+      CAT_WARNING ("poll frequency reply not ready:" << reply);
+      return;
     }
 
   if (state ().split ())
@@ -291,8 +299,8 @@ void DXLabSuiteCommanderTransceiver::do_poll ()
         }
       else
         {
-          CAT_ERROR ("get tx frequency unexpected response" << reply);
-          throw error {tr ("DX Lab Suite Commander didn't respond correctly polling TX frequency: ") + reply};
+          CAT_WARNING ("poll tx frequency reply not ready:" << reply);
+          return;
         }
     }
 
@@ -310,14 +318,14 @@ void DXLabSuiteCommanderTransceiver::do_poll ()
         }
       else
         {
-          CAT_ERROR ("unexpected split state" << split);
-          throw error {tr ("DX Lab Suite Commander sent an unrecognised split state: ") + split};
+          CAT_WARNING ("poll split state not ready:" << split);
+          return;
         }
     }
   else
     {
-      CAT_ERROR ("get split mode unexpected response" << reply);
-      throw error {tr ("DX Lab Suite Commander didn't respond correctly polling split status: ") + reply};
+      CAT_WARNING ("poll split reply not ready:" << reply);
+      return;
     }
 
   get_mode ();
@@ -372,15 +380,15 @@ auto DXLabSuiteCommanderTransceiver::get_mode () -> MODE
         }
       else
         {
-          CAT_ERROR ("unexpected mode name" << mode);
-          throw error {tr ("DX Lab Suite Commander sent an unrecognised mode: \"") + mode + '"'};
+          CAT_WARNING ("poll mode not ready:" << mode);
+          return UNK;
         }
       update_mode (m);
     }
   else
     {
-      CAT_ERROR ("unexpected response" << reply);
-      throw error {tr ("DX Lab Suite Commander didn't respond correctly polling mode: ") + reply};
+      CAT_WARNING ("poll mode reply not ready:" << reply);
+      return UNK;
     }
   return m;
 }
@@ -418,7 +426,7 @@ QString DXLabSuiteCommanderTransceiver::command_with_reply (QString const& cmd)
   bool replied {false};
   while (!replied && --retries)
     {
-      replied = commander_->waitForReadyRead ();
+      replied = commander_->waitForReadyRead (400);
       if (!replied && commander_->error () != commander_->SocketTimeoutError)
         {
           CAT_ERROR (cmd << "failed to read reply:" << commander_->errorString ());
@@ -459,7 +467,7 @@ bool DXLabSuiteCommanderTransceiver::write_to_port (QString const& s)
   while (total_bytes_sent < length)
     {
       auto bytes_sent = commander_->write (to_send + total_bytes_sent, length - total_bytes_sent);
-      if (bytes_sent < 0 || !commander_->waitForBytesWritten ())
+      if (bytes_sent < 0 || !commander_->waitForBytesWritten (500))
         {
           return false;
         }

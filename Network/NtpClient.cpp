@@ -9,35 +9,12 @@
 #include <cmath>
 #include <random>
 #include <QLocale>
+#include <QRandomGenerator>
 
 namespace
 {
-  bool env_flag_enabled(char const *name, bool default_value)
-  {
-    auto const raw = QString::fromLocal8Bit(qgetenv(name)).trimmed().toLower();
-    if (raw.isEmpty()) return default_value;
-    if (raw == "0" || raw == "false" || raw == "off" || raw == "no") return false;
-    if (raw == "1" || raw == "true" || raw == "on" || raw == "yes") return true;
-    return default_value;
-  }
-
-  double env_double(char const *name, double default_value, double min_value, double max_value)
-  {
-    bool ok = false;
-    auto const raw = QString::fromLocal8Bit(qgetenv(name)).trimmed();
-    auto value = raw.toDouble(&ok);
-    if (!ok) return default_value;
-    return qBound(min_value, value, max_value);
-  }
-
-  int env_int(char const *name, int default_value, int min_value, int max_value)
-  {
-    bool ok = false;
-    auto const raw = QString::fromLocal8Bit(qgetenv(name)).trimmed();
-    auto value = raw.toInt(&ok);
-    if (!ok) return default_value;
-    return qBound(min_value, value, max_value);
-  }
+  constexpr double HTTP_COARSE_ABS_LIMIT_MS = 180.0;
+  constexpr int NTP_INITIAL_MIN_SERVERS = 2;
 
   double median_of(QVector<double> values)
   {
@@ -116,19 +93,6 @@ NtpClient::NtpClient(QObject *parent)
       "ntp.ubuntu.com",       // Ubuntu/Canonical
     })
 {
-  m_weakSyncEnabled = env_flag_enabled("FT2_NTP_WEAK_SYNC", true);
-  m_weakDeadbandMs = env_double("FT2_NTP_WEAK_DEADBAND_MS", 20.0, 1.0, 500.0);
-  m_weakStrongStepMs = env_double("FT2_NTP_WEAK_STRONG_MS", 350.0, 5.0, 2000.0);
-  m_weakEmergencyStepMs = env_double("FT2_NTP_WEAK_EMERGENCY_MS", 2000.0, 200.0, 10000.0);
-  m_weakConfirmNeeded = env_int("FT2_NTP_WEAK_CONFIRM", 2, 1, 5);
-  m_weakStrongConfirmNeeded = env_int("FT2_NTP_WEAK_STRONG_CONFIRM", 4, 1, 10);
-  m_clusterWindowMs = env_double("FT2_NTP_CLUSTER_WINDOW_MS", 180.0, 20.0, 1000.0);
-  m_lockWindowMs = env_double("FT2_NTP_LOCK_WINDOW_MS", 180.0, 20.0, 1000.0);
-  m_httpLockToleranceMs = env_double("FT2_NTP_HTTP_LOCK_TOL_MS", 220.0, 50.0, 2000.0);
-  m_sparseJumpMs = env_double("FT2_NTP_SPARSE_JUMP_MS", 50.0, 10.0, 500.0);
-  m_sparseJumpConfirmNeeded = env_int("FT2_NTP_SPARSE_JUMP_CONFIRM", 4, 1, 10);
-  m_httpHoldoffMs = env_int("FT2_NTP_HTTP_HOLDOFF_MS", 900000, 60000, 7200000);
-
   m_refreshTimer.setInterval(REFRESH_INTERVAL_MS);
   connect(&m_refreshTimer, &QTimer::timeout, this, &NtpClient::onRefreshTimeout);
 
@@ -290,19 +254,21 @@ void NtpClient::sendQuery(QHostAddress const& address)
   QByteArray packet(NTP_PACKET_SIZE, '\0');
   packet[0] = 0x23;  // LI=0, VN=4, Mode=3 (client)
 
-  // Record T1 (client send time)
+  // Record T1 (client send time) for offset calculation.
   qint64 t1Ms = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
 
-  // Write T1 into Transmit Timestamp (bytes 40-47).
-  quint32 t1Sec, t1Frac;
-  msToNtpTimestamp(t1Ms, t1Sec, t1Frac);
-  qToBigEndian(t1Sec, reinterpret_cast<uchar*>(packet.data() + 40));
-  qToBigEndian(t1Frac, reinterpret_cast<uchar*>(packet.data() + 44));
+  // Use an unpredictable originate token in the transmit timestamp so reply
+  // matching cannot be forged by guessing wall-clock time.
+  quint64 const token = QRandomGenerator::global()->generate64();
+  quint32 const tokenSec = static_cast<quint32>(token >> 32);
+  quint32 const tokenFrac = static_cast<quint32>(token & 0xffffffffULL);
+  qToBigEndian(tokenSec, reinterpret_cast<uchar*>(packet.data() + 40));
+  qToBigEndian(tokenFrac, reinterpret_cast<uchar*>(packet.data() + 44));
 
   PendingQuery pq;
   pq.t1Ms = t1Ms;
-  pq.t1Sec = t1Sec;
-  pq.t1Frac = t1Frac;
+  pq.t1Sec = tokenSec;
+  pq.t1Frac = tokenFrac;
   m_pendingQueries.insert(key, pq);
 
   m_socket.writeDatagram(packet, address, NTP_PORT);
@@ -317,6 +283,9 @@ void NtpClient::onReadyRead()
     // Validate packet size
     if (data.size() < NTP_PACKET_SIZE) continue;
 
+    // Accept only canonical NTP replies from server port 123.
+    if (datagram.senderPort() != NTP_PORT) continue;
+
     // Record T4 (client receive time)
     qint64 t4Ms = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
 
@@ -327,6 +296,15 @@ void NtpClient::onReadyRead()
     quint32 sentT1Sec = m_pendingQueries.value(senderKey).t1Sec;
     quint32 sentT1Frac = m_pendingQueries.value(senderKey).t1Frac;
     m_pendingQueries.remove(senderKey);
+
+    // Validate LI/VN/Mode byte.
+    quint8 const livnmode = static_cast<quint8>(data[0]);
+    quint8 const leap = (livnmode >> 6) & 0x3;
+    quint8 const version = (livnmode >> 3) & 0x7;
+    quint8 const mode = livnmode & 0x7;
+    if (leap == 3) continue;  // clock unsynchronized
+    if (version < 3 || version > 4) continue;
+    if (mode != 4 && mode != 5) continue; // server or broadcast server
 
     // Validate stratum (byte 1): must be 1-15
     quint8 stratum = static_cast<quint8>(data[1]);
@@ -352,12 +330,15 @@ void NtpClient::onReadyRead()
     double offset = ((t2Ms - t1Ms) + (t3Ms - t4Ms)) / 2.0;
     double rtt = (t4Ms - t1Ms) - (t3Ms - t2Ms);
 
-    if (rtt > m_maxRttMs) continue;
+    if (rtt < 0.0 || rtt > m_maxRttMs) continue;
 
     // Sanity gate: discard offsets > 1 hour
     if (std::abs(offset) > MAX_OFFSET_MS) continue;
 
-    m_collectedOffsets.append(offset);
+    OffsetSample sample;
+    sample.offsetMs = offset;
+    sample.rttMs = rtt;
+    m_collectedOffsets.append(sample);
 
     // If all responses received, compute result immediately
     if (m_pendingQueries.isEmpty()) {
@@ -416,7 +397,23 @@ void NtpClient::onQueryTimeout()
   // NTP succeeded — reset failure counter
   m_ntpConsecutiveFailures = 0;
 
-  QVector<double> coherent = m_collectedOffsets;
+  QVector<OffsetSample> usable = m_collectedOffsets;
+  std::sort(usable.begin(), usable.end(), [](OffsetSample const& a, OffsetSample const& b) {
+    return a.rttMs < b.rttMs;
+  });
+  if (usable.size() >= 4) {
+    // Favor lower-latency samples to reduce asymmetric-path bias.
+    int const keep = qMax(3, static_cast<int>(std::ceil(static_cast<double>(usable.size()) * 0.6)));
+    if (keep < usable.size()) {
+      usable.resize(keep);
+    }
+  }
+
+  QVector<double> coherent;
+  coherent.reserve(usable.size());
+  for (auto const& sample : usable) {
+    coherent.append(sample.offsetMs);
+  }
   if (coherent.size() >= 3) {
     auto cluster = densest_cluster(coherent, m_clusterWindowMs);
     if (cluster.size() >= 2 && cluster.size() < coherent.size()) {
@@ -487,6 +484,15 @@ void NtpClient::onQueryTimeout()
       resetSparseJumpState();
     }
   } else {
+    if (n < NTP_INITIAL_MIN_SERVERS) {
+      m_synced = false;
+      Q_EMIT syncStatusChanged(
+          false,
+          QString("NTP waiting: only %1 server response, need >=%2 for initial lock")
+              .arg(n)
+              .arg(NTP_INITIAL_MIN_SERVERS));
+      return;
+    }
     resetSparseJumpState();
   }
 
@@ -570,8 +576,9 @@ void NtpClient::onHttpReply(QNetworkReply *reply)
       if (serverTime.isValid()) {
         qint64 serverMs = serverTime.toMSecsSinceEpoch();
         qint64 rtt = t4Ms - t1Ms;
-        // Estimate: server time corresponds to midpoint of round-trip
-        double offset = static_cast<double>(serverMs) - static_cast<double>(t1Ms + rtt / 2);
+        // HTTP Date has 1-second resolution; add half-second to center the bucket.
+        // This removes the systematic ~[-1000, 0]ms bias from coarse timestamps.
+        double offset = static_cast<double>(serverMs + 500) - static_cast<double>(t1Ms + rtt / 2);
         // HTTP Date has 1-second resolution, so only trust offsets within 1 hour
         if (std::abs(offset) < MAX_OFFSET_MS) {
           m_httpOffsets.append(offset);
@@ -587,6 +594,7 @@ void NtpClient::onHttpReply(QNetworkReply *reply)
     if (!m_httpOffsets.isEmpty()) {
       int n = m_httpOffsets.size();
       double median = median_of(m_httpOffsets);
+      bool const coarseMedian = std::abs(median) > HTTP_COARSE_ABS_LIMIT_MS;
 
       if (m_hasOffsetLock) {
         if (n < 3) {
@@ -595,6 +603,14 @@ void NtpClient::onHttpReply(QNetworkReply *reply)
               true,
               QString("HTTP hold: only %1 server(s), keeping locked %2 ms")
                   .arg(n)
+                  .arg(m_offsetMs, 0, 'f', 1));
+        } else if (coarseMedian) {
+          m_synced = true;
+          Q_EMIT syncStatusChanged(
+              true,
+              QString("HTTP hold: coarse median %1 ms (>|%2|), keeping locked %3 ms")
+                  .arg(median, 0, 'f', 0)
+                  .arg(HTTP_COARSE_ABS_LIMIT_MS, 0, 'f', 0)
                   .arg(m_offsetMs, 0, 'f', 1));
         } else {
           double const deltaFromLock = std::abs(median - m_offsetMs);
@@ -631,26 +647,35 @@ void NtpClient::onHttpReply(QNetworkReply *reply)
           }
         }
       } else {
-        m_synced = true;
-        m_ntpConsecutiveFailures = 0;
-        m_lastServerCount = n;
-        m_lastGoodSyncMs = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
-        m_refreshTimer.setInterval(m_refreshIntervalMs);
-        QString weak_reason;
-        if (weakSyncShouldApply(median, &weak_reason)) {
-          m_offsetMs = median;
-          m_hasOffsetLock = true;
-          Q_EMIT offsetUpdated(m_offsetMs);
-          Q_EMIT syncStatusChanged(true, QString("HTTP time sync: %1 servers, offset %2 ms%3")
-                                   .arg(n)
-                                   .arg(median, 0, 'f', 0)
-                                   .arg(weak_reason.isEmpty() ? QString{} : QString(" [%1]").arg(weak_reason)));
+        if (n < 3 || coarseMedian) {
+          m_synced = false;
+          Q_EMIT syncStatusChanged(
+              false,
+              QString("HTTP coarse fallback ignored: %1 server(s), median %2 ms; waiting UDP NTP")
+                  .arg(n)
+                  .arg(median, 0, 'f', 0));
         } else {
-          Q_EMIT syncStatusChanged(true, QString("HTTP weak-sync hold: %1 servers, candidate %2 ms, active %3 ms [%4]")
-                                   .arg(n)
-                                   .arg(median, 0, 'f', 0)
-                                   .arg(m_offsetMs, 0, 'f', 0)
-                                   .arg(weak_reason));
+          m_synced = true;
+          m_ntpConsecutiveFailures = 0;
+          m_lastServerCount = n;
+          m_lastGoodSyncMs = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
+          m_refreshTimer.setInterval(m_refreshIntervalMs);
+          QString weak_reason;
+          if (weakSyncShouldApply(median, &weak_reason)) {
+            m_offsetMs = median;
+            m_hasOffsetLock = true;
+            Q_EMIT offsetUpdated(m_offsetMs);
+            Q_EMIT syncStatusChanged(true, QString("HTTP time sync: %1 servers, offset %2 ms%3")
+                                     .arg(n)
+                                     .arg(median, 0, 'f', 0)
+                                     .arg(weak_reason.isEmpty() ? QString{} : QString(" [%1]").arg(weak_reason)));
+          } else {
+            Q_EMIT syncStatusChanged(true, QString("HTTP weak-sync hold: %1 servers, candidate %2 ms, active %3 ms [%4]")
+                                     .arg(n)
+                                     .arg(median, 0, 'f', 0)
+                                     .arg(m_offsetMs, 0, 'f', 0)
+                                     .arg(weak_reason));
+          }
         }
       }
     } else {

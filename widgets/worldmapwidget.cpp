@@ -3,6 +3,7 @@
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFileInfo>
 #include <QFontMetricsF>
 #include <QLineF>
@@ -26,6 +27,27 @@ int const kMaxContacts = 40;
 int const kRoleDowngradeHoldSeconds = 75;
 int const kPostTxQueueMs = 10 * 1000;
 int const kPostTxQueueMaxVisible = 6;
+
+qint64 monotonicNowMs()
+{
+  static QElapsedTimer timer;
+  static bool started = false;
+  if (!started)
+    {
+      timer.start();
+      started = true;
+    }
+  return timer.elapsed();
+}
+
+qint64 ageSecondsFromMonotonic(qint64 nowMs, qint64 seenMs)
+{
+  if (seenMs <= 0 || nowMs <= seenMs)
+    {
+      return 0;
+    }
+  return (nowMs - seenMs) / 1000;
+}
 
 QPixmap loadPixmapWithFallback(QStringList const& candidates)
 {
@@ -230,8 +252,8 @@ void WorldMapWidget::addContact(QString const& call, QString const& sourceGrid, 
   contact.destinationGrid = destinationGrid.trimmed().toUpper();
   contact.sourceLonLat = sourceLonLat;
   contact.destinationLonLat = destinationLonLat;
-  auto now = QDateTime::currentDateTimeUtc();
-  contact.lastSeenUtc = now;
+  auto const nowMs = monotonicNowMs();
+  contact.lastSeenMonotonicMs = nowMs;
   contact.role = role;
   contact.queuedDuringTx = (role == PathRole::IncomingToMe && m_transmitting);
 
@@ -243,7 +265,7 @@ void WorldMapWidget::addContact(QString const& call, QString const& sourceGrid, 
       contact.queuedDuringTx = contact.queuedDuringTx || prev.queuedDuringTx;
       bool directionalPrev = (prev.role == PathRole::IncomingToMe || prev.role == PathRole::OutgoingFromMe);
       bool downgradeToBand = (role == PathRole::BandOnly && directionalPrev);
-      bool stillFreshDirectional = (prev.lastSeenUtc.secsTo(now) <= kRoleDowngradeHoldSeconds);
+      bool stillFreshDirectional = (nowMs - prev.lastSeenMonotonicMs) <= (kRoleDowngradeHoldSeconds * 1000LL);
       if (downgradeToBand && stillFreshDirectional)
         {
           // Keep a fresh directed contact visible instead of immediately downgrading it to BAND.
@@ -257,7 +279,7 @@ void WorldMapWidget::addContact(QString const& call, QString const& sourceGrid, 
       auto oldest = m_contacts.end();
       for (auto it = m_contacts.begin(); it != m_contacts.end(); ++it)
         {
-          if (oldest == m_contacts.end() || it.value().lastSeenUtc < oldest.value().lastSeenUtc)
+          if (oldest == m_contacts.end() || it.value().lastSeenMonotonicMs < oldest.value().lastSeenMonotonicMs)
             {
               oldest = it;
             }
@@ -299,8 +321,8 @@ void WorldMapWidget::addContactByLonLat(QString const& call, QPointF const& sour
   contact.destinationGrid = destinationGrid.trimmed().toUpper();
   contact.sourceLonLat = QPointF {wrapLongitude(sourceLonLat.x()), qBound(-90.0, static_cast<double>(sourceLonLat.y()), 90.0)};
   contact.destinationLonLat = destinationLonLat;
-  auto now = QDateTime::currentDateTimeUtc();
-  contact.lastSeenUtc = now;
+  auto const nowMs = monotonicNowMs();
+  contact.lastSeenMonotonicMs = nowMs;
   contact.role = role;
   contact.queuedDuringTx = (role == PathRole::IncomingToMe && m_transmitting);
 
@@ -315,7 +337,7 @@ void WorldMapWidget::addContactByLonLat(QString const& call, QPointF const& sour
       contact.queuedDuringTx = contact.queuedDuringTx || prev.queuedDuringTx;
       bool directionalPrev = (prev.role == PathRole::IncomingToMe || prev.role == PathRole::OutgoingFromMe);
       bool downgradeToBand = (role == PathRole::BandOnly && directionalPrev);
-      bool stillFreshDirectional = (prev.lastSeenUtc.secsTo(now) <= kRoleDowngradeHoldSeconds);
+      bool stillFreshDirectional = (nowMs - prev.lastSeenMonotonicMs) <= (kRoleDowngradeHoldSeconds * 1000LL);
       if (downgradeToBand && stillFreshDirectional)
         {
           return;
@@ -328,7 +350,7 @@ void WorldMapWidget::addContactByLonLat(QString const& call, QPointF const& sour
       auto oldest = m_contacts.end();
       for (auto it = m_contacts.begin(); it != m_contacts.end(); ++it)
         {
-          if (oldest == m_contacts.end() || it.value().lastSeenUtc < oldest.value().lastSeenUtc)
+          if (oldest == m_contacts.end() || it.value().lastSeenMonotonicMs < oldest.value().lastSeenMonotonicMs)
             {
               oldest = it;
             }
@@ -384,7 +406,7 @@ void WorldMapWidget::paintEvent(QPaintEvent * event)
       {
         return pa > pb;
       }
-    return a.lastSeenUtc > b.lastSeenUtc;
+    return a.lastSeenMonotonicMs > b.lastSeenMonotonicMs;
   });
   int visiblePaths = 0;
   int visibleBand = 0;
@@ -402,6 +424,7 @@ void WorldMapWidget::paintEvent(QPaintEvent * event)
     {
       int selectedIndex = -1;
       int bestScore = std::numeric_limits<int>::min();
+      auto const nowMs = monotonicNowMs();
       QString targetCall = normalizeCall(m_txTargetCall);
       QString targetGrid = m_txTargetGrid.trimmed().toUpper();
 
@@ -437,7 +460,7 @@ void WorldMapWidget::paintEvent(QPaintEvent * event)
           int score = 0;
           if (callMatch) score += 6;
           if (gridMatch) score += 4;
-          score += qMax(0, 1800 - int(c.lastSeenUtc.secsTo(QDateTime::currentDateTimeUtc())));
+          score += qMax(0, 1800 - static_cast<int>(ageSecondsFromMonotonic(nowMs, c.lastSeenMonotonicMs)));
 
           if (score > bestScore)
             {
@@ -841,11 +864,7 @@ void WorldMapWidget::drawContact(QPainter * painter, QRectF const& bounds, Conta
       return;
     }
 
-  qint64 ageSecs = contact.lastSeenUtc.secsTo(QDateTime::currentDateTimeUtc());
-  if (ageSecs < 0)
-    {
-      ageSecs = 0;
-    }
+  qint64 ageSecs = ageSecondsFromMonotonic(monotonicNowMs(), contact.lastSeenMonotonicMs);
 
   auto const source = projectLonLatToPoint(contact.sourceLonLat, bounds);
   auto const destination = projectLonLatToPoint(contact.destinationLonLat, bounds);
@@ -1146,7 +1165,7 @@ void WorldMapWidget::updateViewportTargets()
         {
           points << contact.destinationLonLat;
         }
-      if (!hasNewestContact || contact.lastSeenUtc > newestContact.lastSeenUtc)
+      if (!hasNewestContact || contact.lastSeenMonotonicMs > newestContact.lastSeenMonotonicMs)
         {
           newestContact = contact;
           hasNewestContact = true;
@@ -1342,15 +1361,23 @@ bool WorldMapWidget::computeCircularLongitudeBounds(QVector<double> const& longi
 
 void WorldMapWidget::pruneExpiredContacts()
 {
-  auto now = QDateTime::currentDateTimeUtc();
+  auto const nowMs = monotonicNowMs();
+  auto const lifetimeMs = static_cast<qint64>(kContactLifetimeSeconds) * 1000;
+  auto const downgradeMs = static_cast<qint64>(kRoleDowngradeHoldSeconds) * 1000;
   for (auto it = m_contacts.begin(); it != m_contacts.end(); )
     {
-      if (it.value().lastSeenUtc.secsTo(now) > kContactLifetimeSeconds)
+      auto ageMs = nowMs - it.value().lastSeenMonotonicMs;
+      if (ageMs > lifetimeMs)
         {
           it = m_contacts.erase(it);
         }
       else
         {
+          if (it.value().role == PathRole::IncomingToMe && ageMs > downgradeMs)
+            {
+              it.value().role = PathRole::BandOnly;
+              it.value().queuedDuringTx = false;
+            }
           ++it;
         }
     }

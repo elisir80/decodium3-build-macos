@@ -1,7 +1,26 @@
 #include "Network/NetworkAccessManager.hpp"
 
 #include <QString>
+#include <QCryptographicHash>
 #include <QNetworkReply>
+#include <QNetworkRequest>
+
+namespace
+{
+QString ssl_error_key (QNetworkReply const * reply, QSslError const& error)
+{
+  auto const url = reply ? reply->request ().url () : QUrl {};
+  auto const scheme = url.scheme ().toLower ();
+  auto const port = url.port ("https" == scheme ? 443 : -1);
+  auto const digest = QCryptographicHash::hash (error.certificate ().toDer (), QCryptographicHash::Sha256).toHex ();
+
+  return QString {"%1|%2|%3|%4"}
+    .arg (url.host ().toLower ())
+    .arg (port)
+    .arg (static_cast<int> (error.error ()))
+    .arg (QString::fromLatin1 (digest));
+}
+}
 
 #include "moc_NetworkAccessManager.cpp"
 
@@ -9,54 +28,46 @@ NetworkAccessManager::NetworkAccessManager (QWidget * parent)
   : QNetworkAccessManager (parent)
   , parent_widget_ {parent}
 {
-  // handle SSL errors that have not been cached as allowed
-  // exceptions and offer them to the user to add to the ignored
-  // exception cache
+  // Security hardening: never bypass SSL/TLS validation.
   connect (this, &QNetworkAccessManager::sslErrors, this, &NetworkAccessManager::filter_SSL_errors);
 }
 
 void NetworkAccessManager::filter_SSL_errors (QNetworkReply * reply, QList<QSslError> const& errors)
 {
+  if (!reply || errors.isEmpty ())
+    {
+      return;
+    }
+
   QString message;
-  QList<QSslError> new_errors;
+  QString certs;
+  bool has_unreported = false;
   for (auto const& error: errors)
     {
-      if (!allowed_ssl_errors_.contains (error))
+      auto const key = ssl_error_key (reply, error);
+      if (!reported_ssl_error_keys_.contains (key))
         {
-          new_errors << error;
+          reported_ssl_error_keys_.insert (key);
+          has_unreported = true;
           message += '\n' + reply->request ().url ().toDisplayString () + ": " + error.errorString ();
         }
     }
-  if (new_errors.size ())
+  if (has_unreported)
     {
-      QString certs;
       for (auto const& cert : reply->sslConfiguration ().peerCertificateChain ())
         {
           certs += cert.toText () + '\n';
         }
-      if (MessageBox::Ignore == MessageBox::query_message (parent_widget_
-                                                           , tr ("Network SSL/TLS Errors")
-                                                           , message, certs
-                                                           , MessageBox::Abort | MessageBox::Ignore))
-        {
-          // accumulate new SSL error exceptions that have been allowed
-          allowed_ssl_errors_.append (new_errors);
-          reply->ignoreSslErrors (allowed_ssl_errors_);
-        }
+      MessageBox::warning_message (parent_widget_, tr ("Network SSL/TLS Errors"), message, certs);
     }
-  else
+  if (reply->isRunning ())
     {
-      // no new exceptions so silently ignore the ones already allowed
-      reply->ignoreSslErrors (allowed_ssl_errors_);
+      reply->abort ();
     }
 }
 
 QNetworkReply * NetworkAccessManager::createRequest (Operation operation, QNetworkRequest const& request
                                                      , QIODevice * outgoing_data)
 {
-  auto reply = QNetworkAccessManager::createRequest (operation, request, outgoing_data);
-  // errors are usually certificate specific so passing all cached
-  // exceptions here is ok
-  reply->ignoreSslErrors (allowed_ssl_errors_);
-  return reply;
+  return QNetworkAccessManager::createRequest (operation, request, outgoing_data);
 }

@@ -1,8 +1,8 @@
 #include <QDebug>
-#include <qsharedmemory.h>
 #include <QSystemSemaphore>
+#include "SharedMemorySegment.hpp"
 
-QSharedMemory mem_m65("mem_m65");
+SharedMemorySegment mem_m65("mem_m65");
 QSystemSemaphore sem_m65("sem_m65", 1, QSystemSemaphore::Open);
 
 extern "C" {
@@ -27,7 +27,7 @@ bool create_m65_(int nsize) {return mem_m65.create(nsize);}
 bool detach_m65_() {return mem_m65.detach();}
 bool lock_m65_() {return mem_m65.lock();}
 bool unlock_m65_() {return mem_m65.unlock();}
-char* address_m65_() {return (char*)mem_m65.constData();}
+char* address_m65_() {return static_cast<char*>(mem_m65.data());}
 int size_m65_() {return (int)mem_m65.size();}
 
 bool acquire_m65_() {return sem_m65.acquire();}

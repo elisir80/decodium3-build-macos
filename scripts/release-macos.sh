@@ -7,24 +7,22 @@ Usage:
   scripts/release-macos.sh <version> [--publish] [--repo owner/repo]
                                  [--compat-macos 15.0] [--skip-compat-check]
                                  [--codesign-identity "-"]
+                                 [--asset-suffix macos-sequoia-arm64]
 
 Examples:
-  scripts/release-macos.sh v1.1.0
-  scripts/release-macos.sh v1.1.0 --publish --repo elisir80/decodium3-build-macos
+  scripts/release-macos.sh v1.3.0
+  scripts/release-macos.sh v1.3.0 --publish --repo elisir80/decodium3-build-macos
 
 What it does:
   1) Configures the project in ./build
   2) Builds the project in ./build
   3) Generates macOS DMG via CPack (DragNDrop)
   4) Verifies bundle compatibility (absolute deps + minos threshold)
-  5) Re-signs the app bundle (ad-hoc by default) and creates a macOS installer
-     PKG that installs ft2.app and configures
-     shared-memory sysctl values for FT2/JTDX coexistence
+  5) Re-signs the app bundle (ad-hoc by default)
   6) Creates versioned assets:
-       decodium3-ft2-<version>-macos-<arch>.dmg
-       decodium3-ft2-<version>-macos-<arch>.zip
-       decodium3-ft2-<version>-macos-<arch>.pkg
-       decodium3-ft2-<version>-macos-<arch>-sha256.txt
+       decodium3-ft2-<version>-<asset-suffix>.dmg
+       decodium3-ft2-<version>-<asset-suffix>.zip
+       decodium3-ft2-<version>-<asset-suffix>-sha256.txt
   7) Optionally creates/updates the GitHub release when --publish is used
 EOF
 }
@@ -47,6 +45,7 @@ REPO="elisir80/decodium3-build-macos"
 COMPAT_MACOS="15.0"
 SKIP_COMPAT_CHECK=0
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:--}"
+ASSET_SUFFIX=""
 
 version_gt() {
   local lhs="$1"
@@ -189,6 +188,14 @@ while [[ $# -gt 0 ]]; do
       CODESIGN_IDENTITY="$2"
       shift 2
       ;;
+    --asset-suffix)
+      if [[ $# -lt 2 ]]; then
+        echo "error: --asset-suffix requires a value"
+        exit 1
+      fi
+      ASSET_SUFFIX="$2"
+      shift 2
+      ;;
     *)
       echo "error: unknown argument: $1"
       usage
@@ -199,12 +206,8 @@ done
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${ROOT_DIR}/build"
-APP_NAME="ft2.app"
 PREFIX="decodium3-ft2"
 ARCH="$(uname -m)"
-PKG_IDENTIFIER="com.9h1sr.decodium3.ft2"
-PKG_POSTINSTALL="${ROOT_DIR}/Darwin/ft2-pkg-postinstall.sh"
-PKG_SYSCTL_PLIST="${ROOT_DIR}/Darwin/com.ft2.jtdx.sysctl.plist"
 
 if [[ "$ARCH" == "x86_64" ]]; then
   ARCH_LABEL="x86_64"
@@ -216,7 +219,7 @@ fi
 
 JOBS="$(sysctl -n hw.ncpu 2>/dev/null || echo 8)"
 
-echo "[1/7] Configuring project (macOS target ${COMPAT_MACOS})..."
+echo "[1/6] Configuring project (macOS target ${COMPAT_MACOS})..."
 cmake_args=(
   -DCMAKE_BUILD_TYPE=Release
   -DCMAKE_OSX_DEPLOYMENT_TARGET="$COMPAT_MACOS"
@@ -241,10 +244,10 @@ cmake \
   -B "$BUILD_DIR" \
   "${cmake_args[@]}"
 
-echo "[2/7] Building project..."
+echo "[2/6] Building project..."
 cmake --build "$BUILD_DIR" -j"$JOBS"
 
-echo "[3/7] Generating DMG with CPack..."
+echo "[3/6] Generating DMG with CPack..."
 (
   cd "$BUILD_DIR"
   cpack -G DragNDrop
@@ -264,7 +267,7 @@ STAGED_APP_ABS="${BUILD_DIR}/${STAGED_APP}"
 STAGED_ROOT_ABS="$(dirname "${STAGED_APP_ABS}")"
 
 if [[ "$SKIP_COMPAT_CHECK" -eq 0 ]]; then
-  echo "[4/7] Checking bundle compatibility target macOS ${COMPAT_MACOS}..."
+  echo "[4/6] Checking bundle compatibility target macOS ${COMPAT_MACOS}..."
   if ! check_bundle_compatibility "${BUILD_DIR}/${STAGED_APP}" "$COMPAT_MACOS"; then
     echo
     echo "Bundle compatibility check failed."
@@ -272,54 +275,30 @@ if [[ "$SKIP_COMPAT_CHECK" -eq 0 ]]; then
     exit 1
   fi
 else
-  echo "[4/7] Skipping compatibility checks (--skip-compat-check)."
+  echo "[4/6] Skipping compatibility checks (--skip-compat-check)."
 fi
 
-DMG_OUT="${PREFIX}-${VERSION}-macos-${ARCH_LABEL}.dmg"
-ZIP_OUT="${PREFIX}-${VERSION}-macos-${ARCH_LABEL}.zip"
-PKG_OUT="${PREFIX}-${VERSION}-macos-${ARCH_LABEL}.pkg"
-SHA_OUT="${PREFIX}-${VERSION}-macos-${ARCH_LABEL}-sha256.txt"
-PKG_VERSION="${VERSION#v}"
-PKG_ROOT="${BUILD_DIR}/pkgroot-${VERSION}"
-PKG_SCRIPTS_DIR="${BUILD_DIR}/pkgscripts-${VERSION}"
-
-if [[ ! -f "$PKG_POSTINSTALL" ]]; then
-  echo "error: missing postinstall script: $PKG_POSTINSTALL"
-  exit 1
-fi
-if [[ ! -f "$PKG_SYSCTL_PLIST" ]]; then
-  echo "error: missing shared-memory plist: $PKG_SYSCTL_PLIST"
-  exit 1
+if [[ -z "$ASSET_SUFFIX" ]]; then
+  ASSET_SUFFIX="macos-${ARCH_LABEL}"
 fi
 
-echo "[5/7] Re-signing app bundle and building macOS installer package..."
+DMG_OUT="${PREFIX}-${VERSION}-${ASSET_SUFFIX}.dmg"
+ZIP_OUT="${PREFIX}-${VERSION}-${ASSET_SUFFIX}.zip"
+SHA_OUT="${PREFIX}-${VERSION}-${ASSET_SUFFIX}-sha256.txt"
+
+echo "[5/6] Re-signing app bundle..."
 sign_app_bundle "${STAGED_APP_ABS}" "${CODESIGN_IDENTITY}"
 
-rm -rf "$PKG_ROOT" "$PKG_SCRIPTS_DIR"
-mkdir -p "${PKG_ROOT}/Applications" "$PKG_SCRIPTS_DIR"
-/usr/bin/ditto "${STAGED_APP_ABS}" "${PKG_ROOT}/Applications/${APP_NAME}"
-cp -f "$PKG_POSTINSTALL" "${PKG_SCRIPTS_DIR}/postinstall"
-cp -f "$PKG_SYSCTL_PLIST" "${PKG_SCRIPTS_DIR}/${PKG_SYSCTL_PLIST##*/}"
-chmod 755 "${PKG_SCRIPTS_DIR}/postinstall"
-
-pkgbuild \
-  --root "$PKG_ROOT" \
-  --identifier "$PKG_IDENTIFIER" \
-  --version "$PKG_VERSION" \
-  --install-location "/" \
-  --scripts "$PKG_SCRIPTS_DIR" \
-  "${BUILD_DIR}/${PKG_OUT}"
-
-echo "[6/7] Creating release assets..."
+echo "[6/6] Creating release assets..."
 create_dmg_from_staged_root "${STAGED_ROOT_ABS}" "${BUILD_DIR}/${DMG_OUT}" "ft2"
 (
   /usr/bin/ditto -c -k --sequesterRsrc --keepParent "${STAGED_APP_ABS}" "${BUILD_DIR}/${ZIP_OUT}"
   cd "$BUILD_DIR"
-  shasum -a 256 "$DMG_OUT" "$ZIP_OUT" "$PKG_OUT" > "$SHA_OUT"
+  shasum -a 256 "$DMG_OUT" "$ZIP_OUT" > "$SHA_OUT"
 )
 
 echo "Assets ready:"
-ls -lh "${BUILD_DIR}/${DMG_OUT}" "${BUILD_DIR}/${ZIP_OUT}" "${BUILD_DIR}/${PKG_OUT}" "${BUILD_DIR}/${SHA_OUT}"
+ls -lh "${BUILD_DIR}/${DMG_OUT}" "${BUILD_DIR}/${ZIP_OUT}" "${BUILD_DIR}/${SHA_OUT}"
 echo
 cat "${BUILD_DIR}/${SHA_OUT}"
 
@@ -334,65 +313,37 @@ if [[ "$PUBLISH" -eq 1 ]]; then
 # Decodium 3 FT2 ${VERSION} (macOS)
 
 ## English (UK)
-This release includes:
-- Audio output auto-rebind recovery on runtime failures (prevents silent TX after transient device glitches).
-- Improved output-device resilience for underruns (non-fatal handling).
-- UDP/network interface reliability improvements (preserve selected interfaces even when temporarily unavailable).
-- NTP protocol hardening (query de-duplication, timestamp validation, stale DNS lookup filtering, better fallback state handling).
-- NTP status bar improvements: offset + last sync age with clearer status/tooltip behavior.
-- DT timing improvements for remote stations:
-  configurable DT clamp limits in Settings -> Advanced, with independent synced/unsynced limits and dedicated enable checkbox.
-- Local and release configuration updates for fork version \`${VERSION}\`.
-- Release targets:
-  Apple Silicon build for macOS Sequoia/Tahoe and Intel build for macOS Sequoia.
+This release includes fork updates up to \`${VERSION}\`.
 
 If the app does not start on macOS, run from Terminal:
-\`xattr -r -d com.apple.quarantine /Applications/ft2.app\`
+\`sudo xattr -r -d com.apple.quarantine /Applications/ft2.app\`
 
 See \`CHANGELOG.md\` for full details.
 
 Assets:
 - \`${DMG_OUT}\`
 - \`${ZIP_OUT}\`
-- \`${PKG_OUT}\`
 - \`${SHA_OUT}\`
 
 ## Italiano
-Questa release include:
-- Recupero automatico (auto-rebind) dell'uscita audio in caso di errori runtime
-  (evita TX muta dopo glitch temporanei del device).
-- Maggiore robustezza delle periferiche audio in uscita sugli underrun
-  (gestione non-fatal).
-- Miglioramenti affidabilita' UDP/interfacce di rete
-  (le interfacce selezionate restano visibili anche se temporaneamente non disponibili).
-- Robustezza NTP migliorata (de-duplicazione query, validazione timestamp,
-  filtro lookup DNS stale, stato fallback piu' coerente).
-- Miglioramenti UI NTP: offset + eta' dell'ultima sincronizzazione con stato/tooltip piu' chiari.
-- Miglioramenti timing DT per stazioni remote:
-  limiti DT configurabili in Impostazioni -> Avanzate, con limiti separati synced/unsynced
-  e checkbox dedicata di attivazione.
-- Aggiornamenti configurazione locale/release alla versione fork \`${VERSION}\`.
-- Target release:
-  build Apple Silicon per macOS Sequoia/Tahoe e build Intel per macOS Sequoia.
+Questa release include aggiornamenti fork fino a \`${VERSION}\`.
 
 Se l'app non si avvia su macOS, esegui da Terminale:
-\`xattr -r -d com.apple.quarantine /Applications/ft2.app\`
+\`sudo xattr -r -d com.apple.quarantine /Applications/ft2.app\`
 
 Per i dettagli completi, vedi \`CHANGELOG.md\`.
 
 Asset:
 - \`${DMG_OUT}\`
 - \`${ZIP_OUT}\`
-- \`${PKG_OUT}\`
 - \`${SHA_OUT}\`
 EOF
 
-  echo "[7/7] Publishing release to ${REPO}..."
+  echo "[publish] Publishing release to ${REPO}..."
   if gh release view "$VERSION" --repo "$REPO" >/dev/null 2>&1; then
     gh release upload "$VERSION" \
       "${BUILD_DIR}/${DMG_OUT}" \
       "${BUILD_DIR}/${ZIP_OUT}" \
-      "${BUILD_DIR}/${PKG_OUT}" \
       "${BUILD_DIR}/${SHA_OUT}" \
       --repo "$REPO" \
       --clobber
@@ -401,7 +352,6 @@ EOF
     gh release create "$VERSION" \
       "${BUILD_DIR}/${DMG_OUT}" \
       "${BUILD_DIR}/${ZIP_OUT}" \
-      "${BUILD_DIR}/${PKG_OUT}" \
       "${BUILD_DIR}/${SHA_OUT}" \
       --repo "$REPO" \
       --title "Decodium 3 FT2 ${VERSION} (macOS)" \

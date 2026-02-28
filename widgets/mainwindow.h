@@ -82,8 +82,8 @@
 //#define DEBUG_LOG_FNAME "debug.txt"
 #define TEMP_LOG_QSL_FNAME "lotwreport_qsl.adi"  //avt 9/23/25
 
-extern int volatile itone[MAX_NUM_SYMBOLS];   //Audio tones for all Tx symbols
-extern int volatile icw[NUM_CW_SYMBOLS];	    //Dits for CW ID
+extern int itone[MAX_NUM_SYMBOLS];   // Audio tones for all Tx symbols
+extern int icw[NUM_CW_SYMBOLS];      // Dits for CW ID
 
 //--------------------------------------------------------------- MainWindow
 namespace Ui {
@@ -91,7 +91,6 @@ namespace Ui {
 }
 
 class QProcessEnvironment;
-class QSharedMemory;
 class QSplashScreen;
 class QSettings;
 class QLineEdit;
@@ -122,6 +121,7 @@ class EqualizationToolsDialog;
 class DecodedText;
 class Cloudlog;
 class WorldMapWidget;
+class SharedMemorySegment;
 
 class MainWindow
   : public MultiGeometryWidget<3, QMainWindow>
@@ -135,7 +135,7 @@ public:
   using SpecOp = Configuration::SpecialOperatingActivity;
 
   explicit MainWindow(QDir const& temp_directory, bool multiple, MultiSettings *,
-                      QSharedMemory *shdmem, unsigned downSampleFactor,
+                      SharedMemorySegment *shdmem, unsigned downSampleFactor,
                       QSplashScreen *, QProcessEnvironment const&,
                       QWidget *parent = nullptr);
   ~MainWindow();
@@ -394,6 +394,7 @@ private slots:
   void on_RxFreqSpinBox_valueChanged(int n);
   void on_outAttenuation_valueChanged (int);
   void rigOpen ();
+  void attemptRigReconnect ();
   void handle_transceiver_update (Transceiver::TransceiverState const&);
   void handle_transceiver_failure (QString const& reason);
   void handle_leavingSettings();
@@ -515,6 +516,7 @@ private:
       SoundOutput *, AudioDevice::Channel = AudioDevice::Mono,
       bool synchronize = true, bool fastMode = false, double dBSNR = 99.,
                              int TRperiod=60) const;
+  Q_SIGNAL void sendSymbolTables (QVector<int> itone_values, QVector<int> icw_values) const;
   Q_SIGNAL void outAttenuationChanged (qreal) const;
   Q_SIGNAL void toggleShorthand () const;
   Q_SIGNAL void reset_audio_input_stream (bool report_dropped_frames) const;
@@ -578,7 +580,7 @@ private:
   QScopedPointer<HelpTextWindow> m_mouseCmnds;
   QScopedPointer<MessageAveraging> m_msgAvgWidget;
   QScopedPointer<ActiveStations> m_ActiveStationsWidget;
-  WorldMapWidget * m_worldMapWidget {nullptr};
+  QPointer<WorldMapWidget> m_worldMapWidget;
   QHash<QString, QString> m_worldMapGridByCall;
   bool m_worldMapCall3Loaded {false};
   QScopedPointer<FoxLogWindow> m_foxLogWindow;
@@ -875,9 +877,9 @@ private:
 
   QProcess p2;
   QProcess p4;
-  QProcess *upLotw;    //avt 9/23/25
+  QPointer<QProcess> upLotw;    //avt 9/23/25
 
-  WSPRNet *wsprNet;
+  QPointer<WSPRNet> wsprNet;
 
   QTimer m_guiTimer;
   QTimer m_decoderWatchdog;
@@ -895,6 +897,7 @@ private:
   QTimer splashTimer;
   QTimer p1Timer;
   QTimer externalCtrlTimer;     //avt 12/16/21
+  QTimer m_rigReconnectTimer;
 
   QString m_path;
   QString m_baseCall;
@@ -1017,7 +1020,7 @@ private:
   QDateTime m_dateTimeBestSP;
   QDateTime m_dateTimeSeqStart;        //Nominal start time of Rx sequence about to be decoded
 
-  QSharedMemory *mem_jt9;
+  SharedMemorySegment *mem_jt9;
   QString m_QSOText;
   unsigned m_downSampleFactor;
   QThread::Priority m_audioThreadPriority;
@@ -1071,7 +1074,7 @@ private:
   double m_soundcardDriftMsPerPeriod {0.0};
 
   // NTP Time Synchronization
-  NtpClient *m_ntpClient {nullptr};
+  QPointer<NtpClient> m_ntpClient;
   double m_ntpOffset_ms {0.0};
   bool m_ntpEnabled {false};
   QString m_ntpCustomServer;

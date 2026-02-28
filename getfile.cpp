@@ -4,6 +4,7 @@
 #include <random>
 #endif
 
+#include <cstdlib>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
@@ -43,8 +44,8 @@ float gran()
    * that are inside the unit circle
    */
   do {
-    v1 = 2.0 * (float)qrand() / RAND_MAX - 1;
-    v2 = 2.0 * (float)qrand() / RAND_MAX - 1;
+    v1 = 2.0f * static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX) - 1.0f;
+    v2 = 2.0f * static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX) - 1.0f;
     rsq = v1*v1 + v2*v2;
   } while(rsq >= 1.0 || rsq == 0.0);
   fac = sqrt(-2.0*log(rsq)/rsq);

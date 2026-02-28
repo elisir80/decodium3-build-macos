@@ -7,6 +7,7 @@
 #include <QToolTip>
 #include "revision_utils.hpp"
 #include "qt_helpers.hpp"
+#include "SharedMemorySegment.hpp"
 #include "SettingsGroup.hpp"
 #include "widgets/MessageBox.hpp"
 #include "ui_mainwindow.h"
@@ -22,8 +23,11 @@
 #include <portaudio.h>
 
 #include <QApplication>
+#include <QCoreApplication>
 #include <QDebug>
 #include <QDateTime>
+#include <QElapsedTimer>
+#include <QEventLoop>
 
 #define NFFT 32768
 
@@ -38,8 +42,7 @@ int iqAmp;
 int iqPhase;
 qint16 id[4*60*96000];
 
-TxTune*    g_pTxTune = NULL;
-QSharedMemory mem_m65("mem_m65");
+SharedMemorySegment mem_m65("mem_m65");
 
 extern const int RxDataFrequency = 96000;
 extern const int TxDataFrequency = 11025;
@@ -48,6 +51,49 @@ QString guiDate;         //liveCQ
 QStringList allDecodes;  //liveCQ
 QString m_otherUrl;
 bool m_w3szUrl;
+
+namespace
+{
+  constexpr int kMap65D4SampleCount {static_cast<int> (sizeof (datcom_.d4) / sizeof (datcom_.d4[0]))};
+
+  void process_events_no_user_input ()
+  {
+    QCoreApplication::processEvents (QEventLoop::ExcludeUserInputEvents);
+  }
+
+  int clamp_d4_index (int value, char const * context)
+  {
+    auto const clamped = qBound (0, value, kMap65D4SampleCount);
+    if (clamped != value)
+      {
+        qWarning () << context << "clamped sample index from" << value << "to" << clamped;
+      }
+    return clamped;
+  }
+
+  bool wait_for_process_exit_no_input (QProcess& process, int timeout_ms)
+  {
+    if (QProcess::NotRunning == process.state ())
+      {
+        return true;
+      }
+    QElapsedTimer timer;
+    timer.start ();
+    while (QProcess::NotRunning != process.state ())
+      {
+        if (process.waitForFinished (50))
+          {
+            return true;
+          }
+        process_events_no_user_input ();
+        if (timer.elapsed () >= timeout_ms)
+          {
+            return false;
+          }
+      }
+    return true;
+  }
+}
 
 //-------------------------------------------------- MainWindow constructor
 MainWindow::MainWindow(QWidget *parent) :
@@ -99,7 +145,7 @@ MainWindow::MainWindow(QWidget *parent) :
   ui->actionNormal_Deep_Search->setActionGroup(DepthGroup);
   ui->actionAggressive_Deep_Search->setActionGroup(DepthGroup);
 
-  QButtonGroup* txMsgButtonGroup = new QButtonGroup;
+  QButtonGroup* txMsgButtonGroup = new QButtonGroup {this};
   txMsgButtonGroup->addButton(ui->txrb1,1);
   txMsgButtonGroup->addButton(ui->txrb2,2);
   txMsgButtonGroup->addButton(ui->txrb3,3);
@@ -195,18 +241,34 @@ MainWindow::MainWindow(QWidget *parent) :
 #endif
 
   if(!mem_m65.attach()) {
-    if (!mem_m65.create(sizeof(datcom_))) {
+    if (!mem_m65.create(static_cast<int> (sizeof(datcom_)))) {
       msgBox("Unable to create shared memory segment.");
     }
   }
-  char *to = (char*)mem_m65.data();
-  int size=sizeof(datcom_);
-  if(datcom_.newdat==0) {
-    int noffset = 4*4*5760000 + 4*4*322*32768 + 4*4*32768;
-    to += noffset;
-    size -= noffset;
-  }
-  memset(to,0,size);         //Zero all decoding params in shared memory
+  char *to = static_cast<char*>(mem_m65.data());
+  int size = static_cast<int>(sizeof(datcom_));
+  if (!to || mem_m65.size() <= 0)
+    {
+      msgBox("Shared memory mem_m65 is not available.");
+    }
+  else
+    {
+      if(datcom_.newdat==0) {
+        int noffset = 4*4*5760000 + 4*4*322*32768 + 4*4*32768;
+        if (mem_m65.size() > noffset && size > noffset)
+          {
+            to += noffset;
+            size -= noffset;
+          }
+        else
+          {
+            qWarning() << "mem_m65 too small for offset clear:" << mem_m65.size() << noffset;
+            size = 0;
+          }
+      }
+      int clear_bytes = qMin(mem_m65.size(), qMax(0, size));
+      memset(to,0,clear_bytes);         //Zero all decoding params in shared memory
+    }
 
   fftwf_import_wisdom_from_filename (QDir {m_appDir}.absoluteFilePath ("map65_wisdom.dat").toLocal8Bit ());
 
@@ -252,13 +314,8 @@ MainWindow::MainWindow(QWidget *parent) :
   if(m_modeJT65==1) on_actionJT65A_triggered();
   if(m_modeJT65==2) on_actionJT65B_triggered();
   if(m_modeJT65==3) on_actionJT65C_triggered();
-  future1 = new QFuture<void>;
-  watcher1 = new QFutureWatcher<void>;
-  connect(watcher1, SIGNAL(finished()),this,SLOT(diskDat()));
-
-  future2 = new QFuture<void>;
-  watcher2 = new QFutureWatcher<void>;
-  connect(watcher2, SIGNAL(finished()),this,SLOT(diskWriteFinished()));
+  connect(&watcher1, SIGNAL(finished()),this,SLOT(diskDat()));
+  connect(&watcher2, SIGNAL(finished()),this,SLOT(diskWriteFinished()));
 
 // Assign input device and start input thread
   soundInThread.setInputDevice(m_paInDevice);
@@ -338,7 +395,6 @@ MainWindow::~MainWindow()
     QFile lockFile(m_appDir + "/.lock");
     lockFile.remove();
   }
-  delete ui;
 }
 
 //-------------------------------------------------------- writeSettings()
@@ -553,6 +609,11 @@ void MainWindow::dataSink(int k)
     ndiskdat=0;
     datcom_.ndiskdat=0;
   }
+  k = clamp_d4_index(k, "map65 dataSink");
+  if (k <= 0)
+    {
+      return;
+    }
 // Get x and y power, polarized spectrum, nkhz, and ihsym
   nb=0;
   if(m_NB) nb=1;
@@ -674,8 +735,8 @@ void MainWindow::dataSink(int k)
           t.time().toString("hhmm");
       if(m_xpol) fname += ".tf2";
       if(!m_xpol) fname += ".iq";
-      *future2 = QtConcurrent::run(savetf2, fname, m_xpol);
-      watcher2->setFuture(*future2);
+      future2 = QtConcurrent::run(savetf2, fname, m_xpol);
+      watcher2.setFuture(future2);
     }
   }
 
@@ -949,44 +1010,44 @@ bool MainWindow::eventFilter(QObject *object, QEvent *event)  //eventFilter()
 
 void MainWindow::createStatusBar()                           //createStatusBar
 {
-  lab1 = new QLabel("Receiving");
+  lab1 = new QLabel("Receiving", statusBar());
   lab1->setAlignment(Qt::AlignHCenter);
   lab1->setMinimumSize(QSize(80,10));
   lab1->setStyleSheet("QLabel{background-color: #00ff00}");
   lab1->setFrameStyle(QFrame::Panel | QFrame::Sunken);
   statusBar()->addWidget(lab1);
 
-  lab2 = new QLabel("QSO freq:  125");
+  lab2 = new QLabel("QSO freq:  125", statusBar());
   lab2->setAlignment(Qt::AlignHCenter);
   lab2->setMinimumSize(QSize(90,10));
   lab2->setFrameStyle(QFrame::Panel | QFrame::Sunken);
   statusBar()->addWidget(lab2);
 
-  lab3 = new QLabel("QSO DF:   0");
+  lab3 = new QLabel("QSO DF:   0", statusBar());
   lab3->setAlignment(Qt::AlignHCenter);
   lab3->setMinimumSize(QSize(80,10));
   lab3->setFrameStyle(QFrame::Panel | QFrame::Sunken);
   statusBar()->addWidget(lab3);
 
-  lab4 = new QLabel("");
+  lab4 = new QLabel("", statusBar());
   lab4->setAlignment(Qt::AlignHCenter);
   lab4->setMinimumSize(QSize(80,10));
   lab4->setFrameStyle(QFrame::Panel | QFrame::Sunken);
   statusBar()->addWidget(lab4);
 
-  lab5 = new QLabel("");
+  lab5 = new QLabel("", statusBar());
   lab5->setAlignment(Qt::AlignHCenter);
   lab5->setMinimumSize(QSize(50,10));
   lab5->setFrameStyle(QFrame::Panel | QFrame::Sunken);
   statusBar()->addWidget(lab5);
 
-  lab6 = new QLabel("");
+  lab6 = new QLabel("", statusBar());
   lab6->setAlignment(Qt::AlignHCenter);
   lab6->setMinimumSize(QSize(50,10));
   lab6->setFrameStyle(QFrame::Panel | QFrame::Sunken);
   statusBar()->addWidget(lab6);
 
-  lab7 = new QLabel("Avg: 0");
+  lab7 = new QLabel("Avg: 0", statusBar());
   lab7->setAlignment(Qt::AlignHCenter);
   lab7->setMinimumSize(QSize(50,10));
   lab7->setFrameStyle(QFrame::Panel | QFrame::Sunken);
@@ -1026,7 +1087,7 @@ void MainWindow::closeEvent (QCloseEvent * e)
   proc_m65.readAll ();
 
   proc_m65.disconnect ();
-  if (!proc_m65.waitForFinished (1000)) proc_m65.kill();
+  if (!wait_for_process_exit_no_input (proc_m65, 1000)) proc_m65.kill();
   quitFile.remove();
   mem_m65.detach();
   if (m_astro_window) m_astro_window->close ();
@@ -1128,8 +1189,8 @@ void MainWindow::on_actionOpen_triggered()                     //Open File
     m_diskData=true;
     int dbDgrd=0;
     if(m_myCall=="K1JT" and m_idInt<0) dbDgrd=m_idInt;
-    *future1 = QtConcurrent::run(getfile, fname, m_xpol, dbDgrd);
-    watcher1->setFuture(*future1);
+    future1 = QtConcurrent::run(getfile, fname, m_xpol, dbDgrd);
+    watcher1.setFuture(future1);
   }
 }
 
@@ -1160,8 +1221,8 @@ void MainWindow::on_actionOpen_next_in_directory_triggered()   //Open Next
       m_diskData=true;
       int dbDgrd=0;
       if(m_myCall=="K1JT" and m_idInt<0) dbDgrd=m_idInt;
-      *future1 = QtConcurrent::run(getfile, fname, m_xpol, dbDgrd);
-      watcher1->setFuture(*future1);
+      future1 = QtConcurrent::run(getfile, fname, m_xpol, dbDgrd);
+      watcher1.setFuture(future1);
       return;
     }
   }
@@ -1188,7 +1249,7 @@ void MainWindow::diskDat()                                   //diskDat()
   for(int i=0; i<304; i++) {           // Do the half-symbol FFTs
     int k = i*hsym + 2048.5;
     dataSink(k);
-    qApp->processEvents();             // Allow the waterfall to update
+    process_events_no_user_input();    // Keep UI responsive without input re-entrancy
   }
 }
 
@@ -1403,16 +1464,28 @@ void MainWindow::decode()                                       //decode()
   //newdat=1  ==> this is new data, must do the big FFT
   //nagain=1  ==> decode only at fQSO +/- Tol
 
-  char *to = (char*)mem_m65.data();
-  char *from = (char*) datcom_.d4;
-  int size=sizeof(datcom_);
+  char *to = static_cast<char*>(mem_m65.data());
+  char *from = reinterpret_cast<char*>(datcom_.d4);
+  int size = static_cast<int>(sizeof(datcom_));
   if(datcom_.newdat==0) {
     int noffset = 4*4*5760000 + 4*4*322*32768 + 4*4*32768;
-    to += noffset;
-    from += noffset;
-    size -= noffset;
+    if (mem_m65.size() > noffset && size > noffset)
+      {
+        if (to) to += noffset;
+        from += noffset;
+        size -= noffset;
+      }
+    else
+      {
+        qWarning() << "mem_m65 too small for decode offset copy:" << mem_m65.size() << noffset;
+        size = 0;
+      }
   }
-  memcpy(to, from, qMin(mem_m65.size(), size-8));
+  int copy_bytes = qMin(mem_m65.size(), qMax(0, size-8));
+  if (to && from && copy_bytes > 0)
+    {
+      memcpy(to, from, copy_bytes);
+    }
   datcom_.nagain=0;
   datcom_.ndiskdat=0;
   m_map65RxLog=0;
@@ -2399,13 +2472,13 @@ void MainWindow::on_actionEdit_wsjt_log_triggered()
 
 void MainWindow::on_actionTx_Tune_triggered()
 {
-  if(g_pTxTune==NULL) {
-    g_pTxTune = new TxTune(0);
+  if(!m_txTune) {
+    m_txTune = new TxTune(this);
   }
-  g_pTxTune->set_iqAmp(iqAmp);
-  g_pTxTune->set_iqPhase(iqPhase);
-  g_pTxTune->set_txPower(txPower);
-  g_pTxTune->show();
+  m_txTune->set_iqAmp(iqAmp);
+  m_txTune->set_iqPhase(iqPhase);
+  m_txTune->set_txPower(txPower);
+  m_txTune->show();
 }
 
 void MainWindow::on_pbTxMode_clicked()

@@ -29,6 +29,7 @@ class Astro;
 class BandMap;
 class Messages;
 class WideGraph;
+class TxTune;
 
 class MainWindow : public QMainWindow
 {
@@ -147,7 +148,7 @@ private slots:
   void on_pbTxMode_clicked();
 
 private:
-  Ui::MainWindow *ui;
+  QScopedPointer<Ui::MainWindow> ui;
   QString m_appDir;
   QString m_settings_filename;
   QScopedPointer<Astro> m_astro_window;
@@ -245,10 +246,10 @@ private:
 
   QMessageBox msgBox0;
 
-  QFuture<void>* future1;
-  QFuture<void>* future2;
-  QFutureWatcher<void>* watcher1;
-  QFutureWatcher<void>* watcher2;
+  QFuture<void> future1;
+  QFuture<void> future2;
+  QFutureWatcher<void> watcher1;
+  QFutureWatcher<void> watcher2;
 
   QProcess proc_m65;
   QProcess proc_qthid;
@@ -279,6 +280,7 @@ private:
 
   SignalMeter *xSignalMeter;
   SignalMeter *ySignalMeter;
+  QPointer<TxTune> m_txTune;
 
 
   SoundInThread soundInThread;             //Instantiate the audio threads

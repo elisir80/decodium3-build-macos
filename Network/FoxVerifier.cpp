@@ -4,6 +4,7 @@
 FoxVerifier::FoxVerifier(QString user_agent, QNetworkAccessManager *manager,QString base_url, QString callsign, QDateTime timestamp, QString code, unsigned int hz=750) : QObject(nullptr)
 {
   manager_ = manager;
+  reply_ = nullptr;
   finished_ = false;
   errored_ = false;
   callsign_ = callsign;
@@ -19,7 +20,6 @@ FoxVerifier::FoxVerifier(QString user_agent, QNetworkAccessManager *manager,QStr
   if (manager_ == nullptr) {
     LOG_INFO("FoxVerifier: manager is null, creating new one");
     manager_ = new QNetworkAccessManager(this);
-    manager_->deleteLater();
   }
   if (q_url_.isValid()) {
     request_ = QNetworkRequest(q_url_);
@@ -32,7 +32,15 @@ FoxVerifier::FoxVerifier(QString user_agent, QNetworkAccessManager *manager,QStr
 #endif
 
     reply_ =  manager_->get(request_);
+    if (!reply_)
+      {
+        errored_ = true;
+        error_reason_ = QStringLiteral("FoxVerifier: network request creation failed");
+        finished_ = true;
+        return;
+      }
     connect(reply_, &QNetworkReply::finished, this, &FoxVerifier::httpFinished);
+    connect(reply_, &QObject::destroyed, this, [this] () { reply_ = nullptr; });
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
     connect(reply_, &QNetworkReply::errorOccurred, this, &FoxVerifier::errorOccurred);
 #endif
@@ -50,6 +58,10 @@ FoxVerifier::FoxVerifier(QString user_agent, QNetworkAccessManager *manager,QStr
 }
 
 FoxVerifier::~FoxVerifier() {
+  if (reply_ && reply_->isRunning())
+    {
+      reply_->abort();
+    }
 }
 
 bool FoxVerifier::finished() {
@@ -59,6 +71,13 @@ bool FoxVerifier::finished() {
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
 void FoxVerifier::errorOccurred(QNetworkReply::NetworkError code)
 {
+  if (!reply_)
+    {
+      errored_ = true;
+      error_reason_ = QStringLiteral("FoxVerifier: reply destroyed before error handling");
+      finished_ = true;
+      return;
+    }
   int status =  reply_->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
   QString reason = reply_->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString();
   errored_ = true;
@@ -75,6 +94,13 @@ void FoxVerifier::errorOccurred(QNetworkReply::NetworkError code)
 
 void FoxVerifier::httpFinished()
 {
+  if (!reply_)
+    {
+      errored_ = true;
+      error_reason_ = QStringLiteral("FoxVerifier: missing reply at completion");
+      finished_ = true;
+      return;
+    }
   int status =  reply_->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
   QString reason = reply_->attribute(QNetworkRequest::HttpReasonPhraseAttribute).toString();
   if (reply_->error() != QNetworkReply::NoError) {
@@ -91,10 +117,30 @@ void FoxVerifier::httpFinished()
   }
 }
 
-void FoxVerifier::sslErrors(const QList<QSslError> &)
+void FoxVerifier::sslErrors(const QList<QSslError> & errors)
 {
-  LOG_INFO(QString("FoxVerifier: sslErrors").toStdString());
-  reply_->ignoreSslErrors();
+  if (!reply_)
+    {
+      errored_ = true;
+      error_reason_ = QStringLiteral("FoxVerifier: SSL errors without active reply");
+      finished_ = true;
+      return;
+    }
+  QString details;
+  for (auto const& error : errors)
+    {
+      if (!details.isEmpty ()) details += "; ";
+      details += QString {"%1 (%2)"}
+        .arg (error.errorString ())
+        .arg (static_cast<int> (error.error ()));
+    }
+  LOG_INFO(QString("FoxVerifier: sslErrors - refusing insecure TLS certificate: %1").arg(details).toStdString());
+
+  // Security hardening: do not bypass TLS verification.
+  if (reply_ && reply_->isRunning())
+    {
+      reply_->abort();
+    }
 }
 
 void FoxVerifier::httpRedirected(const QUrl &url) {

@@ -31,6 +31,7 @@ namespace
 {
   // Dictionary mapping call sign to date of last upload to LotW
   using dictionary = QHash<QString, QDate>;
+  constexpr qint64 kMaxCloudlogReplyBytes = 64 * 1024;
 }
 
 class Cloudlog::impl final
@@ -100,7 +101,21 @@ public:
     QString result;
     if (reply_ && reply_->isFinished ())
       {
-        result = reply_->readAll();
+        auto const length_header = reply_->header (QNetworkRequest::ContentLengthHeader);
+        if (length_header.isValid () && length_header.toLongLong () > kMaxCloudlogReplyBytes)
+          {
+            qWarning () << "Cloudlog API reply too large";
+            reply_->abort ();
+            return;
+          }
+        auto body = reply_->read (kMaxCloudlogReplyBytes + 1);
+        if (body.size () > kMaxCloudlogReplyBytes)
+          {
+            qWarning () << "Cloudlog API reply exceeds limit";
+            reply_->abort ();
+            return;
+          }
+        result = QString::fromUtf8 (body);
         if (result.contains("<status>Valid</status>"))
           {
             if (result.contains("<rights>rw</rights>"))
@@ -123,7 +138,21 @@ public:
     QString result;
     if (reply_ && reply_->isFinished ())
       {
-        result = reply_->readAll();
+        auto const length_header = reply_->header (QNetworkRequest::ContentLengthHeader);
+        if (length_header.isValid () && length_header.toLongLong () > kMaxCloudlogReplyBytes)
+          {
+            qWarning () << "Cloudlog upload reply too large";
+            reply_->abort ();
+            return;
+          }
+        auto body = reply_->read (kMaxCloudlogReplyBytes + 1);
+        if (body.size () > kMaxCloudlogReplyBytes)
+          {
+            qWarning () << "Cloudlog upload reply exceeds limit";
+            reply_->abort ();
+            return;
+          }
+        result = QString::fromUtf8 (body);
         QJsonDocument data = QJsonDocument::fromJson(result.toUtf8());
         QJsonObject obj = data.object();
         if (obj["status"] == "failed") {

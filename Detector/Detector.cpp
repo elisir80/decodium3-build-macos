@@ -55,6 +55,7 @@ void Detector::clear ()
 
 qint64 Detector::writeData (char const * data, qint64 maxSize)
 {
+  constexpr int kMaxKin = NTMAX * RX_SAMPLE_RATE;
   static unsigned mstr0=999999;
   qint64 ms0 = QDateTime::currentMSecsSinceEpoch() % 86400000;
   unsigned mstr = ms0 % int(1000.0*m_period); // ms into the nominal Tx start time
@@ -63,6 +64,13 @@ qint64 Detector::writeData (char const * data, qint64 maxSize)
     m_bufferPos = 0;
   }
   mstr0=mstr;
+
+  if (dec_data.params.kin < 0 || dec_data.params.kin > kMaxKin)
+    {
+      qWarning () << "Detector: clamping out-of-range kin:" << dec_data.params.kin;
+      dec_data.params.kin = qBound (0, dec_data.params.kin, kMaxKin);
+    }
+  Q_ASSERT (dec_data.params.kin >= 0);
 
   // no torn frames
   Q_ASSERT (!(maxSize % static_cast<qint64> (bytesPerFrame ())));
@@ -92,11 +100,12 @@ qint64 Detector::writeData (char const * data, qint64 maxSize)
         if(m_bufferPos==m_samplesPerFFT*m_downSampleFactor) {
           qint32 framesToProcess (m_samplesPerFFT * m_downSampleFactor);
           qint32 framesAfterDownSample (m_samplesPerFFT);
-          if(m_downSampleFactor > 1 && dec_data.params.kin>=0 &&
-             dec_data.params.kin < (NTMAX*12000 - framesAfterDownSample)) {
-            fil4_(&m_buffer[0], &framesToProcess, &dec_data.d2[dec_data.params.kin],
+          int const boundedKin = qBound (0, dec_data.params.kin, kMaxKin);
+          if(m_downSampleFactor > 1 &&
+             boundedKin <= (kMaxKin - framesAfterDownSample)) {
+            fil4_(&m_buffer[0], &framesToProcess, &dec_data.d2[boundedKin],
                 &framesAfterDownSample);
-            dec_data.params.kin += framesAfterDownSample;
+            dec_data.params.kin = boundedKin + framesAfterDownSample;
           } else {
             // qDebug() << "framesToProcess     = " << framesToProcess;
             // qDebug() << "dec_data.params.kin = " << dec_data.params.kin;
