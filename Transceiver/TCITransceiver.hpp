@@ -2,6 +2,7 @@
 #define TCI_TRANSCEIVER_HPP__
 
 #include <memory>
+#include <array>
 
 #include "TransceiverFactory.hpp"
 #include "PollingTransceiver.hpp"
@@ -9,7 +10,7 @@
 
 #include <QtWebSockets/QWebSocket>
 #include <QTimer>
-#include <QEventLoop>
+#include <QVector>
 #include <mutex>
 
 typedef float REAL;
@@ -214,6 +215,8 @@ private:
   void mysleep8 (int ms = 1);
   QString mode_to_command (QString) const;
   std::unique_ptr<TransceiverBase> wrapped_; // may be null
+  bool wait_for_tci_event (QTimer * timer, int index, int ms);
+  void reset_tci_wait_flags ();
   QString rx_;
   QString server_;
   bool use_for_ptt_;
@@ -228,21 +231,14 @@ private:
   QWebSocket * commander_;
   QLocale locale_;
   QTimer * tci_timer1_;
-  QEventLoop * tci_loop1_;
   QTimer * tci_timer2_;
-  QEventLoop * tci_loop2_;
   QTimer * tci_timer3_;
-  QEventLoop * tci_loop3_;
   QTimer * tci_timer4_;
-  QEventLoop * tci_loop4_;
   QTimer * tci_timer5_;
-  QEventLoop * tci_loop5_;
   QTimer * tci_timer6_;
-  QEventLoop * tci_loop6_;
   QTimer * tci_timer7_;
-  QEventLoop * tci_loop7_;
   QTimer * tci_timer8_;
-  QEventLoop * tci_loop8_;
+  std::array<bool, 8> tci_done_flags_ {};
   int nIqBytes;
   bool inConnected;
   bool tci_Ready;
@@ -350,6 +346,7 @@ private:
   QByteArray m_tx1[8];
   int tx_fifo, tx_fifo2;
   quint32 last_type;  
+  QVector<float> m_waveSnapshot;
   std::string debug_file_;
   std::string wav_file_;
   std::mutex mtx_;

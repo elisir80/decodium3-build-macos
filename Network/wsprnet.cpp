@@ -8,7 +8,6 @@
 
 #include <QTimer>
 #include <QFile>
-#include <QRegExp>
 #include <QRegularExpression>
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
@@ -52,6 +51,8 @@ with app.test_request_context ():
   \s+`
   \s+<?(?<call>[A-Z0-9/]+)>?(?:\s(?<grid>[A-R]{2}[0-9]{2}(?:[A-X]{2})?))?(?:\s+(?<dBm>\d+))?
 )", QRegularExpression::ExtendedPatternSyntaxOption};
+
+  QRegularExpression wspr_spots_added_re {"spot\\(s\\) added"};
 
   // regexp to parse wspr_spots.txt from wsprd
   //
@@ -187,7 +188,7 @@ void WSPRNet::networkReply (QNetworkReply * reply)
           QString serverResponse = reply->readAll ();
           if (m_uploadType == 2)
             {
-              if (!serverResponse.contains(QRegExp("spot\\(s\\) added")))
+              if (!wspr_spots_added_re.match(serverResponse).hasMatch())
                 {
                   Q_EMIT uploadStatus (QString {"Upload Failed: %1"}.arg (serverResponse));
                   spot_queue_.clear ();

@@ -3,6 +3,8 @@
 
 #include <QtGlobal>
 #include <QDateTime>
+#include <atomic>
+#include <cmath>
 
 #ifdef Q_OS_WIN
 #define WIN32_LEAN_AND_MEAN
@@ -33,6 +35,27 @@ inline qint64 preciseCurrentMSecsSinceEpoch()
 #else
     return QDateTime::currentMSecsSinceEpoch();
 #endif
+}
+
+inline std::atomic<qint64>& globalNtpOffsetMsStorage()
+{
+  static std::atomic<qint64> offset_ms {0};
+  return offset_ms;
+}
+
+inline void setGlobalNtpOffsetMs(double offsetMs)
+{
+  globalNtpOffsetMsStorage().store(static_cast<qint64>(std::llround(offsetMs)), std::memory_order_relaxed);
+}
+
+inline qint64 globalNtpOffsetMs()
+{
+  return globalNtpOffsetMsStorage().load(std::memory_order_relaxed);
+}
+
+inline qint64 ntpCorrectedCurrentMSecsSinceEpoch()
+{
+  return preciseCurrentMSecsSinceEpoch() + globalNtpOffsetMs();
 }
 
 // Returns fractional microseconds part (0-999) for sub-millisecond precision

@@ -36,8 +36,16 @@ bool SoundInput::checkStream ()
           Q_EMIT error (tr ("Non-recoverable error, audio input device not usable at this time."));
           break;
 
-        case QAudio::UnderrunError: // TODO G4WJS: stop ignoring this
-                                    // when we find the cause on macOS
+        case QAudio::UnderrunError:
+          // Soft-fail on underrun, but do not silently ignore it.
+          qWarning () << "SoundInput underrun detected on" << QSysInfo::prettyProductName ();
+          if (m_stream)
+            {
+              m_stream->reset ();
+            }
+          result = true;
+          break;
+
         case QAudio::NoError:
           result = true;
           break;

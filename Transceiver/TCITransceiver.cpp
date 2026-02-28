@@ -3,7 +3,12 @@
 #include <QRegularExpression>
 #include <QLocale>
 #include <QThread>
+#include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QEventLoop>
 #include <cstdlib>
+#include <cmath>
+#include <limits>
 #include <qmath.h>
 
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
@@ -12,6 +17,7 @@
 
 #include <QString>
 #include "widgets/itoneAndicw.h"
+#include "widgets/FoxWaveGuard.hpp"
 #include "Network/NetworkServerLookup.hpp"
 #include "moc_TCITransceiver.cpp"
 
@@ -20,6 +26,7 @@
 #include <QDebug>
 #include <QDateTime>
 #include <QTimer>
+#include <QReadLocker>
 
 namespace
 {
@@ -110,6 +117,27 @@ namespace
   static const QString CmdAgcMode("agc_mode");
   static const QString CmdAgcGain("agc_gain");
   static const QString CmdLock("lock");
+
+  constexpr int kMaxKin = NTMAX * RX_SAMPLE_RATE;
+  constexpr quint64 kFloatPairBytes = sizeof(float) * 2ULL;
+
+  bool checked_payload_size (quint32 length, int available_bytes, quint64 * required_bytes)
+  {
+    if (available_bytes < 0)
+      {
+        return false;
+      }
+    quint64 req = static_cast<quint64> (length) * kFloatPairBytes;
+    if (req > static_cast<quint64> (available_bytes))
+      {
+        return false;
+      }
+    if (required_bytes)
+      {
+        *required_bytes = req;
+      }
+    return true;
+  }
 }
 
 extern "C" {
@@ -177,21 +205,13 @@ TCITransceiver::TCITransceiver (logger_type * logger, std::unique_ptr<Transceive
   , tci_audio_ {(poll_interval & tci__audio) == tci__audio}
   , commander_ {nullptr}
   , tci_timer1_ {nullptr}
-  , tci_loop1_ {nullptr}
   , tci_timer2_ {nullptr}
-  , tci_loop2_ {nullptr}
   , tci_timer3_ {nullptr}
-  , tci_loop3_ {nullptr}
   , tci_timer4_ {nullptr}
-  , tci_loop4_ {nullptr}
   , tci_timer5_ {nullptr}
-  , tci_loop5_ {nullptr}
   , tci_timer6_ {nullptr}
-  , tci_loop6_ {nullptr}
   , tci_timer7_ {nullptr}
-  , tci_loop7_ {nullptr}
   , tci_timer8_ {nullptr}
-  , tci_loop8_ {nullptr}
   , wavptr_ {nullptr}
   , m_downSampleFactor {4}
   , m_buffer ((m_downSampleFactor > 1) ?
@@ -312,78 +332,47 @@ int TCITransceiver::do_start ()
     connect(commander_,SIGNAL(textMessageReceived(QString)),this,SLOT(onMessageReceived(QString)));
     connect(commander_,SIGNAL(error(QAbstractSocket::SocketError)),this,SLOT(onError(QAbstractSocket::SocketError)));
   }
-  if (!tci_loop1_) {
-    tci_loop1_ = new QEventLoop  {this};
-  }
   if (!tci_timer1_) {
     tci_timer1_ = new QTimer {this};
     tci_timer1_ -> setSingleShot(true);
-    connect( tci_timer1_, &QTimer::timeout, tci_loop1_, &QEventLoop::quit);
-    connect( this, &TCITransceiver::tci_done1, tci_loop1_, &QEventLoop::quit);
-  }
-  if (!tci_loop2_) {
-    tci_loop2_ = new QEventLoop  {this};
+    connect(this, &TCITransceiver::tci_done1, this, [this]() { tci_done_flags_[0] = true; });
   }
   if (!tci_timer2_) {
     tci_timer2_ = new QTimer {this};
     tci_timer2_ -> setSingleShot(true);
-    connect( tci_timer2_, &QTimer::timeout, tci_loop2_, &QEventLoop::quit);
-    connect( this, &TCITransceiver::tci_done2, tci_loop2_, &QEventLoop::quit);
-  }
-  if (!tci_loop3_) {
-    tci_loop3_ = new QEventLoop  {this};
+    connect(this, &TCITransceiver::tci_done2, this, [this]() { tci_done_flags_[1] = true; });
   }
   if (!tci_timer3_) {
     tci_timer3_ = new QTimer {this};
     tci_timer3_ -> setSingleShot(true);
-    connect( tci_timer3_, &QTimer::timeout, tci_loop3_, &QEventLoop::quit);
-    connect( this, &TCITransceiver::tci_done3, tci_loop3_, &QEventLoop::quit);
-  }
-  if (!tci_loop4_) {
-    tci_loop4_ = new QEventLoop  {this};
+    connect(this, &TCITransceiver::tci_done3, this, [this]() { tci_done_flags_[2] = true; });
   }
   if (!tci_timer4_) {
     tci_timer4_ = new QTimer {this};
     tci_timer4_ -> setSingleShot(true);
-    connect( tci_timer4_, &QTimer::timeout, tci_loop4_, &QEventLoop::quit);
-    connect( this, &TCITransceiver::tci_done4, tci_loop4_, &QEventLoop::quit);
-  }
-  if (!tci_loop5_) {
-    tci_loop5_ = new QEventLoop  {this};
+    connect(this, &TCITransceiver::tci_done4, this, [this]() { tci_done_flags_[3] = true; });
   }
   if (!tci_timer5_) {
     tci_timer5_ = new QTimer {this};
     tci_timer5_ -> setSingleShot(true);
-    connect( tci_timer5_, &QTimer::timeout, tci_loop5_, &QEventLoop::quit);
-    connect( this, &TCITransceiver::tci_done5, tci_loop5_, &QEventLoop::quit);
-  }
-  if (!tci_loop6_) {
-    tci_loop6_ = new QEventLoop  {this};
+    connect(this, &TCITransceiver::tci_done5, this, [this]() { tci_done_flags_[4] = true; });
   }
   if (!tci_timer6_) {
     tci_timer6_ = new QTimer {this};
     tci_timer6_ -> setSingleShot(true);
-    connect( tci_timer6_, &QTimer::timeout, tci_loop6_, &QEventLoop::quit);
-    connect( this, &TCITransceiver::tci_done6, tci_loop6_, &QEventLoop::quit);
-  }
-  if (!tci_loop7_) {
-      tci_loop7_ = new QEventLoop  {this};
+    connect(this, &TCITransceiver::tci_done6, this, [this]() { tci_done_flags_[5] = true; });
   }
   if (!tci_timer7_) {
       tci_timer7_ = new QTimer {this};
       tci_timer7_ -> setSingleShot(true);
-      connect( tci_timer7_, &QTimer::timeout, tci_loop7_, &QEventLoop::quit);
-      connect( this, &TCITransceiver::tci_done7, tci_loop7_, &QEventLoop::quit);
-  }
-  if (!tci_loop8_) {
-      tci_loop8_ = new QEventLoop  {this};
+      connect(this, &TCITransceiver::tci_done7, this, [this]() { tci_done_flags_[6] = true; });
   }
   if (!tci_timer8_) {
       tci_timer8_ = new QTimer {this};
       tci_timer8_ -> setSingleShot(true);
-      connect( tci_timer8_, &QTimer::timeout, tci_loop8_, &QEventLoop::quit);
-      connect( this, &TCITransceiver::tci_done8, tci_loop8_, &QEventLoop::quit);
+      connect(this, &TCITransceiver::tci_done8, this, [this]() { tci_done_flags_[7] = true; });
   }
+  reset_tci_wait_flags();
 
   tx_fifo = 0; tx_top_ = true;
   tci_Ready = false;
@@ -534,99 +523,44 @@ void TCITransceiver::do_stop ()
   if (tci_timer1_)
   {
     if (tci_timer1_->isActive()) tci_timer1_->stop();
-    // tci_timer1_->deleteLater(), tci_timer1_ = nullptr;
     CAT_TRACE ("timer1 ");
-  }
-  if (tci_loop1_)
-  {
-    tci_loop1_->quit();
-    //  tci_loop1_->deleteLater(), tci_loop1_ = nullptr;
-    CAT_TRACE ("loop1 ");
   }
   if (tci_timer2_)
   {
     if (tci_timer2_->isActive()) tci_timer2_->stop();
-    //  tci_timer2_->deleteLater(), tci_timer2_ = nullptr;
     CAT_TRACE ("timer2 ");
-  }
-  if (tci_loop2_)
-  {
-    tci_loop2_->quit();
-   //   tci_loop2_->deleteLater(), tci_loop2_ = nullptr;
-    CAT_TRACE ("loop2 ");
   }
   if (tci_timer3_)
   {
     if (tci_timer3_->isActive()) tci_timer3_->stop();
-    //  tci_timer3_->deleteLater(), tci_timer3_ = nullptr;
     CAT_TRACE ("timer3 ");
-  }
-  if (tci_loop3_)
-  {
-    tci_loop3_->quit();
-    //  tci_loop3_->deleteLater(), tci_loop3_ = nullptr;
-    CAT_TRACE ("loop3 ");
   }
   if (tci_timer4_)
   {
     if (tci_timer4_->isActive()) tci_timer4_->stop();
-   // tci_timer4_->deleteLater(), tci_timer4_ = nullptr;
     CAT_TRACE ("timer4 ");
-  }
-  if (tci_loop4_)
-  {
-    tci_loop4_->quit();
-   // tci_loop4_->deleteLater(), tci_loop4_ = nullptr;
-    CAT_TRACE ("loop4 ");
   }
   if (tci_timer5_)
   {
     if (tci_timer5_->isActive()) tci_timer5_->stop();
-   // tci_timer5_->deleteLater(), tci_timer5_ = nullptr;
     CAT_TRACE ("timer5 ");
-  }
-  if (tci_loop5_)
-  {
-    tci_loop5_->quit();
-   // tci_loop5_->deleteLater(), tci_loop5_ = nullptr;
-    CAT_TRACE ("loop5 ");
   }
   if (tci_timer6_)
   {
     if (tci_timer6_->isActive()) tci_timer6_->stop();
-  //  tci_timer6_->deleteLater(), tci_timer6_ = nullptr;
     CAT_TRACE ("timer6 ");
-  }
-  if (tci_loop6_)
-  {
-    tci_loop6_->quit();
-  //  tci_loop6_->deleteLater(), tci_loop6_ = nullptr;
-    CAT_TRACE ("loop6 ");
   }
   if (tci_timer7_)
   {
       if (tci_timer7_->isActive()) tci_timer7_->stop();
-    //  tci_timer7_->deleteLater(), tci_timer7_ = nullptr;
       CAT_TRACE ("timer7 ");
-  }
-  if (tci_loop7_)
-  {
-      tci_loop7_->quit();
-    //  tci_loop7_->deleteLater(), tci_loop7_ = nullptr;
-      CAT_TRACE ("loop7 ");
   }
   if (tci_timer8_)
   {
       if (tci_timer8_->isActive()) tci_timer8_->stop();
-   //   tci_timer8_->deleteLater(), tci_timer8_ = nullptr;
       CAT_TRACE ("timer8 ");
   }
-  if (tci_loop8_)
-  {
-      tci_loop8_->quit();
-   //   tci_loop8_->deleteLater(), tci_loop8_ = nullptr;
-      CAT_TRACE ("loop8 ");
-  }
+  reset_tci_wait_flags();
 
   if (wrapped_) wrapped_->stop ();
   CAT_TRACE ("& closed TCITransceiver\n");
@@ -845,47 +779,83 @@ void TCITransceiver::sendTextMessage(const QString &message)
 
 void TCITransceiver::onBinaryReceived(const QByteArray &data)
 {
-  Data_Stream *pStream = (Data_Stream*)(data.data());
-  if (pStream->type != last_type) {
-    last_type = pStream->type;
-  }
-  if (pStream->type == Iq_Stream){
-    bool tx = false;
-    if (pStream->receiver == 0){
-      tx = trxA == 0;
-      trxA = 1;
+  if (data.size () < static_cast<int> (AudioHeaderSize))
+    {
+      qWarning () << "TCI: dropping truncated binary frame (no header), size=" << data.size ();
+      return;
     }
-    if (pStream->receiver == 1) {
-      tx = trxB == 0;
-      trxB = 1;
+
+  auto const * pStream = reinterpret_cast<Data_Stream const *> (data.constData ());
+  auto const payload_bytes = data.size () - static_cast<int> (AudioHeaderSize);
+  quint64 required_bytes = 0;
+  if (!checked_payload_size (pStream->length, payload_bytes, &required_bytes))
+    {
+      qWarning () << "TCI: dropping malformed binary frame, type=" << pStream->type
+                  << "length=" << pStream->length
+                  << "payload=" << payload_bytes;
+      return;
     }
-    printf("sendIqData\n");
-    emit sendIqData(pStream->receiver,pStream->length,pStream->data,tx);
-    qDebug() << "IQ" << data.size() << pStream->length;
-  } else if (pStream->type == RxAudioStream && audio_  && pStream->receiver == rx_.toUInt()) {
-    writeAudioData(pStream->data,pStream->length);
-  } else if (pStream->type == TxChrono &&  pStream->receiver == rx_.toUInt()) {
-    mtx_.lock(); tx_fifo += 1; tx_fifo &= 7;
-    int ssize = AudioHeaderSize+pStream->length*sizeof(float)*2;
-    quint16 tehtud;
-    if (m_tx1[tx_fifo].size() != ssize) m_tx1[tx_fifo].resize(ssize);
-    Data_Stream * pOStream1 = (Data_Stream*)(m_tx1[tx_fifo].data());
-    pOStream1->receiver = pStream->receiver;
-    pOStream1->sampleRate = pStream->sampleRate;
-    pOStream1->format = pStream->format;
-    pOStream1->codec = 0;
-    pOStream1->crc = 0;
-    pOStream1->length = pStream->length;
-    pOStream1->type = TxAudioStream;
-    tehtud = readAudioData(pOStream1->data,pOStream1->length, txAtten);
-    if (tehtud && tehtud != pOStream1->length) {
-      quint16 valmis = tehtud;
-      tehtud = readAudioData(pOStream1->data + valmis,pOStream1->length - valmis,txAtten);
+
+  if (pStream->type != last_type)
+    {
+      last_type = pStream->type;
     }
-    tx_fifo2 = tx_fifo; mtx_.unlock();
-    if (!inConnected || commander_->sendBinaryMessage(m_tx1[tx_fifo2]) != m_tx1[tx_fifo2].size()) {
+
+  if (pStream->type == Iq_Stream)
+    {
+      bool tx = false;
+      if (pStream->receiver == 0)
+        {
+          tx = trxA == 0;
+          trxA = 1;
+        }
+      if (pStream->receiver == 1)
+        {
+          tx = trxB == 0;
+          trxB = 1;
+        }
+      printf ("sendIqData\n");
+      emit sendIqData (pStream->receiver, pStream->length, const_cast<float *> (pStream->data), tx);
+      qDebug () << "IQ" << data.size () << pStream->length;
     }
-  }
+  else if (pStream->type == RxAudioStream && audio_ && pStream->receiver == rx_.toUInt ())
+    {
+      writeAudioData (const_cast<float *> (pStream->data), static_cast<qint32> (pStream->length));
+    }
+  else if (pStream->type == TxChrono && pStream->receiver == rx_.toUInt ())
+    {
+      quint64 const ssize64 = static_cast<quint64> (AudioHeaderSize) + required_bytes;
+      if (ssize64 > static_cast<quint64> (std::numeric_limits<int>::max ()))
+        {
+          qWarning () << "TCI: dropping oversized TxChrono frame, bytes=" << ssize64;
+          return;
+        }
+      std::lock_guard<std::mutex> lock (mtx_);
+      tx_fifo = (tx_fifo + 1) & 7;
+      int const ssize = static_cast<int> (ssize64);
+      if (m_tx1[tx_fifo].size () != ssize)
+        {
+          m_tx1[tx_fifo].resize (ssize);
+        }
+      auto * pOStream1 = reinterpret_cast<Data_Stream *> (m_tx1[tx_fifo].data ());
+      pOStream1->receiver = pStream->receiver;
+      pOStream1->sampleRate = pStream->sampleRate;
+      pOStream1->format = pStream->format;
+      pOStream1->codec = 0;
+      pOStream1->crc = 0;
+      pOStream1->length = pStream->length;
+      pOStream1->type = TxAudioStream;
+      quint16 done = readAudioData (pOStream1->data, static_cast<qint32> (pOStream1->length), txAtten);
+      if (done && done != pOStream1->length)
+        {
+          quint16 const ready = done;
+          readAudioData (pOStream1->data + ready, static_cast<qint32> (pOStream1->length - ready), txAtten);
+        }
+      tx_fifo2 = tx_fifo;
+      if (!inConnected || commander_->sendBinaryMessage (m_tx1[tx_fifo2]) != m_tx1[tx_fifo2].size ())
+        {
+        }
+    }
 }
 
 void TCITransceiver::txAudioData(quint32 len, float * data)
@@ -915,70 +885,96 @@ quint32 TCITransceiver::writeAudioData (float * data, qint32 maxSize)
   }
   mstr0=mstr;
 
-  if(data != NULL) {
-  // block below adjusts receive audio attenuation
-  quint64 i = 0;
-  float * data1 = (float*)malloc(maxSize * sizeof(float));
-  for(i=0;i<(quint64)maxSize;i++) {
-    data1[i] = ((float)(pow(10, 0.05*rxAtten) * data[i]));
-  }
-
-  // no torn frames
-  Q_ASSERT (!(maxSize % static_cast<qint32> (bytesPerFrame)));
-
-  // these are in terms of input frames (not down sampled)
-  size_t framesAcceptable ((sizeof (dec_data.d2) /
-                               sizeof (dec_data.d2[0]) - dec_data.params.kin) * m_downSampleFactor);
-  size_t framesAccepted (qMin (static_cast<size_t> (maxSize /
-                                                    bytesPerFrame), framesAcceptable));
-
-  if (framesAccepted < static_cast<size_t> (maxSize / bytesPerFrame)) {
-    qDebug () << "dropped " << maxSize / bytesPerFrame - framesAccepted
-             << " frames of data on the floor!"
-             << dec_data.params.kin << mstr;
-  }
-
-  for (unsigned remaining = framesAccepted; remaining; ) {
-    size_t numFramesProcessed (qMin (m_samplesPerFFT *
-                                     m_downSampleFactor - m_bufferPos, remaining));
-
-    if(m_downSampleFactor > 1) {
-      store (&data1[(framesAccepted - remaining) * bytesPerFrame],
-            numFramesProcessed, &m_buffer[m_bufferPos]);
-      m_bufferPos += numFramesProcessed;
-
-      if(m_bufferPos==m_samplesPerFFT*m_downSampleFactor) {
-        qint32 framesToProcess (m_samplesPerFFT * m_downSampleFactor);
-        qint32 framesAfterDownSample (m_samplesPerFFT);
-        if(m_downSampleFactor > 1 && dec_data.params.kin>=0 &&
-            dec_data.params.kin < (NTMAX*12000 - framesAfterDownSample)) {
-          fil4_(&m_buffer[0], &framesToProcess, &dec_data.d2[dec_data.params.kin],
-                &framesAfterDownSample, &dec_data.d2[dec_data.params.kin]);
-          dec_data.params.kin += framesAfterDownSample;
-        } else {
-          qDebug() << "framesToProcess     = " << framesToProcess;
-          qDebug() << "dec_data.params.kin = " << dec_data.params.kin;
-          qDebug() << "framesAfterDownSample" << framesAfterDownSample;
+  if (data && maxSize > 0)
+    {
+      if (dec_data.params.kin < 0 || dec_data.params.kin > kMaxKin)
+        {
+          qWarning () << "TCI: clamping out-of-range kin:" << dec_data.params.kin;
+          dec_data.params.kin = qBound (0, dec_data.params.kin, kMaxKin);
         }
-        Q_EMIT tciframeswritten (dec_data.params.kin);
-        m_bufferPos = 0;
-      }
+      Q_ASSERT (dec_data.params.kin >= 0);
 
-    } else {
-      store (&data1[(framesAccepted - remaining) * bytesPerFrame],
-            numFramesProcessed, &dec_data.d2[dec_data.params.kin]);
-      m_bufferPos += numFramesProcessed;
-      dec_data.params.kin += numFramesProcessed;
-      if (m_bufferPos == static_cast<unsigned> (m_samplesPerFFT)) {
-        Q_EMIT tciframeswritten (dec_data.params.kin);
-        m_bufferPos = 0;
-      }
+      // no torn frames
+      Q_ASSERT (!(maxSize % static_cast<qint32> (bytesPerFrame)));
+
+      // block below adjusts receive audio attenuation
+      QVector<float> data1 (maxSize);
+      float const gain = static_cast<float> (pow (10, 0.05 * rxAtten));
+      for (qint32 i = 0; i < maxSize; ++i)
+        {
+          data1[static_cast<int> (i)] = gain * data[i];
+        }
+
+      int const boundedKin0 = qBound (0, dec_data.params.kin, kMaxKin);
+      size_t const framesAcceptable ((static_cast<size_t> (kMaxKin - boundedKin0)) * m_downSampleFactor);
+      size_t const framesInput = static_cast<size_t> (maxSize / bytesPerFrame);
+      size_t const framesAccepted = qMin (framesInput, framesAcceptable);
+
+      if (framesAccepted < framesInput)
+        {
+          qDebug () << "dropped " << framesInput - framesAccepted
+                    << " frames of data on the floor!"
+                    << dec_data.params.kin << mstr;
+        }
+
+      for (size_t remaining = framesAccepted; remaining; )
+        {
+          size_t const numFramesProcessed (qMin (static_cast<size_t> (m_samplesPerFFT) *
+                                                 m_downSampleFactor - m_bufferPos, remaining));
+
+          if (m_downSampleFactor > 1)
+            {
+              store (&data1[static_cast<int> ((framesAccepted - remaining) * bytesPerFrame)],
+                     numFramesProcessed, &m_buffer[m_bufferPos]);
+              m_bufferPos += numFramesProcessed;
+
+              if (m_bufferPos == static_cast<unsigned> (m_samplesPerFFT * m_downSampleFactor))
+                {
+                  qint32 framesToProcess (m_samplesPerFFT * m_downSampleFactor);
+                  qint32 framesAfterDownSample (m_samplesPerFFT);
+                  int const boundedKin = qBound (0, dec_data.params.kin, kMaxKin);
+                  if (boundedKin <= (kMaxKin - framesAfterDownSample))
+                    {
+                      fil4_ (&m_buffer[0], &framesToProcess, &dec_data.d2[boundedKin],
+                             &framesAfterDownSample, &dec_data.d2[boundedKin]);
+                      dec_data.params.kin = boundedKin + framesAfterDownSample;
+                    }
+                  else
+                    {
+                      qWarning () << "TCI: dropping downsample block due to kin bounds"
+                                  << boundedKin << framesAfterDownSample;
+                    }
+                  Q_EMIT tciframeswritten (dec_data.params.kin);
+                  m_bufferPos = 0;
+                }
+              remaining -= numFramesProcessed;
+            }
+          else
+            {
+              int const boundedKin = qBound (0, dec_data.params.kin, kMaxKin);
+              size_t const writableFrames = qMin (numFramesProcessed, static_cast<size_t> (kMaxKin - boundedKin));
+              if (writableFrames == 0)
+                {
+                  qWarning () << "TCI: no writable frames left in dec_data.d2";
+                  break;
+                }
+              store (&data1[static_cast<int> ((framesAccepted - remaining) * bytesPerFrame)],
+                     writableFrames, &dec_data.d2[boundedKin]);
+              m_bufferPos += writableFrames;
+              dec_data.params.kin = boundedKin + static_cast<int> (writableFrames);
+              if (writableFrames < numFramesProcessed)
+                {
+                  qWarning () << "TCI: truncated write to dec_data.d2 due to bounds";
+                }
+              if (m_bufferPos >= static_cast<unsigned> (m_samplesPerFFT))
+                {
+                  Q_EMIT tciframeswritten (dec_data.params.kin);
+                  m_bufferPos = 0;
+                }
+              remaining -= writableFrames;
+            }
+        }
     }
-    remaining -= numFramesProcessed;
-  }
-
-  free(data1);
-}
   return maxSize;    // we drop any data past the end of the buffer on
   // the floor until the next period starts
 }
@@ -1390,66 +1386,100 @@ auto TCITransceiver::string_to_frequency (QString s) const -> Frequency
   return f;
 }
 
-/*
- * mysleep1 is used in do_stop
- * mysleep2 is used in do_tx_frequency
- * mysleep3 is used in do_ptt
- * mysleep4 is used in rx2_enable
- * mysleep5 is used in rig_split
- * mysleep6 is used in do_start
- * mysleep7 is used in do_frequency
- * mysleep8 is used in do_mode which is never called
- * */
+void TCITransceiver::reset_tci_wait_flags ()
+{
+  for (auto& done : tci_done_flags_)
+    {
+      done = false;
+    }
+}
+
+bool TCITransceiver::wait_for_tci_event (QTimer * timer, int index, int ms)
+{
+  if (!timer || index < 0 || index >= static_cast<int> (tci_done_flags_.size ()))
+    {
+      return false;
+    }
+
+  tci_done_flags_[static_cast<size_t> (index)] = false;
+  if (ms > 0)
+    {
+      timer->start (ms);
+    }
+
+  QElapsedTimer elapsed;
+  elapsed.start ();
+  bool finished = false;
+
+  while (true)
+    {
+      QCoreApplication::processEvents (QEventLoop::AllEvents, 20);
+      if (tci_done_flags_[static_cast<size_t> (index)])
+        {
+          finished = true;
+          break;
+        }
+      if (!timer->isActive ())
+        {
+          break;
+        }
+      if (ms > 0 && elapsed.elapsed () > (ms + 100))
+        {
+          break; // fail-safe timeout
+        }
+      QThread::msleep (2);
+    }
+
+  if (timer->isActive ())
+    {
+      timer->stop ();
+    }
+  tci_done_flags_[static_cast<size_t> (index)] = false;
+  return finished;
+}
 
 void TCITransceiver::mysleep1 (int ms)
 {
-  //printf("%s TCI sleep1 start %d %d\n",QDateTime::QDateTime::currentDateTimeUtc().toString("hh:mm:ss.zzz").toStdString().c_str(),ms,tci_timer1_->isActive());
-  if (ms) tci_timer1_->start(ms);
-  tci_loop1_->exec();
-  if (tci_timer1_->isActive() && tci_Ready) tci_timer1_->stop();
+  wait_for_tci_event (tci_timer1_, 0, ms);
 }
+
 void TCITransceiver::mysleep2 (int ms)
 {
-  if (ms) tci_timer2_->start(ms);
-  tci_loop2_->exec();
-  if (tci_timer2_->isActive()) tci_timer2_->stop();
+  wait_for_tci_event (tci_timer2_, 1, ms);
 }
+
 void TCITransceiver::mysleep3 (int ms)
 {
-  if (ms) tci_timer3_->start(ms);
-  tci_loop3_->exec();
-  if (tci_timer3_->isActive()) tci_timer3_->stop();
+  wait_for_tci_event (tci_timer3_, 2, ms);
 }
+
 void TCITransceiver::mysleep4 (int ms)
 {
-  if (ms) tci_timer4_->start(ms);
-  tci_loop4_->exec();
-  if (tci_timer4_->isActive()) tci_timer4_->stop();
+  wait_for_tci_event (tci_timer4_, 3, ms);
 }
+
 void TCITransceiver::mysleep5 (int ms)
 {
-  if((tci_loop5_ && (tci_loop5_->isRunning())) || (tci_timer5_ && tci_timer5_->isActive())) return;
-  if (ms) tci_timer5_->start(ms);
-  tci_loop5_->exec();
-  if (tci_timer5_->isActive()) tci_timer5_->stop();
+  if (ms > 0 && tci_timer5_ && tci_timer5_->isActive ())
+    {
+      return;
+    }
+  wait_for_tci_event (tci_timer5_, 4, ms);
 }
+
 void TCITransceiver::mysleep6 (int ms)
 {
-  if (ms) tci_timer6_->start(ms);
-  tci_loop6_->exec();
-  if (tci_timer6_->isActive()) tci_timer6_->stop();
+  wait_for_tci_event (tci_timer6_, 5, ms);
 }
+
 void TCITransceiver::mysleep7 (int ms)
 {
-    if (ms) tci_timer7_->start(ms);
-    tci_loop7_->exec();
-    if (tci_timer7_->isActive()) tci_timer7_->stop();
+  wait_for_tci_event (tci_timer7_, 6, ms);
 }
+
 void TCITransceiver::mysleep8 (int ms)
 {
-    if (ms) tci_timer8_->start(ms);
-    tci_loop8_->exec();
-    if (tci_timer8_->isActive()) tci_timer8_->stop();
+  wait_for_tci_event (tci_timer8_, 7, ms);
 }
 // Modulator part
 
@@ -1476,6 +1506,20 @@ void TCITransceiver::do_modulator_start (QString mode, unsigned symbolsLength, d
   m_toneSpacing = toneSpacing;
   m_bFastMode=fastMode;
   m_TRperiod=TRperiod;
+  m_waveSnapshot.clear ();
+  if (!m_tuning && m_toneSpacing < 0.0)
+    {
+      qint64 requiredSamples = static_cast<qint64> (std::ceil (symbolsLength * 4.0 * framesPerSymbol)) + 2;
+      if (m_bFastMode && m_TRperiod > 0.0)
+        {
+          requiredSamples = qMax (requiredSamples, static_cast<qint64> (std::ceil (m_TRperiod * 48000.0 - 24000.0)) + 2);
+        }
+      int const kFoxWaveSampleCount = static_cast<int> (sizeof (foxcom_.wave) / sizeof (foxcom_.wave[0]));
+      int const copySamples = static_cast<int> (qBound<qint64> (1, requiredSamples, kFoxWaveSampleCount));
+      m_waveSnapshot.resize (copySamples);
+      QReadLocker wave_lock {&fox_wave_lock ()};
+      std::memcpy (m_waveSnapshot.data (), foxcom_.wave, static_cast<size_t> (copySamples) * sizeof (float));
+    }
   unsigned delay_ms=1000;
 
   if((mode=="FT8" and m_nsps==1920) or (mode=="FST4" and m_nsps==720)) delay_ms=500;  //FT8, FST4-15
@@ -1518,6 +1562,7 @@ void TCITransceiver::do_tune (bool newState)
 void TCITransceiver::do_modulator_stop (bool quick)
 {
   m_quickClose = quick;
+  m_waveSnapshot.clear ();
   if(m_state != Idle) {
     m_state = Idle;
     Q_EMIT tci_mod_active(m_state != Idle);
@@ -1671,7 +1716,12 @@ quint16 TCITransceiver::readAudioData (float * data, qint32 maxSize, qreal txAtt
         //transmit from a precomputed FT8 wave[] array:
         if(!m_tuning and (m_toneSpacing < 0.0)) {
           m_amp=32767.0;
-          sample=qRound(newVolume * m_amp*foxcom_.wave[m_ic]);
+          float wave_sample = 0.0f;
+          if (m_ic < static_cast<unsigned> (m_waveSnapshot.size ()))
+            {
+              wave_sample = m_waveSnapshot[static_cast<int> (m_ic)];
+            }
+          sample=qRound(newVolume * m_amp * wave_sample);
         }
         samples = load (postProcessSample (sample), samples);
         ++framesGenerated;

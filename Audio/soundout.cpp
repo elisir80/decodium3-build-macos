@@ -154,13 +154,24 @@ void SoundOutput::stop ()
 {
   if (m_stream)
     {
+#if defined(__APPLE__)
+      bool const sequoia_or_newer =
+          QOperatingSystemVersion::current () >= QOperatingSystemVersion (QOperatingSystemVersion::MacOS, 15);
+      // On macOS 15+, QAudioOutput::reset() is observed to destabilize output.
+      if (!sequoia_or_newer)
+        {
+          m_stream->reset ();
+        }
+#else
       m_stream->reset ();
+#endif
       m_stream->stop ();
     }
-#ifdef __APPLE__
-  // this code is here to help certain rigs not drop audio, however on Sequoia this causes audio to drop, so we don't do it!
-  if( QOperatingSystemVersion::current() < QOperatingSystemVersion(QOperatingSystemVersion::MacOS, 15) )
-    m_stream.reset ();
+#if defined(__APPLE__)
+  if (QOperatingSystemVersion::current () < QOperatingSystemVersion (QOperatingSystemVersion::MacOS, 15))
+    {
+      m_stream.reset ();
+    }
 #endif
 }
 

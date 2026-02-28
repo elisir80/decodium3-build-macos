@@ -16,25 +16,24 @@ security fixes, and release automation for:
 ## Current Baseline
 
 - Source branch: `master`
-- Latest stable release: `v1.3.3`
+- Latest stable release: `v1.3.4`
 - App bundle/executable: `ft2.app` / `ft2`
 
-## Key Notes for v1.3.3
+## Key Notes for v1.3.4
 
-- Imported upstream Raptor features: B4 strikethrough in Band Activity, Auto CQ caller FIFO queue, TX bracket waterfall overlay, and auto `cty.dat` refresh/download policy.
-- FT2 decoder tuning imported from upstream (`syncmin` adaptive profile, extended AP types, relaxed deep-search thresholds, OSD depth near `nfqso`).
-- Shared memory on macOS moved to file-backed `mmap` path (`SharedMemorySegment`), reducing System V fragility.
-- Hardened NTP/DT behavior and mode-specific tuning for FT2/FT4/FT8.
-- CAT reconnection and startup mode-selection robustness improvements.
-- Security fixes applied on TLS handling and network paths documented in changelog/release notes.
-- Startup freeze/hang mitigation: expensive startup file loading moved off the main UI thread.
-- CTY/grid/satellite/comments file parsing hardened with size/bounds guards and fallback recovery.
-- Small-display UI responsiveness improved with automatic top-controls 2-row layout and light-theme seconds/progress visibility fixes.
+- TCI binary frame parser hardening with strict header/payload bounds validation.
+- TCI pseudo-sync waits refactored to avoid nested `QEventLoop::exec()` loops in `mysleep1..8`.
+- Cross-thread TX waveform safety: `foxcom_.wave` now read through guarded snapshots.
+- TCI C++/Fortran boundary strengthened with `kin` clamping and bounded writes.
+- macOS audio path stability updates (Sequoia-safe stop path + underrun handling improvements).
+- TOTP generation now uses NTP-corrected time.
+- `QRegExp` migrated to `QRegularExpression` in critical runtime/network paths (`mainwindow`, `wsprnet`).
+- Existing fork baseline retained: mmap shared-memory backend on macOS (no `.pkg`), startup mode/frequency alignment, and small-display UI improvements.
 
 ## Quick Start (macOS)
 
 ```bash
-cmake -S . -B build -DFORK_RELEASE_VERSION=v1.3.3
+cmake -S . -B build -DFORK_RELEASE_VERSION=v1.3.4
 cmake --build build -j8
 ./build/ft2.app/Contents/MacOS/ft2
 ```
@@ -44,13 +43,13 @@ cmake --build build -j8
 Local release script:
 
 ```bash
-scripts/release-macos.sh v1.3.3 --publish --repo elisir80/decodium3-build-macos
+scripts/release-macos.sh v1.3.4 --publish --repo elisir80/decodium3-build-macos
 ```
 
 Per-platform suffix example:
 
 ```bash
-scripts/release-macos.sh v1.3.3 --compat-macos 15.0 --asset-suffix macos-sequoia-arm64
+scripts/release-macos.sh v1.3.4 --compat-macos 15.0 --asset-suffix macos-sequoia-arm64
 ```
 
 Generated assets:
@@ -84,9 +83,9 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 ## Documentation
 
 - `README.md`
-- `RELEASE_NOTES_v1.3.3.md`
+- `RELEASE_NOTES_v1.3.4.md`
 - `CHANGELOG.md`
-- `doc/GITHUB_RELEASE_BODY_v1.3.3.md`
+- `doc/GITHUB_RELEASE_BODY_v1.3.4.md`
 - `doc/SECURITY_BUG_ANALYSIS_REPORT.md`
 
 ## Licence

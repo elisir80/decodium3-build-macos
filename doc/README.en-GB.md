@@ -6,7 +6,7 @@ Repository-specific notes for the macOS fork.
 
 ## Current Release Context
 
-- Latest stable release: `v1.3.3`
+- Latest stable release: `v1.3.4`
 - Targets: macOS Tahoe ARM64, Sequoia ARM64, Sequoia Intel, Monterey Intel (experimental), Linux x86_64 AppImage
 
 ## Build and Runtime Notes
@@ -21,10 +21,14 @@ Repository-specific notes for the macOS fork.
 - This fork now uses `SharedMemorySegment` with file-backed `mmap` on Darwin.
 - The release flow no longer depends on System V shared-memory `sysctl` tuning (`kern.sysv.shmmax/shmall`).
 
-### Startup I/O hardening and UI/runtime updates (v1.3.3)
+### Security/concurrency hardening and UI/runtime updates (v1.3.4)
 
-- Heavy startup file reads were moved off the main UI thread to avoid hangs.
-- `CTY.DAT`, `grid.dat`, `sat.dat`, `comments.txt`, `wsjtx.log`, and related startup files now use size and parser guards.
+- TCI binary frame parser now validates header/payload size before access.
+- TCI pseudo-sync waits no longer rely on nested `QEventLoop::exec()` loops.
+- `foxcom_.wave` TX path now uses guarded snapshots across UI/audio threads.
+- TCI audio path clamps `kin` and bounds shared-buffer writes at the C++/Fortran boundary.
+- macOS audio stop/underrun handling improved for Sequoia-era behavior.
+- TOTP now uses NTP-corrected time source.
 
 ### Release artifacts
 
@@ -50,6 +54,6 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 ## References
 
 - `CHANGELOG.md`
-- `RELEASE_NOTES_v1.3.3.md`
-- `doc/GITHUB_RELEASE_BODY_v1.3.3.md`
+- `RELEASE_NOTES_v1.3.4.md`
+- `doc/GITHUB_RELEASE_BODY_v1.3.4.md`
 - `doc/SECURITY_BUG_ANALYSIS_REPORT.md`

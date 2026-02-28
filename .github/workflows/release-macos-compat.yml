@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. v1.3.3)"
+        description: "Release version (e.g. v1.3.4)"
         required: true
-        default: "v1.3.3"
+        default: "v1.3.4"
       publish_release:
         description: "Publish GitHub release"
         required: true
@@ -174,10 +174,13 @@ jobs:
             echo
             echo "## English (UK)"
             echo "This release includes:"
-            echo "- Upstream Raptor feature import: B4 strikethrough, Auto CQ caller FIFO queue, TX bracket waterfall, and auto CTY.DAT refresh."
-            echo "- FT2 decoder tuning updates: adaptive syncmin, extended AP types, relaxed deep-search thresholds."
-            echo "- Startup mode/frequency auto-alignment fixes and small-display responsive UI refinements."
-            echo "- Light-theme seconds/progress visibility fix."
+            echo "- TCI binary frame parser hardening with strict header/payload bounds checks."
+            echo "- TCI pseudo-sync wait refactor: nested QEventLoop::exec() loops removed in mysleep1..8."
+            echo "- Protected foxcom_.wave snapshots across UI/audio threads to reduce TX race risk."
+            echo "- TCI C++/Fortran boundary hardening (kin clamps + bounded writes)."
+            echo "- macOS audio resilience updates (Sequoia-safe stop path + improved underrun handling)."
+            echo "- TOTP now aligned to NTP-corrected time source."
+            echo "- QRegExp migration to QRegularExpression in critical runtime/network paths."
             echo "- macOS shared-memory mmap flow retained (no .pkg required)."
             echo "- Apple Silicon build for macOS Tahoe."
             echo "- Apple Silicon build for macOS Sequoia."
@@ -197,10 +200,13 @@ jobs:
             echo
             echo "## Italiano"
             echo "Questa release include:"
-            echo "- Import feature upstream Raptor: B4 barrato, coda FIFO Auto CQ, bracket TX waterfall e refresh automatico CTY.DAT."
-            echo "- Aggiornamenti tuning decoder FT2: syncmin adattivo, AP esteso, soglie deep-search rilassate."
-            echo "- Correzioni auto-allineamento modalita'/frequenza all'avvio e rifiniture UI responsive per display piccoli."
-            echo "- Correzione visibilita' barra secondi/progressi nel tema chiaro."
+            echo "- Hardening parser frame binari TCI con controlli rigorosi header/payload."
+            echo "- Refactor attese pseudo-sync TCI: rimossi loop annidati QEventLoop::exec() in mysleep1..8."
+            echo "- Snapshot protetti di foxcom_.wave tra thread UI/audio per ridurre rischio race TX."
+            echo "- Hardening boundary TCI C++/Fortran (clamp kin + scritture limitate)."
+            echo "- Aggiornamenti resilienza audio macOS (stop path Sequoia-safe + gestione underrun migliorata)."
+            echo "- TOTP ora allineato al tempo corretto NTP."
+            echo "- Migrazione QRegExp a QRegularExpression nei percorsi runtime/network critici."
             echo "- Flusso shared-memory macOS su mmap confermato (nessun .pkg richiesto)."
             echo "- Build Apple Silicon per macOS Tahoe."
             echo "- Build Apple Silicon per macOS Sequoia."

@@ -1,5 +1,43 @@
 # Changelog / Registro Modifiche
 
+## [1.3.4] - 2026-02-28
+
+### English
+
+Release focused on closing high-impact TCI/security/concurrency issues and completing release alignment for macOS + Linux targets.
+
+#### Changed
+
+- TCI pseudo-sync waits (`mysleep1..8`) refactored to remove nested `QEventLoop::exec()` behavior.
+- TCI TX waveform path now uses guarded snapshot reads of `foxcom_.wave` to reduce cross-thread race risk.
+- TOTP generation switched to NTP-corrected time source.
+- Critical runtime/network regex paths migrated from `QRegExp` to `QRegularExpression`.
+- Release/documentation baseline updated to `v1.3.4` (EN/IT), including Linux requirements and quarantine guidance.
+
+#### Fixed
+
+- Critical TCI binary frame over-read risk by validating frame header/payload bounds before access/copy.
+- TCI C++/Fortran shared-buffer boundary in audio ingest hardened with `kin` clamp and bounded writes.
+- macOS audio stop/underrun behavior improved for Sequoia-era runtime stability.
+
+### Italiano
+
+Release focalizzata sulla chiusura definitiva di problemi TCI/sicurezza/concorrenza ad alto impatto e sull'allineamento release per target macOS + Linux.
+
+#### Modificato
+
+- Refactor attese pseudo-sync TCI (`mysleep1..8`) con rimozione del comportamento annidato `QEventLoop::exec()`.
+- Percorso waveform TX TCI aggiornato con snapshot protetti di `foxcom_.wave` per ridurre rischio race tra thread.
+- Generazione TOTP allineata a sorgente tempo corretta NTP.
+- Migrazione dei percorsi regex runtime/network critici da `QRegExp` a `QRegularExpression`.
+- Baseline release/documentazione aggiornata a `v1.3.4` (EN/IT), inclusi requisiti Linux e istruzioni quarantena.
+
+#### Corretto
+
+- Rischio critico over-read frame binari TCI risolto con validazione completa header/payload prima di accesso/copia.
+- Boundary buffer condiviso C++/Fortran in ingest audio TCI irrobustito con clamp `kin` e scritture limitate.
+- Migliorato comportamento audio macOS (stop/underrun) per maggiore stabilita' runtime su Sequoia.
+
 ## [1.3.3] - 2026-02-28
 
 ### English

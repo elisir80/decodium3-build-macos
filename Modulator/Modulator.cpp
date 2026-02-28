@@ -1,13 +1,17 @@
 #include "Modulator.hpp"
 #include <limits>
 #include <cstdlib>
+#include <cstring>
+#include <cmath>
 #include <qmath.h>
 #include <QDateTime>
+#include <QReadLocker>
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
 #include <QRandomGenerator>
 #endif
 #include <QDebug>
 #include "widgets/itoneAndicw.h"  //w3sz tci
+#include "widgets/FoxWaveGuard.hpp"
 //#include "widgets/mainwindow.h" // TODO: G4WJS - break this dependency //w3sz tci
 #include "Audio/soundout.h"
 #include "commons.h"
@@ -102,6 +106,20 @@ void Modulator::start (QString mode, unsigned symbolsLength, double framesPerSym
   m_toneSpacing = toneSpacing;
   m_bFastMode=fastMode;
   m_TRperiod=TRperiod;
+  m_waveSnapshot.clear ();
+  if (!m_tuning && m_toneSpacing < 0.0)
+    {
+      qint64 requiredSamples = static_cast<qint64> (std::ceil (symbolsLength * 4.0 * framesPerSymbol)) + 2;
+      if (m_bFastMode && m_TRperiod > 0.0)
+        {
+          requiredSamples = qMax (requiredSamples, static_cast<qint64> (std::ceil (m_TRperiod * 48000.0 - 24000.0)) + 2);
+        }
+      int const kFoxWaveSampleCount = static_cast<int> (sizeof (foxcom_.wave) / sizeof (foxcom_.wave[0]));
+      int const copySamples = static_cast<int> (qBound<qint64> (1, requiredSamples, kFoxWaveSampleCount));
+      m_waveSnapshot.resize (copySamples);
+      QReadLocker wave_lock {&fox_wave_lock ()};
+      std::memcpy (m_waveSnapshot.data (), foxcom_.wave, static_cast<size_t> (copySamples) * sizeof (float));
+    }
   m_icmin=4294967295;
   m_icmax=0;
   unsigned delay_ms=1000;
@@ -169,6 +187,7 @@ void Modulator::stop (bool quick)
 
 void Modulator::close ()
 {
+  m_waveSnapshot.clear ();
   if (m_stream)
     {
       if (m_quickClose)
@@ -359,7 +378,12 @@ qint64 Modulator::readData (char * data, qint64 maxSize)
 //Here's where we transmit from a precomputed wave[] array:
           if(!m_tuning and (m_toneSpacing < 0) and (m_itone[0]<100)) {
             m_amp=32767.0;
-            sample=qRound(m_amp*foxcom_.wave[m_ic]);
+            float wave_sample = 0.0f;
+            if (m_ic < static_cast<unsigned> (m_waveSnapshot.size ()))
+              {
+                wave_sample = m_waveSnapshot[static_cast<int> (m_ic)];
+              }
+            sample=qRound(m_amp * wave_sample);
             m_icmin=qMin(m_ic,m_icmin);
             m_icmax=qMax(m_ic,m_icmax);
           }

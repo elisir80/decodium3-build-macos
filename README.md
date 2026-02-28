@@ -1,13 +1,13 @@
-# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.3.3
+# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.3.4
 
 English and Italian documentation for this fork is included in this repository.
 
 ## English
 
-Fork release `v1.3.3` is based on upstream `iu8lmc/Decodium-3.0-Codename-Raptor` and adds macOS-focused operational hardening.
+Fork release `v1.3.4` is based on upstream `iu8lmc/Decodium-3.0-Codename-Raptor` and adds macOS-focused operational hardening.
 
 - Upstream base: Decodium v3.0 SE "Raptor"
-- Fork release: `v1.3.3`
+- Fork release: `v1.3.4`
 - App bundle/executable on macOS: `ft2.app` / `ft2`
 - License: GPLv3
 
@@ -28,10 +28,17 @@ Fork release `v1.3.3` is based on upstream `iu8lmc/Decodium-3.0-Codename-Raptor`
   - TX slot red bracket overlay on waterfall (FT2/FT8/FT4).
   - Auto `cty.dat` refresh at startup when missing or older than 30 days.
   - FT2 decoder updates: adaptive `syncmin` (`0.90/0.85/0.80`), extended AP types for Tx3/Tx4, relaxed deep-search thresholds, OSD depth boost near `nfqso`.
-- Fork `v1.3.3` UI/runtime refinements:
+- Fork `v1.3.4` UI/runtime refinements:
   - Startup mode auto-selection now scans full frequency list (fixes FT8/FT2 mismatch on launch).
   - Responsive top controls with automatic 2-row layout on small displays.
   - Light-theme progress/seconds bar rendering fixed for clear visibility.
+- Fork `v1.3.4` security/concurrency hardening:
+  - TCI binary frame parser now validates header/payload lengths before access (malformed frame drop).
+  - TCI pseudo-sync nested event loops removed from `mysleep1..8` (no `QEventLoop::exec()` path).
+  - `foxcom_.wave` transmission path hardened with guarded snapshot reads across UI/audio threads.
+  - TCI C++/Fortran audio boundary hardened with `kin` clamps and bounded writes.
+  - TOTP generation aligned to NTP-corrected time source.
+  - `QRegExp` migration completed in critical runtime/network paths (`mainwindow`, `wsprnet`).
 
 ### Build (macOS)
 
@@ -61,12 +68,12 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ### Documentation
 
-- Release notes (EN/IT): [RELEASE_NOTES_v1.3.3.md](RELEASE_NOTES_v1.3.3.md)
+- Release notes (EN/IT): [RELEASE_NOTES_v1.3.4.md](RELEASE_NOTES_v1.3.4.md)
 - Changelog (EN/IT): [CHANGELOG.md](CHANGELOG.md)
 - Security and bug analysis report: [doc/SECURITY_BUG_ANALYSIS_REPORT.md](doc/SECURITY_BUG_ANALYSIS_REPORT.md)
 - macOS porting details (EN/IT): [doc/MACOS_PORTING_v1.2.0.md](doc/MACOS_PORTING_v1.2.0.md)
 - DT/NTP architecture (EN/IT): [doc/DT_NTP_ROBUST_SYNC_v1.2.0.md](doc/DT_NTP_ROBUST_SYNC_v1.2.0.md)
-- GitHub release body template (EN/IT): [doc/GITHUB_RELEASE_BODY_v1.3.3.md](doc/GITHUB_RELEASE_BODY_v1.3.3.md)
+- GitHub release body template (EN/IT): [doc/GITHUB_RELEASE_BODY_v1.3.4.md](doc/GITHUB_RELEASE_BODY_v1.3.4.md)
 
 ### CI release targets
 
@@ -90,10 +97,10 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ## Italiano
 
-La release fork `v1.3.3` e' basata su `iu8lmc/Decodium-3.0-Codename-Raptor` e aggiunge hardening operativo specifico per macOS.
+La release fork `v1.3.4` e' basata su `iu8lmc/Decodium-3.0-Codename-Raptor` e aggiunge hardening operativo specifico per macOS.
 
 - Base upstream: Decodium v3.0 SE "Raptor"
-- Versione fork: `v1.3.3`
+- Versione fork: `v1.3.4`
 - Bundle/eseguibile su macOS: `ft2.app` / `ft2`
 - Licenza: GPLv3
 
@@ -114,10 +121,17 @@ La release fork `v1.3.3` e' basata su `iu8lmc/Decodium-3.0-Codename-Raptor` e ag
   - Overlay waterfall con parentesi rosse sullo slot TX (FT2/FT8/FT4).
   - Aggiornamento automatico `cty.dat` all'avvio se mancante o piu vecchio di 30 giorni.
   - Aggiornamenti decoder FT2: `syncmin` adattivo (`0.90/0.85/0.80`), AP esteso su Tx3/Tx4, soglie deep-search rilassate, OSD potenziato vicino a `nfqso`.
-- Rifiniture fork `v1.3.3` su UI/runtime:
+- Rifiniture fork `v1.3.4` su UI/runtime:
   - Auto-selezione modalita' all'avvio basata su lista frequenze completa (fix mismatch FT8/FT2).
   - Controlli top responsivi con passaggio automatico a 2 righe su schermi piccoli.
   - Rendering barra progressi/secondi corretto nel tema chiaro.
+- Hardening sicurezza/concorrenza fork `v1.3.4`:
+  - Parser frame binari TCI con validazione completa header/payload prima dell'accesso (drop frame malformati).
+  - Rimossi loop annidati pseudo-sync in `mysleep1..8` (eliminato il percorso `QEventLoop::exec()`).
+  - Percorso TX `foxcom_.wave` irrobustito con snapshot protetti tra thread UI/audio.
+  - Boundary audio TCI C++/Fortran irrobustito con clamp `kin` e scritture limitate.
+  - Generazione TOTP allineata a sorgente tempo corretta NTP.
+  - Migrazione `QRegExp` completata nei percorsi runtime/network critici (`mainwindow`, `wsprnet`).
 
 ### Compilazione (macOS)
 
@@ -147,12 +161,12 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ### Documentazione
 
-- Note di rilascio (EN/IT): [RELEASE_NOTES_v1.3.3.md](RELEASE_NOTES_v1.3.3.md)
+- Note di rilascio (EN/IT): [RELEASE_NOTES_v1.3.4.md](RELEASE_NOTES_v1.3.4.md)
 - Changelog (EN/IT): [CHANGELOG.md](CHANGELOG.md)
 - Report analisi sicurezza e bug: [doc/SECURITY_BUG_ANALYSIS_REPORT.md](doc/SECURITY_BUG_ANALYSIS_REPORT.md)
 - Porting macOS (EN/IT): [doc/MACOS_PORTING_v1.2.0.md](doc/MACOS_PORTING_v1.2.0.md)
 - Architettura DT/NTP (EN/IT): [doc/DT_NTP_ROBUST_SYNC_v1.2.0.md](doc/DT_NTP_ROBUST_SYNC_v1.2.0.md)
-- Template release GitHub (EN/IT): [doc/GITHUB_RELEASE_BODY_v1.3.3.md](doc/GITHUB_RELEASE_BODY_v1.3.3.md)
+- Template release GitHub (EN/IT): [doc/GITHUB_RELEASE_BODY_v1.3.4.md](doc/GITHUB_RELEASE_BODY_v1.3.4.md)
 
 ### Target CI release
 

@@ -101,6 +101,7 @@ private:
   double m_toneFrequency0;
   std::array<int, MAX_NUM_SYMBOLS> m_itone {};
   std::array<int, NUM_CW_SYMBOLS> m_icw {};
+  QVector<float> m_waveSnapshot;
 };
 
 #endif

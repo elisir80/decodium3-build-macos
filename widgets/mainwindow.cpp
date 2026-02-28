@@ -31,8 +31,7 @@
 #include <QProgressBar>
 #include <QLineEdit>
 #include <QHBoxLayout>
-#include <QRegExpValidator>
-#include <QRegExp>
+#include <QRegularExpressionValidator>
 #include <QRegularExpression>
 #include <QDesktopServices>
 #include <QNetworkAccessManager> // TCI
@@ -62,12 +61,14 @@
 #include <QSignalBlocker>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QWriteLocker>
 #include <QHash>
 #if QT_VERSION >= QT_VERSION_CHECK (5, 15, 0)
 #include <QRandomGenerator>
 #endif
 
 #include "itoneAndicw.h" // TCI
+#include "FoxWaveGuard.hpp"
 #include "PrecisionTime.hpp"
 #include "SharedMemorySegment.hpp"
 
@@ -323,7 +324,10 @@ int* ipc_qmap;
 namespace
 {
   Radio::Frequency constexpr default_frequency {14074000};
-  QRegExp message_alphabet {"[- @A-Za-z0-9+./?#<>;$]*"};
+  QRegularExpression message_alphabet {R"([- @A-Za-z0-9+./?#<>;$]*)"};
+  QRegularExpression call_alnum_regexp {"[0-9A-Z]"};
+  QRegularExpression ws_tail_regexp {"\\s+$"};
+  QRegularExpression ws_split_regexp {"\\s+"};
   // grid exact match excluding RR73
   QRegularExpression grid_regexp {"\\A(?![Rr]{2}73)[A-Ra-r]{2}[0-9]{2}([A-Xa-x]{2}){0,1}\\z"};
   QRegularExpression non_r_db_regexp {"\\A[-+]{1}[0-9]{1,2}\\z"};
@@ -1576,12 +1580,12 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
                                                             , QMessageBox::ActionRole);
 
   // set up message text validators
-  ui->tx1->setValidator (new QRegExpValidator {message_alphabet, this});
-  ui->tx2->setValidator (new QRegExpValidator {message_alphabet, this});
-  ui->tx3->setValidator (new QRegExpValidator {message_alphabet, this});
-  ui->tx4->setValidator (new QRegExpValidator {message_alphabet, this});
-  ui->tx5->setValidator (new QRegExpValidator {message_alphabet, this});
-  ui->tx6->setValidator (new QRegExpValidator {message_alphabet, this});
+  ui->tx1->setValidator (new QRegularExpressionValidator {message_alphabet, this});
+  ui->tx2->setValidator (new QRegularExpressionValidator {message_alphabet, this});
+  ui->tx3->setValidator (new QRegularExpressionValidator {message_alphabet, this});
+  ui->tx4->setValidator (new QRegularExpressionValidator {message_alphabet, this});
+  ui->tx5->setValidator (new QRegularExpressionValidator {message_alphabet, this});
+  ui->tx6->setValidator (new QRegularExpressionValidator {message_alphabet, this});
 
   // Free text macros model to widget hook up.
   ui->tx5->setModel (m_config.macros ());
@@ -2501,6 +2505,7 @@ void MainWindow::readSettings()
   m_dtCorrection_ms = 0.0;
   m_dtFeedbackEnabled = true;
   m_ntpOffset_ms = m_settings->value("NTPOffset_ms", 0.0).toDouble();
+  setGlobalNtpOffsetMs (m_ntpOffset_ms);
   m_ntpEnabled = m_settings->value("NTPEnabled", false).toBool();
   ntp_checkbox.setChecked(m_ntpEnabled);
   m_ntpCustomServer = m_settings->value("NTPCustomServer", "").toString();
@@ -5417,6 +5422,7 @@ void MainWindow::createStatusBar()                           //createStatusBar
       ntp_status_label.setStyleSheet("QLabel{color:#888;background:#333}");
       ntp_status_label.setToolTip("NTP disabled");
       m_ntpOffset_ms = 0.0;
+      setGlobalNtpOffsetMs (0.0);
     }
     if (m_timeSyncPanel) m_timeSyncPanel->syncNtpEnabled(checked);
   });
@@ -5955,6 +5961,7 @@ void MainWindow::on_actionTime_Sync_triggered()
       }
       if (!en) {
         m_ntpOffset_ms = 0;
+        setGlobalNtpOffsetMs (0.0);
         ntp_status_label.setText("NTP: OFF");
         ntp_status_label.setStyleSheet("QLabel{color:#888;background:#333}");
         ntp_status_label.setToolTip("NTP disabled");
@@ -10523,7 +10530,7 @@ void MainWindow::doubleClickOnCall(Qt::KeyboardModifiers modifiers)
     }
 
     if(call.length()<3) return;
-    if(!call.contains(QRegExp("[0-9]|[A-Z]"))) return;
+    if (!call.contains (call_alnum_regexp)) return;
 
     //avt 8/22/23
     if (((QDateTime::currentMSecsSinceEpoch() / 1000 - m_secBandChanged) > 4*int(m_TRperiod)/4)) {  //band wasn't recently changed
@@ -11789,11 +11796,11 @@ void MainWindow::on_tx6_editingFinished()                       //tx6 edited
   QString t=ui->tx6->text().toUpper();
   if(t.indexOf(" ")>0) {
     QString t1=t.split(" ").at(1);
-    QRegExp AZ4("^[A-Z]{1,4}$");
-    QRegExp NN3("^[0-9]{1,3}$");
+    static QRegularExpression const az4_re {"^[A-Z]{1,4}$"};
+    static QRegularExpression const nn3_re {"^[0-9]{1,3}$"};
     m_CQtype="CQ";
-    if(t1.size()<=4 and t1.contains(AZ4)) m_CQtype="CQ " + t1;
-    if(t1.size()<=3 and t1.contains(NN3)) m_CQtype="CQ " + t1;
+    if(t1.size()<=4 and t1.contains(az4_re)) m_CQtype="CQ " + t1;
+    if(t1.size()<=3 and t1.contains(nn3_re)) m_CQtype="CQ " + t1;
   }
   msgtype(t, ui->tx6);
 }
@@ -14556,6 +14563,8 @@ void MainWindow::rigFailure (QString const& reason)
 
 void MainWindow::transmit (double snr)
 {
+  // Serialize access to foxcom_.wave while waveform generators update it.
+  QWriteLocker fox_wave_guard {&fox_wave_lock ()};
   double toneSpacing=0.0;
   QVector<int> tone_values (MAX_NUM_SYMBOLS);
   QVector<int> cw_values (NUM_CW_SYMBOLS);
@@ -15750,7 +15759,7 @@ void MainWindow::postDecode (bool is_new, DecodedText decoded_text)      //avt 1
   decoded_text.deCallAndGrid(call, grid);
 
   if(call.length()<3) return;
-  if(!call.contains(QRegExp("[0-9]|[A-Z]"))) return;
+  if (!call.contains (call_alnum_regexp)) return;
 
   //avt 10/26/21
   if (((QDateTime::currentMSecsSinceEpoch() / 1000 - m_secBandChanged) > 4*int(m_TRperiod)/4)) {  //avt 7/7/22 band wasn't recently changed
@@ -15884,8 +15893,8 @@ void MainWindow::p1ReadFromStdout()                        //p1readFromStdout
     } else {
       int n=t.length();
       t=t.mid(0,n-2) + "                                                  ";
-      t.remove(QRegExp("\\s+$"));
-      QStringList rxFields = t.split(QRegExp("\\s+"));
+      t.remove(ws_tail_regexp);
+      QStringList rxFields = t.split(ws_split_regexp, Qt::SkipEmptyParts);
       QString rxLine;
       QString grid="";
       if ( rxFields.count() == 8 ) {
@@ -20049,7 +20058,7 @@ void MainWindow::setCallPriority(QString call, int isEven)   //avt 2/20/25
     m_dblClk = false;
     m_checkCmd = "";
     if(call.length()<3) return;
-    if(!call.contains(QRegExp("[0-9]|[A-Z]"))) return;
+    if (!call.contains (call_alnum_regexp)) return;
 
     //debugToFile(QString {"setCallPrio: call:%1 m_mode:%2 grid:%3 m_currentBand:%4"}.arg(call).arg(m_mode).arg(grid).arg(m_currentBand));
     auto const& looked_up = m_logBook.countries ()->lookup (call);
@@ -20751,6 +20760,7 @@ void MainWindow::setIncrLogCount()
 void MainWindow::onNtpOffsetUpdated(double offsetMs)
 {
   m_ntpOffset_ms = offsetMs;
+  setGlobalNtpOffsetMs (offsetMs);
   int rounded = qRound(offsetMs);
   int srvCount = m_ntpClient ? m_ntpClient->lastServerCount() : 0;
   QString text = QString("NTP:%1%2ms(%3srv)")

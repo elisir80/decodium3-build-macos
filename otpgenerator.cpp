@@ -6,6 +6,8 @@
 #include <QDateTime>
 #include <QtMath>
 
+#include "PrecisionTime.hpp"
+
 // FROM https://github.com/RikudouSage/QtOneTimePassword/
 /*
 MIT License
@@ -61,7 +63,7 @@ QString OTPGenerator::generateHOTP(const QString &secret, quint64 counter, int l
 
 QByteArray OTPGenerator::generateTOTP(const QByteArray &rawSecret, int length)
 {
-  const qint64 counter = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch() / 30000;
+  const qint64 counter = ntpCorrectedCurrentMSecsSinceEpoch() / 30000;
   return generateHOTP(rawSecret, counter, length);
 }
 
