@@ -55,6 +55,7 @@ jobs:
             pkg-config \
             qtbase5-dev \
             qtmultimedia5-dev \
+            libqt5multimedia5-plugins \
             libqt5serialport5-dev \
             libqt5websockets5-dev \
             libqt5svg5-dev \
