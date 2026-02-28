@@ -6,8 +6,8 @@ Note specifiche del fork macOS nel repository.
 
 ## Contesto release attuale
 
-- Ultima release stabile: `v1.3.0`
-- Target: macOS Tahoe ARM64, Sequoia ARM64, Sequoia Intel
+- Ultima release stabile: `v1.3.1`
+- Target: macOS Tahoe ARM64, Sequoia ARM64, Sequoia Intel, Linux x86_64 AppImage
 
 ## Note build e runtime
 
@@ -26,6 +26,15 @@ Note specifiche del fork macOS nel repository.
 - `decodium3-ft2-<version>-<asset-suffix>.dmg`
 - `decodium3-ft2-<version>-<asset-suffix>.zip`
 - `decodium3-ft2-<version>-<asset-suffix>-sha256.txt`
+- `decodium3-ft2-<version>-linux-x86_64.AppImage`
+- `decodium3-ft2-<version>-linux-x86_64.AppImage.sha256.txt`
+
+### Requisiti minimi Linux
+
+- Architettura: `x86_64`
+- CPU: dual-core 2.0 GHz o superiore
+- RAM: minimo 4 GB
+- Runtime: `glibc >= 2.35`, `libfuse2`/FUSE2, ALSA/PulseAudio/PipeWire
 
 ### Comando quarantena Gatekeeper
 
@@ -36,6 +45,6 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 ## Riferimenti
 
 - `CHANGELOG.md`
-- `RELEASE_NOTES_v1.3.0.md`
-- `doc/GITHUB_RELEASE_BODY_v1.3.0.md`
+- `RELEASE_NOTES_v1.3.1.md`
+- `doc/GITHUB_RELEASE_BODY_v1.3.1.md`
 - `doc/SECURITY_BUG_ANALYSIS_REPORT.md`

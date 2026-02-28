@@ -10,14 +10,15 @@ security fixes, and release automation for:
 - Apple Silicon Tahoe (26.x)
 - Apple Silicon Sequoia (15.x)
 - Apple Intel Sequoia (15.x)
+- Linux x86_64 AppImage
 
 ## Current Baseline
 
 - Source branch: `master`
-- Latest stable release: `v1.3.0`
+- Latest stable release: `v1.3.1`
 - App bundle/executable: `ft2.app` / `ft2`
 
-## Key Notes for v1.3.0
+## Key Notes for v1.3.1
 
 - Shared memory on macOS moved to file-backed `mmap` path (`SharedMemorySegment`), reducing System V fragility.
 - Hardened NTP/DT behavior and mode-specific tuning for FT2/FT4/FT8.
@@ -27,7 +28,7 @@ security fixes, and release automation for:
 ## Quick Start (macOS)
 
 ```bash
-cmake -S . -B build -DFORK_RELEASE_VERSION=v1.3.0
+cmake -S . -B build -DFORK_RELEASE_VERSION=v1.3.1
 cmake --build build -j8
 ./build/ft2.app/Contents/MacOS/ft2
 ```
@@ -37,13 +38,13 @@ cmake --build build -j8
 Local release script:
 
 ```bash
-scripts/release-macos.sh v1.3.0 --publish --repo elisir80/decodium3-build-macos
+scripts/release-macos.sh v1.3.1 --publish --repo elisir80/decodium3-build-macos
 ```
 
 Per-platform suffix example:
 
 ```bash
-scripts/release-macos.sh v1.3.0 --compat-macos 15.0 --asset-suffix macos-sequoia-arm64
+scripts/release-macos.sh v1.3.1 --compat-macos 15.0 --asset-suffix macos-sequoia-arm64
 ```
 
 Generated assets:
@@ -53,6 +54,18 @@ Generated assets:
 - `decodium3-ft2-<version>-<asset-suffix>-sha256.txt`
 
 Note: `.pkg` is no longer required for shared-memory sysctl setup in this fork release flow.
+
+## Linux Minimum Requirements
+
+- Architecture: `x86_64` (64-bit)
+- CPU: dual-core 2.0 GHz or better
+- RAM: 4 GB minimum (8 GB recommended)
+- Storage: 500 MB free (AppImage + logs + settings)
+- Runtime:
+  - Linux with `glibc >= 2.35` (Ubuntu 22.04 class or newer)
+  - `libfuse2` / FUSE2 support for AppImage execution
+  - ALSA, PulseAudio, or PipeWire audio stack
+- Station integration: CAT/audio hardware according to radio setup
 
 ## macOS Quarantine Command
 
@@ -65,9 +78,9 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 ## Documentation
 
 - `README.md`
-- `RELEASE_NOTES_v1.3.0.md`
+- `RELEASE_NOTES_v1.3.1.md`
 - `CHANGELOG.md`
-- `doc/GITHUB_RELEASE_BODY_v1.3.0.md`
+- `doc/GITHUB_RELEASE_BODY_v1.3.1.md`
 - `doc/SECURITY_BUG_ANALYSIS_REPORT.md`
 
 ## Licence

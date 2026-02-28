@@ -1,5 +1,41 @@
 # Changelog / Registro Modifiche
 
+## [1.3.1] - 2026-02-28
+
+### English
+
+Patch release focused on version alignment, Linux CI/release completion, and cross-platform packaging consistency.
+
+#### Changed
+
+- Program title release identifier now sourced from `FORK_RELEASE_VERSION` instead of hardcoded legacy text.
+- Release documentation updated to `v1.3.1` in English and Italian.
+- Added Linux x86_64 AppImage release flow alongside existing macOS matrices.
+
+#### Fixed
+
+- Linux build compatibility with Hamlib variants lacking `rig_get_conf2` (fallback to `rig_get_conf`).
+- Linux CI link issues by adding missing `libudev` development/runtime dependencies.
+- Linux CI verify/package steps now target `ft2` executable (not legacy `wsjtx` path).
+- Tahoe macOS release compatibility target aligned to `26.0` for bundled dependency checks.
+
+### Italiano
+
+Patch release focalizzata su allineamento versione, completamento CI/release Linux e coerenza packaging multipiattaforma.
+
+#### Modificato
+
+- Identificativo release nel titolo programma ora letto da `FORK_RELEASE_VERSION` invece che hardcoded legacy.
+- Documentazione release aggiornata a `v1.3.1` in inglese e italiano.
+- Aggiunto flusso release Linux x86_64 AppImage insieme alle matrici macOS esistenti.
+
+#### Corretto
+
+- Compatibilita' build Linux con varianti Hamlib senza `rig_get_conf2` (fallback a `rig_get_conf`).
+- Problemi di link Linux CI risolti aggiungendo dipendenze `libudev` development/runtime.
+- Step verify/package Linux CI ora puntano all'eseguibile `ft2` (non al path legacy `wsjtx`).
+- Target compatibilita' release macOS Tahoe allineato a `26.0` per i controlli dipendenze bundle.
+
 ## [1.3.0] - 2026-02-28
 
 ### English

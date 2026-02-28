@@ -1,13 +1,13 @@
-# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.3.0
+# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.3.1
 
 English and Italian documentation for this fork is included in this repository.
 
 ## English
 
-Fork release `v1.3.0` is based on upstream `iu8lmc/Decodium-3.0-Codename-Raptor` and adds macOS-focused operational hardening.
+Fork release `v1.3.1` is based on upstream `iu8lmc/Decodium-3.0-Codename-Raptor` and adds macOS-focused operational hardening.
 
 - Upstream base: Decodium v3.0 SE "Raptor"
-- Fork release: `v1.3.0`
+- Fork release: `v1.3.1`
 - App bundle/executable on macOS: `ft2.app` / `ft2`
 - License: GPLv3
 
@@ -49,25 +49,38 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ### Documentation
 
-- Release notes (EN/IT): [RELEASE_NOTES_v1.3.0.md](RELEASE_NOTES_v1.3.0.md)
+- Release notes (EN/IT): [RELEASE_NOTES_v1.3.1.md](RELEASE_NOTES_v1.3.1.md)
 - Changelog (EN/IT): [CHANGELOG.md](CHANGELOG.md)
 - Security and bug analysis report: [doc/SECURITY_BUG_ANALYSIS_REPORT.md](doc/SECURITY_BUG_ANALYSIS_REPORT.md)
 - macOS porting details (EN/IT): [doc/MACOS_PORTING_v1.2.0.md](doc/MACOS_PORTING_v1.2.0.md)
 - DT/NTP architecture (EN/IT): [doc/DT_NTP_ROBUST_SYNC_v1.2.0.md](doc/DT_NTP_ROBUST_SYNC_v1.2.0.md)
-- GitHub release body template (EN/IT): [doc/GITHUB_RELEASE_BODY_v1.3.0.md](doc/GITHUB_RELEASE_BODY_v1.3.0.md)
+- GitHub release body template (EN/IT): [doc/GITHUB_RELEASE_BODY_v1.3.1.md](doc/GITHUB_RELEASE_BODY_v1.3.1.md)
 
 ### CI release targets
 
 - Apple Silicon Tahoe
 - Apple Silicon Sequoia
 - Apple Intel Sequoia
+- Linux x86_64 AppImage
+
+### Linux minimum requirements
+
+- Architecture: `x86_64` (64-bit)
+- CPU: dual-core 2.0 GHz or better
+- RAM: 4 GB minimum (8 GB recommended)
+- Storage: at least 500 MB free for AppImage + logs/settings
+- OS/runtime:
+  - Linux with `glibc >= 2.35` (Ubuntu 22.04 class or newer)
+  - `FUSE 2` support (`libfuse2`) or an AppImage-compatible launcher/runtime
+  - ALSA/PulseAudio/PipeWire audio stack available
+- Radio integration: CAT/audio interface hardware as required by station setup
 
 ## Italiano
 
-La release fork `v1.3.0` e' basata su `iu8lmc/Decodium-3.0-Codename-Raptor` e aggiunge hardening operativo specifico per macOS.
+La release fork `v1.3.1` e' basata su `iu8lmc/Decodium-3.0-Codename-Raptor` e aggiunge hardening operativo specifico per macOS.
 
 - Base upstream: Decodium v3.0 SE "Raptor"
-- Versione fork: `v1.3.0`
+- Versione fork: `v1.3.1`
 - Bundle/eseguibile su macOS: `ft2.app` / `ft2`
 - Licenza: GPLv3
 
@@ -109,18 +122,31 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ### Documentazione
 
-- Note di rilascio (EN/IT): [RELEASE_NOTES_v1.3.0.md](RELEASE_NOTES_v1.3.0.md)
+- Note di rilascio (EN/IT): [RELEASE_NOTES_v1.3.1.md](RELEASE_NOTES_v1.3.1.md)
 - Changelog (EN/IT): [CHANGELOG.md](CHANGELOG.md)
 - Report analisi sicurezza e bug: [doc/SECURITY_BUG_ANALYSIS_REPORT.md](doc/SECURITY_BUG_ANALYSIS_REPORT.md)
 - Porting macOS (EN/IT): [doc/MACOS_PORTING_v1.2.0.md](doc/MACOS_PORTING_v1.2.0.md)
 - Architettura DT/NTP (EN/IT): [doc/DT_NTP_ROBUST_SYNC_v1.2.0.md](doc/DT_NTP_ROBUST_SYNC_v1.2.0.md)
-- Template release GitHub (EN/IT): [doc/GITHUB_RELEASE_BODY_v1.3.0.md](doc/GITHUB_RELEASE_BODY_v1.3.0.md)
+- Template release GitHub (EN/IT): [doc/GITHUB_RELEASE_BODY_v1.3.1.md](doc/GITHUB_RELEASE_BODY_v1.3.1.md)
 
 ### Target CI release
 
 - Apple Silicon Tahoe
 - Apple Silicon Sequoia
 - Apple Intel Sequoia
+- Linux x86_64 AppImage
+
+### Requisiti minimi Linux
+
+- Architettura: `x86_64` (64 bit)
+- CPU: dual-core 2.0 GHz o superiore
+- RAM: minimo 4 GB (consigliati 8 GB)
+- Spazio disco: almeno 500 MB liberi per AppImage + log/impostazioni
+- OS/runtime:
+  - Linux con `glibc >= 2.35` (classe Ubuntu 22.04 o successiva)
+  - supporto `FUSE 2` (`libfuse2`) o launcher/runtime compatibile AppImage
+  - stack audio ALSA/PulseAudio/PipeWire disponibile
+- Integrazione radio: hardware CAT/interfaccia audio secondo setup stazione
 
 ## Credits
 

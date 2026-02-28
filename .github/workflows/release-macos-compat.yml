@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. v1.3.0)"
+        description: "Release version (e.g. v1.3.1)"
         required: true
-        default: "v1.3.0"
+        default: "v1.3.1"
       publish_release:
         description: "Publish GitHub release"
         required: true
@@ -147,10 +147,12 @@ jobs:
 
           NOTES_FILE="$(mktemp)"
           {
-            echo "# Decodium 3 FT2 ${VERSION} (macOS)"
+            echo "# Decodium 3 FT2 ${VERSION} (macOS + Linux AppImage)"
             echo
             echo "## English (UK)"
             echo "This release includes:"
+            echo "- Program title/version alignment to fork release ${VERSION}."
+            echo "- Linux compatibility fixes (Hamlib fallback, libudev alignment, ft2 executable packaging path)."
             echo "- Audio output auto-rebind recovery on runtime failures."
             echo "- Improved output-device resilience for underruns."
             echo "- UDP/network interface reliability improvements."
@@ -160,6 +162,12 @@ jobs:
             echo "- Apple Silicon build for macOS Tahoe."
             echo "- Apple Silicon build for macOS Sequoia."
             echo "- Apple Intel build for macOS Sequoia."
+            echo "- Linux x86_64 AppImage build (published by Linux release workflow)."
+            echo
+            echo "Linux minimum requirements:"
+            echo "- x86_64 CPU, 4 GB RAM minimum"
+            echo "- glibc >= 2.35"
+            echo "- libfuse2/FUSE2 + ALSA/PulseAudio/PipeWire"
             echo
             echo "If the app does not start on macOS, run from Terminal:"
             echo "\`sudo xattr -r -d com.apple.quarantine /Applications/ft2.app\`"
@@ -168,6 +176,8 @@ jobs:
             echo
             echo "## Italiano"
             echo "Questa release include:"
+            echo "- Allineamento titolo/versione programma alla release fork ${VERSION}."
+            echo "- Fix compatibilita' Linux (fallback Hamlib, allineamento libudev, path packaging eseguibile ft2)."
             echo "- Recupero automatico auto-rebind dell'uscita audio su errori runtime."
             echo "- Maggiore robustezza delle periferiche audio in uscita sugli underrun."
             echo "- Miglioramenti affidabilita' UDP/interfacce di rete."
@@ -177,6 +187,12 @@ jobs:
             echo "- Build Apple Silicon per macOS Tahoe."
             echo "- Build Apple Silicon per macOS Sequoia."
             echo "- Build Apple Intel per macOS Sequoia."
+            echo "- Build Linux x86_64 AppImage (pubblicata dal workflow Linux release)."
+            echo
+            echo "Requisiti minimi Linux:"
+            echo "- CPU x86_64, minimo 4 GB RAM"
+            echo "- glibc >= 2.35"
+            echo "- libfuse2/FUSE2 + ALSA/PulseAudio/PipeWire"
             echo
             echo "Se l'app non si avvia su macOS, esegui da Terminale:"
             echo "\`sudo xattr -r -d com.apple.quarantine /Applications/ft2.app\`"
@@ -202,7 +218,7 @@ jobs:
           else
             gh release create "${VERSION}" "${ASSETS[@]}" \
               --repo "${REPO}" \
-              --title "Decodium 3 FT2 ${VERSION} (macOS arm64 + x86_64)" \
+              --title "Decodium 3 FT2 ${VERSION} (macOS + Linux AppImage)" \
               --notes-file "${NOTES_FILE}"
           fi
 

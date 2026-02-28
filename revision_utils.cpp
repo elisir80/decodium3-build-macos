@@ -7,6 +7,10 @@
 
 #include "scs_version.h"
 
+#ifndef FORK_RELEASE_VERSION
+#define FORK_RELEASE_VERSION "v1.3.1"
+#endif
+
 namespace
 {
   QString revision_extract_number (QString const& s)
@@ -80,7 +84,12 @@ QString version (bool include_patch)
 
 QString program_title (QString const& revision)
 {
+  QString fork_release {QStringLiteral (FORK_RELEASE_VERSION)};
+  if (fork_release.startsWith ('v'))
+    {
+      fork_release.remove (0, 1);
+    }
   QString id {"Decodium v3.0 FT2 \"Raptor\" v" + QCoreApplication::applicationVersion ()
-              + " | Fork by Salvatore Raccampo 9H1SR v 1.2.1"};
+              + " | Fork by Salvatore Raccampo 9H1SR v " + fork_release};
   return id + " " + revision;
 }
