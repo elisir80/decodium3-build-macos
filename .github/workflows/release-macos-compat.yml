@@ -1,4 +1,4 @@
-name: Release macOS (Tahoe + Sequoia + Intel Sequoia)
+name: Release macOS (Tahoe + Sequoia + Intel Sequoia/Monterey)
 
 on:
   workflow_dispatch:
@@ -27,6 +27,7 @@ jobs:
   build:
     name: Build ${{ matrix.asset_suffix }} on ${{ matrix.runner }}
     runs-on: ${{ matrix.runner }}
+    continue-on-error: ${{ matrix.experimental }}
     timeout-minutes: 180
     strategy:
       fail-fast: false
@@ -37,15 +38,24 @@ jobs:
             arch_label: arm64
             compat_macos: "26.0"
             asset_suffix: "macos-tahoe-arm64"
+            experimental: false
           - runner: macos-15
             arch_label: arm64
             compat_macos: "15.0"
             asset_suffix: "macos-sequoia-arm64"
+            experimental: false
           # Intel build runs on GitHub's x86_64 image.
           - runner: macos-15-intel
             arch_label: x86_64
             compat_macos: "15.0"
             asset_suffix: "macos-sequoia-x86_64"
+            experimental: false
+          # Best-effort legacy Intel target for older Macs (Monterey line).
+          - runner: macos-15-intel
+            arch_label: x86_64
+            compat_macos: "12.0"
+            asset_suffix: "macos-monterey-x86_64"
+            experimental: true
     env:
       HOMEBREW_NO_AUTO_UPDATE: "1"
 
@@ -85,10 +95,16 @@ jobs:
 
       - name: Build release assets
         run: |
+          EXTRA_ARGS=()
+          if [[ "${{ matrix.experimental }}" == "true" ]]; then
+            echo "Experimental legacy build enabled for ${{ matrix.asset_suffix }}; skipping strict compatibility gate."
+            EXTRA_ARGS+=(--skip-compat-check)
+          fi
           scripts/release-macos.sh "${VERSION}" \
             --compat-macos "${{ matrix.compat_macos }}" \
             --asset-suffix "${{ matrix.asset_suffix }}" \
-            --repo "${GITHUB_REPOSITORY}"
+            --repo "${GITHUB_REPOSITORY}" \
+            "${EXTRA_ARGS[@]}"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -137,6 +153,13 @@ jobs:
           test -f "release-assets/decodium3-ft2-${VERSION}-macos-sequoia-x86_64.dmg"
           test -f "release-assets/decodium3-ft2-${VERSION}-macos-sequoia-x86_64.zip"
           test -f "release-assets/decodium3-ft2-${VERSION}-macos-sequoia-x86_64-sha256.txt"
+          if [[ -f "release-assets/decodium3-ft2-${VERSION}-macos-monterey-x86_64.dmg" && \
+                -f "release-assets/decodium3-ft2-${VERSION}-macos-monterey-x86_64.zip" && \
+                -f "release-assets/decodium3-ft2-${VERSION}-macos-monterey-x86_64-sha256.txt" ]]; then
+            echo "Monterey Intel artifact detected and will be published."
+          else
+            echo "Monterey Intel artifact not produced in this run (experimental target)."
+          fi
 
       - name: Publish release
         env:
@@ -159,6 +182,7 @@ jobs:
             echo "- Apple Silicon build for macOS Tahoe."
             echo "- Apple Silicon build for macOS Sequoia."
             echo "- Apple Intel build for macOS Sequoia."
+            echo "- Apple Intel build for macOS Monterey (best effort/experimental when generated)."
             echo "- Linux x86_64 AppImage build (published by Linux release workflow)."
             echo
             echo "Linux minimum requirements:"
@@ -181,6 +205,7 @@ jobs:
             echo "- Build Apple Silicon per macOS Tahoe."
             echo "- Build Apple Silicon per macOS Sequoia."
             echo "- Build Apple Intel per macOS Sequoia."
+            echo "- Build Apple Intel per macOS Monterey (best effort/sperimentale quando generata)."
             echo "- Build Linux x86_64 AppImage (pubblicata dal workflow Linux release)."
             echo
             echo "Requisiti minimi Linux:"
@@ -205,6 +230,15 @@ jobs:
             "release-assets/decodium3-ft2-${VERSION}-macos-sequoia-x86_64.zip"
             "release-assets/decodium3-ft2-${VERSION}-macos-sequoia-x86_64-sha256.txt"
           )
+          if [[ -f "release-assets/decodium3-ft2-${VERSION}-macos-monterey-x86_64.dmg" && \
+                -f "release-assets/decodium3-ft2-${VERSION}-macos-monterey-x86_64.zip" && \
+                -f "release-assets/decodium3-ft2-${VERSION}-macos-monterey-x86_64-sha256.txt" ]]; then
+            ASSETS+=(
+              "release-assets/decodium3-ft2-${VERSION}-macos-monterey-x86_64.dmg"
+              "release-assets/decodium3-ft2-${VERSION}-macos-monterey-x86_64.zip"
+              "release-assets/decodium3-ft2-${VERSION}-macos-monterey-x86_64-sha256.txt"
+            )
+          fi
 
           if gh release view "${VERSION}" --repo "${REPO}" >/dev/null 2>&1; then
             gh release upload "${VERSION}" "${ASSETS[@]}" --repo "${REPO}" --clobber

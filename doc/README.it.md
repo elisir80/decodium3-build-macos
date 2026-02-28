@@ -7,7 +7,7 @@ Note specifiche del fork macOS nel repository.
 ## Contesto release attuale
 
 - Ultima release stabile: `v1.3.3`
-- Target: macOS Tahoe ARM64, Sequoia ARM64, Sequoia Intel, Linux x86_64 AppImage
+- Target: macOS Tahoe ARM64, Sequoia ARM64, Sequoia Intel, Monterey Intel (sperimentale), Linux x86_64 AppImage
 
 ## Note build e runtime
 

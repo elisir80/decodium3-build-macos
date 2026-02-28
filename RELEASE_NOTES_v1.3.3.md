@@ -27,6 +27,7 @@ Scope: upstream Raptor feature import + fork UI/runtime fixes + release alignmen
 - macOS Apple Silicon Tahoe: DMG, ZIP, SHA256
 - macOS Apple Silicon Sequoia: DMG, ZIP, SHA256
 - macOS Intel Sequoia: DMG, ZIP, SHA256
+- macOS Intel Monterey (best effort/experimental): DMG, ZIP, SHA256
 - Linux x86_64: AppImage, SHA256
 
 Note: `.pkg` installers are intentionally not produced for this release flow.
@@ -72,6 +73,7 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 - macOS Apple Silicon Tahoe: DMG, ZIP, SHA256
 - macOS Apple Silicon Sequoia: DMG, ZIP, SHA256
 - macOS Intel Sequoia: DMG, ZIP, SHA256
+- macOS Intel Monterey (best effort/sperimentale): DMG, ZIP, SHA256
 - Linux x86_64: AppImage, SHA256
 
 Nota: i pacchetti `.pkg` non vengono prodotti intenzionalmente in questo flusso release.

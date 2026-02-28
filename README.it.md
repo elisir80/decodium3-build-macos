@@ -22,6 +22,7 @@ Questa release fork (`v1.3.3`) e' basata su Decodium v3.0 SE Raptor upstream e i
 - Apple Silicon Tahoe
 - Apple Silicon Sequoia
 - Apple Intel Sequoia
+- Apple Intel Monterey (12.x, sperimentale/best-effort)
 - Linux x86_64 AppImage
 
 ## Requisiti minimi Linux

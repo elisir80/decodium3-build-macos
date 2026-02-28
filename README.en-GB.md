@@ -10,6 +10,7 @@ security fixes, and release automation for:
 - Apple Silicon Tahoe (26.x)
 - Apple Silicon Sequoia (15.x)
 - Apple Intel Sequoia (15.x)
+- Apple Intel Monterey (12.x, experimental best-effort)
 - Linux x86_64 AppImage
 
 ## Current Baseline

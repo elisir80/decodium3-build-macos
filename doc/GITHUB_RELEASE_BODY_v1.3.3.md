@@ -16,6 +16,7 @@ Release focused on upstream Raptor feature import plus fork stability/UI refinem
   - Startup CAT mode auto-alignment using full frequency list.
   - Responsive 2-row top controls on small displays.
   - Light-theme progress/seconds bar visibility fix.
+  - Experimental best-effort Intel Monterey artifact path added in GitHub workflows.
 - macOS + Linux artifact set (no `.pkg`).
 
 ### Linux minimum requirements
@@ -44,6 +45,9 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 - `decodium3-ft2-v1.3.3-macos-sequoia-x86_64.dmg`
 - `decodium3-ft2-v1.3.3-macos-sequoia-x86_64.zip`
 - `decodium3-ft2-v1.3.3-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-v1.3.3-macos-monterey-x86_64.dmg` *(best effort/experimental, when produced)*
+- `decodium3-ft2-v1.3.3-macos-monterey-x86_64.zip` *(best effort/experimental, when produced)*
+- `decodium3-ft2-v1.3.3-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, when produced)*
 - `decodium3-ft2-v1.3.3-linux-x86_64.AppImage`
 - `decodium3-ft2-v1.3.3-linux-x86_64.AppImage.sha256.txt`
 
@@ -65,6 +69,7 @@ Release focalizzata su import feature upstream Raptor e rifiniture stabilita'/UI
   - Auto-allineamento modalita' CAT all'avvio su lista frequenze completa.
   - Controlli top responsivi su 2 righe per display piccoli.
   - Correzione visibilita' barra progressi/secondi nel tema chiaro.
+  - Aggiunto percorso artifact Intel Monterey sperimentale/best effort nei workflow GitHub.
 - Set artifact macOS + Linux (nessun `.pkg`).
 
 ### Requisiti minimi Linux

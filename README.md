@@ -73,6 +73,7 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 - Apple Silicon Tahoe
 - Apple Silicon Sequoia
 - Apple Intel Sequoia
+- Apple Intel Monterey (experimental / best effort)
 - Linux x86_64 AppImage
 
 ### Linux minimum requirements
@@ -158,6 +159,7 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 - Apple Silicon Tahoe
 - Apple Silicon Sequoia
 - Apple Intel Sequoia
+- Apple Intel Monterey (sperimentale / best effort)
 - Linux x86_64 AppImage
 
 ### Requisiti minimi Linux

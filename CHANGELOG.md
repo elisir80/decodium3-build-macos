@@ -16,7 +16,7 @@ Release focused on upstream feature import from the original Raptor repository p
   - FT2 decoder tuning updates (`syncmin` adaptive profile, extended AP types for Tx3/Tx4, deep-search threshold relaxations).
 - Added responsive top-controls layout for small displays with automatic 2-row split.
 - Updated release/build metadata to installer build tag `2602281900`.
-- Release artifacts remain DMG/ZIP/SHA256 for macOS and AppImage/SHA256 for Linux (no `.pkg`).
+- Release artifacts remain DMG/ZIP/SHA256 for macOS and AppImage/SHA256 for Linux (no `.pkg`), with added best-effort Intel Monterey target in GitHub workflows.
 
 #### Fixed
 
@@ -38,7 +38,7 @@ Release focalizzata su import feature upstream dal repository Raptor originale e
   - Tuning decoder FT2 (`syncmin` adattivo, AP esteso su Tx3/Tx4, soglie deep-search rilassate).
 - Aggiunto layout controlli top responsivo per schermi piccoli con split automatico su 2 righe.
 - Aggiornati metadati build/release al build tag installer `2602281900`.
-- Artifact release invariati: DMG/ZIP/SHA256 su macOS e AppImage/SHA256 su Linux (nessun `.pkg`).
+- Artifact release invariati: DMG/ZIP/SHA256 su macOS e AppImage/SHA256 su Linux (nessun `.pkg`), con target Intel Monterey best-effort aggiunto nei workflow GitHub.
 
 #### Corretto
 
