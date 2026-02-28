@@ -8,6 +8,9 @@
 #include <QDir>
 #include <QTimer>
 #include <QPushButton>
+#include <QFile>
+#include <QFileInfo>
+#include <QTextStream>
 
 #include "HelpTextWindow.hpp"
 #include "logbook/logbook.h"
@@ -16,6 +19,7 @@
 #include "models/Bands.hpp"
 #include "models/CabrilloLog.hpp"
 #include "validators/MaidenheadLocatorValidator.hpp"
+#include "Logger.hpp"
 
 #include "ui_logqso.h"
 #include "moc_logqso.cpp"
@@ -95,17 +99,30 @@ LogQSO::LogQSO(QString const& programTitle, QSettings * settings
   QDir dataPath {QStandardPaths::writableLocation (QStandardPaths::DataLocation)};
   sat_file_location = dataPath.exists(sat_file_name) ? dataPath.absoluteFilePath(sat_file_name) : m_config->data_dir ().absoluteFilePath (sat_file_name);
   QFile file {sat_file_location};
-  QStringList wordList;
-  QTextStream stream(&file);
-  if(file.open (QIODevice::ReadOnly | QIODevice::Text)) {
-      while (!stream.atEnd()) {
-          QString line = stream.readLine();
-          wordList = line.split('|');
-          ui->comboBoxSatellite->addItem (wordList[1], wordList[0]);
-      }
-      stream.flush();
-      file.close();
-  }
+  QFileInfo sat_info {sat_file_location};
+  if (sat_info.exists () && sat_info.isFile () && sat_info.size () <= 4LL * 1024LL * 1024LL
+      && file.open (QIODevice::ReadOnly | QIODevice::Text))
+    {
+      QTextStream stream {&file};
+      while (!stream.atEnd ())
+        {
+          auto const line = stream.readLine ().trimmed ();
+          if (line.isEmpty ())
+            {
+              continue;
+            }
+          auto const parts = line.split ('|');
+          if (parts.size () >= 2)
+            {
+              ui->comboBoxSatellite->addItem (parts.at (1), parts.at (0));
+            }
+        }
+      file.close ();
+    }
+  else if (sat_info.exists () && sat_info.size () > 4LL * 1024LL * 1024LL)
+    {
+      LOG_WARN (QString {"Skipping sat.dat load, file too large: %1 bytes"}.arg (sat_info.size ()).toStdString ());
+    }
   for (auto const& prop_mode : prop_modes)
     {
       ui->comboBoxPropMode->addItem (prop_mode.name_, prop_mode.id_);
@@ -172,17 +189,26 @@ void LogQSO::loadSettings ()
   QDir dataPath {QStandardPaths::writableLocation (QStandardPaths::DataLocation)};
   comments_location = dataPath.exists("comments.txt") ? dataPath.absoluteFilePath("comments.txt") : m_config->data_dir ().absoluteFilePath ("comments.txt");
   QFile file2 = {comments_location};
-  QTextStream stream2(&file2);
-  if(file2.open (QIODevice::ReadOnly | QIODevice::Text)) {
-      while (!stream2.atEnd()) {
-          QString line = stream2.readLine();
-          ui->comments->addItem (line);
-      }
-      stream2.flush();
-      file2.close();
-  } else {
+  QFileInfo comments_info {comments_location};
+  if (comments_info.exists () && comments_info.isFile () && comments_info.size () <= 2LL * 1024LL * 1024LL
+      && file2.open (QIODevice::ReadOnly | QIODevice::Text))
+    {
+      QTextStream stream2 {&file2};
+      while (!stream2.atEnd ())
+        {
+          ui->comments->addItem (stream2.readLine ());
+        }
+      file2.close ();
+    }
+  else
+    {
+      if (comments_info.exists () && comments_info.size () > 2LL * 1024LL * 1024LL)
+        {
+          LOG_WARN (QString {"Skipping comments.txt load, file too large: %1 bytes"}
+                    .arg (comments_info.size ()).toStdString ());
+        }
       ui->comments->addItem ("");
-  }
+    }
   if (ui->cbComments->isChecked ()) ui->comments->setItemText(ui->comments->currentIndex(), m_comments);
 
   m_settings->endGroup ();

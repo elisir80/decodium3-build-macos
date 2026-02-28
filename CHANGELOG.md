@@ -1,5 +1,41 @@
 # Changelog / Registro Modifiche
 
+## [1.3.2] - 2026-02-28
+
+### English
+
+Patch release focused on startup hang mitigation and startup data-file hardening.
+
+#### Changed
+
+- Startup file loads now run asynchronously for `wsjtx.log`, `ignore.list`, `ALLCALL7.TXT`, and old-audio cleanup tasks.
+- `WorkedBefore` reload flow now avoids overlapping reload races.
+- Release/documentation baseline updated to `v1.3.2` (EN/IT) for macOS + Linux AppImage targets.
+- macOS release flow remains DMG/ZIP/SHA256 (no `.pkg` required after shared-memory mmap migration).
+
+#### Fixed
+
+- Reduced startup UI hangs/beachball risks by moving expensive file I/O off the main thread.
+- Hardened `CTY.DAT` loading with size guards, parser validation, fallback recovery, and safer reload behavior.
+- Added defensive bounds checks for `grid.dat`, `sat.dat`, and `comments.txt` startup parsing.
+
+### Italiano
+
+Patch release focalizzata su mitigazione hang in avvio e hardening dei file dati caricati allo startup.
+
+#### Modificato
+
+- I caricamenti file in avvio ora sono asincroni per `wsjtx.log`, `ignore.list`, `ALLCALL7.TXT` e cleanup dei vecchi file audio.
+- Flusso di reload `WorkedBefore` aggiornato per evitare race da reload sovrapposti.
+- Baseline release/documentazione aggiornata a `v1.3.2` (EN/IT) per target macOS + Linux AppImage.
+- Il flusso release macOS resta DMG/ZIP/SHA256 (nessun `.pkg` richiesto dopo migrazione shared memory a mmap).
+
+#### Corretto
+
+- Ridotto il rischio di hang/beachball in avvio spostando I/O pesante fuori dal main thread UI.
+- Loader `CTY.DAT` irrobustito con limiti dimensione, validazione parser, recovery fallback e reload piu' sicuro.
+- Aggiunte guardie difensive su parsing startup di `grid.dat`, `sat.dat` e `comments.txt`.
+
 ## [1.3.1] - 2026-02-28
 
 ### English

@@ -25,6 +25,7 @@
 #include <QPointer>
 #include <QSet>
 #include <QVector>
+#include <QPair>
 #include <QScrollBar>
 #include <QQueue>
 #include <QFuture>
@@ -870,6 +871,15 @@ private:
   QFutureWatcher<void> m_wav_future_watcher;
   QFutureWatcher<void> watcher3;
   QFutureWatcher<QString> m_saveWAVWatcher;
+  QFutureWatcher<QString> m_txLogLoadWatcher;
+  QFutureWatcher<QString> m_ignoreListLoadWatcher;
+  QFutureWatcher<QString> m_allCall7LoadWatcher;
+  QFutureWatcher<QPair<int, int>> m_removeOldFilesWatcher;
+  QFutureWatcher<QPair<int, QStringList>> m_emeLogLoadWatcher;
+  bool m_txLogReloadPending {false};
+  bool m_ignoreListReloadPending {false};
+  bool m_allCall7ReloadPending {false};
+  bool m_emeLogReloadPending {false};
 
   NonInheritingProcess proc_jt9;
   NonInheritingProcess p1;

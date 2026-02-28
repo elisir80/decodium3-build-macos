@@ -6,7 +6,7 @@ Repository-specific notes for the macOS fork.
 
 ## Current Release Context
 
-- Latest stable release: `v1.3.1`
+- Latest stable release: `v1.3.2`
 - Targets: macOS Tahoe ARM64, Sequoia ARM64, Sequoia Intel, Linux x86_64 AppImage
 
 ## Build and Runtime Notes
@@ -20,6 +20,11 @@ Repository-specific notes for the macOS fork.
 
 - This fork now uses `SharedMemorySegment` with file-backed `mmap` on Darwin.
 - The release flow no longer depends on System V shared-memory `sysctl` tuning (`kern.sysv.shmmax/shmall`).
+
+### Startup I/O hardening (v1.3.2)
+
+- Heavy startup file reads were moved off the main UI thread to avoid hangs.
+- `CTY.DAT`, `grid.dat`, `sat.dat`, `comments.txt`, `wsjtx.log`, and related startup files now use size and parser guards.
 
 ### Release artifacts
 
@@ -45,6 +50,6 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 ## References
 
 - `CHANGELOG.md`
-- `RELEASE_NOTES_v1.3.1.md`
-- `doc/GITHUB_RELEASE_BODY_v1.3.1.md`
+- `RELEASE_NOTES_v1.3.2.md`
+- `doc/GITHUB_RELEASE_BODY_v1.3.2.md`
 - `doc/SECURITY_BUG_ANALYSIS_REPORT.md`

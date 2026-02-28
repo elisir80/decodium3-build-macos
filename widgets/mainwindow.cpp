@@ -411,6 +411,89 @@ namespace
     return clamped;
   }
 
+  QString load_text_file_for_ui (QString const& path, qint64 max_size_bytes, char const * label)
+  {
+    QFileInfo info {path};
+    if (!info.exists () || !info.isFile ())
+      {
+        return QString {};
+      }
+
+    if (info.size () > max_size_bytes)
+      {
+        LOG_WARN (QString {"%1 too large (%2 bytes), refusing to load"}
+                  .arg (label)
+                  .arg (info.size ())
+                  .toStdString ());
+        return QString {};
+      }
+
+    QFile file {path};
+    if (!file.open (QIODevice::ReadOnly | QIODevice::Text))
+      {
+        LOG_WARN (QString {"Failed to open %1 at %2: %3"}
+                  .arg (label)
+                  .arg (path)
+                  .arg (file.errorString ())
+                  .toStdString ());
+        return QString {};
+      }
+
+    QTextStream stream {&file};
+    return stream.readAll ();
+  }
+
+  QPair<int, QStringList> load_eme_worked_entries (QString const& path
+                                                   , int max_lines
+                                                   , qint64 max_size_bytes)
+  {
+    QFileInfo info {path};
+    if (!info.exists () || !info.isFile ())
+      {
+        return {0, QStringList {}};
+      }
+    if (info.size () > max_size_bytes)
+      {
+        LOG_WARN (QString {"wsjtx.log too large for EME startup scan (%1 bytes), skipping"}
+                  .arg (info.size ())
+                  .toStdString ());
+        return {0, QStringList {}};
+      }
+
+    QFile file {path};
+    if (!file.open (QIODevice::ReadOnly | QIODevice::Text))
+      {
+        LOG_WARN (QString {"Failed to open wsjtx.log for EME scan: %1"}
+                  .arg (file.errorString ())
+                  .toStdString ());
+        return {0, QStringList {}};
+      }
+
+    QTextStream in {&file};
+    QStringList calls;
+    int score {0};
+    for (int i = 0; i < max_lines; ++i)
+      {
+        auto const line = in.readLine ();
+        if (line.isNull () || line.isEmpty ())
+          {
+            break;
+          }
+        auto callsign = line.mid (40, 6).trimmed ();
+        auto const comma = callsign.indexOf (',');
+        if (comma > 0)
+          {
+            callsign = callsign.left (comma).trimmed ();
+          }
+        if (!callsign.isEmpty ())
+          {
+            calls.append (callsign);
+            ++score;
+          }
+      }
+    return {score, calls};
+  }
+
   bool wait_for_process_exit_no_input (QProcess& process, int timeout_ms)
   {
     if (QProcess::NotRunning == process.state ())
@@ -1379,6 +1462,63 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
       if (!result.isEmpty ())   // error
         {
           MessageBox::critical_message (this, tr("Error Writing WAV File"), result);
+        }
+    });
+  connect (&m_txLogLoadWatcher, &QFutureWatcher<QString>::finished, [this] {
+      txLog = m_txLogLoadWatcher.result ();
+      if (m_txLogReloadPending)
+        {
+          m_txLogReloadPending = false;
+          read_txLog ();
+        }
+    });
+  connect (&m_ignoreListLoadWatcher, &QFutureWatcher<QString>::finished, [this] {
+      ignoreList = m_ignoreListLoadWatcher.result ();
+      if (m_ignoreListReloadPending)
+        {
+          m_ignoreListReloadPending = false;
+          read_ignoreList ();
+        }
+    });
+  connect (&m_allCall7LoadWatcher, &QFutureWatcher<QString>::finished, [this] {
+      ALLCALL7 = m_allCall7LoadWatcher.result ();
+      if (m_allCall7ReloadPending)
+        {
+          m_allCall7ReloadPending = false;
+          read_ALLCALL7 ();
+        }
+    });
+  connect (&m_removeOldFilesWatcher, &QFutureWatcher<QPair<int, int>>::finished, [this] {
+      auto const result = m_removeOldFilesWatcher.result ();
+      if (result.first > 0)
+        {
+          LOG_INFO (QString {"Removed %1 expired saved audio files"}.arg (result.first).toStdString ());
+        }
+      if (result.second > 0)
+        {
+          LOG_WARN (QString {"Failed to remove %1 expired saved audio files"}.arg (result.second).toStdString ());
+        }
+    });
+  connect (&m_emeLogLoadWatcher, &QFutureWatcher<QPair<int, QStringList>>::finished, [this] {
+      auto const result = m_emeLogLoadWatcher.result ();
+      m_EMEworked.clear ();
+      for (auto const& call : result.second)
+        {
+          m_EMEworked[call] = true;
+        }
+      m_score = result.first;
+      if (m_ActiveStationsWidget)
+        {
+          m_ActiveStationsWidget->setScore (m_score);
+          if (m_mode == "Q65")
+            {
+              m_ActiveStationsWidget->setRate (m_score);
+            }
+        }
+      if (m_emeLogReloadPending)
+        {
+          m_emeLogReloadPending = false;
+          read_log ();
         }
     });
 
@@ -6981,26 +7121,17 @@ void MainWindow::refreshPileupList()
 
 void MainWindow::read_log()
 {
-  static QFile f {QDir {QStandardPaths::writableLocation (QStandardPaths::DataLocation)}.absoluteFilePath ("wsjtx.log")};
-  f.open(QIODevice::ReadOnly);
-  if(f.isOpen()) {
-    QTextStream in(&f);
-    QString line,callsign;
-    for(int i=0; i<99999; i++) {
-      line=in.readLine();
-      if(line.length()<=0) break;
-      callsign=line.mid(40,6);
-      int n=callsign.indexOf(",");
-      if(n>0) callsign=callsign.left(n);
-      m_EMEworked[callsign]=true;
-      m_score++;
+  auto const path = QDir {QStandardPaths::writableLocation (QStandardPaths::DataLocation)}
+                      .absoluteFilePath ("wsjtx.log");
+  if (m_emeLogLoadWatcher.isRunning ())
+    {
+      m_emeLogReloadPending = true;
+      return;
     }
-    f.close();
-  }
-  if(m_ActiveStationsWidget!=NULL) {
-    m_ActiveStationsWidget->setScore(m_score);
-    if(m_mode=="Q65") m_ActiveStationsWidget->setRate(m_score);
-  }
+  m_emeLogLoadWatcher.setFuture (
+    QtConcurrent::run ([path] {
+      return load_eme_worked_entries (path, 99999, 128LL * 1024LL * 1024LL);
+    }));
 }
 
 void MainWindow::ARRL_Digi_Update(DecodedText dt)
@@ -19530,15 +19661,17 @@ void MainWindow::on_pb24G_clicked()
 
 void MainWindow::read_txLog()
 {
-    static QFile logfile {QDir {QStandardPaths::writableLocation (QStandardPaths::DataLocation)}.absoluteFilePath ("wsjtx.log")};
-    QTextStream logstream(&logfile);
-    if(logfile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        while (!logstream.atEnd()) {
-            txLog = logstream.readAll();
-        }
-        logstream.flush();
-        logfile.close();
-    }
+    auto const path = QDir {QStandardPaths::writableLocation (QStandardPaths::DataLocation)}
+                        .absoluteFilePath ("wsjtx.log");
+    if (m_txLogLoadWatcher.isRunning ())
+      {
+        m_txLogReloadPending = true;
+        return;
+      }
+    m_txLogLoadWatcher.setFuture (
+      QtConcurrent::run ([path] {
+        return load_text_file_for_ui (path, 128LL * 1024LL * 1024LL, "wsjtx.log");
+      }));
 }
 
 void MainWindow::on_actionErase_Tx_Log_triggered()
@@ -19576,15 +19709,17 @@ void MainWindow::addCallsignToignoreList()
 
 void MainWindow::read_ignoreList()
 {
-    static QFile ignoreFile {QDir {QStandardPaths::writableLocation (QStandardPaths::DataLocation)}.absoluteFilePath ("ignore.list")};
-    QTextStream ignoreStream(&ignoreFile);
-    if(ignoreFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        while (!ignoreStream.atEnd()) {
-            ignoreList = ignoreStream.readAll();
-        }
-        ignoreStream.flush();
-        ignoreFile.close();
-    }
+    auto const path = QDir {QStandardPaths::writableLocation (QStandardPaths::DataLocation)}
+                        .absoluteFilePath ("ignore.list");
+    if (m_ignoreListLoadWatcher.isRunning ())
+      {
+        m_ignoreListReloadPending = true;
+        return;
+      }
+    m_ignoreListLoadWatcher.setFuture (
+      QtConcurrent::run ([path] {
+        return load_text_file_for_ui (path, 8LL * 1024LL * 1024LL, "ignore.list");
+      }));
 }
 
 void MainWindow::on_actionErase_Ignore_List_triggered()
@@ -19600,36 +19735,52 @@ void MainWindow::on_actionErase_Ignore_List_triggered()
 
 void MainWindow::read_ALLCALL7()
 {
-  static QFile AllCall7File {"ALLCALL7.TXT"};
-  QTextStream AllCall7Stream(&AllCall7File);
-  if(AllCall7File.open(QIODevice::ReadOnly | QIODevice::Text)) {
-    while (!AllCall7Stream.atEnd()) {
-      ALLCALL7 = AllCall7Stream.readAll();
+  auto const path = QString {"ALLCALL7.TXT"};
+  if (m_allCall7LoadWatcher.isRunning ())
+    {
+      m_allCall7ReloadPending = true;
+      return;
     }
-      AllCall7Stream.flush();
-      AllCall7File.close();
-  }
+  m_allCall7LoadWatcher.setFuture (
+    QtConcurrent::run ([path] {
+      return load_text_file_for_ui (path, 128LL * 1024LL * 1024LL, "ALLCALL7.TXT");
+    }));
 }
 
 void MainWindow::remove_old_files(const QString &directoryPath, int daysOld)
 {
-    QDir dir(directoryPath);
-    if (!dir.exists()) {
-        qWarning() << "Directory does not exist:" << directoryPath;
+    if (m_removeOldFilesWatcher.isRunning ())
+      {
         return;
-    }
-    dir.setFilter(QDir::Files);
-    QDateTime timeThreshold = QDateTime::currentDateTime().addDays(-daysOld);
-    QFileInfoList fileList = dir.entryInfoList();
-    foreach(QFileInfo fileInfo, fileList) {
-        if(fileInfo.lastModified() < timeThreshold) {
-            if(!QFile::remove(fileInfo.absoluteFilePath())) {
-              qWarning() << "Could not delete file:" << fileInfo.absoluteFilePath();
-            } else {
-              qDebug() << "Deleted old file:" << fileInfo.absoluteFilePath();
-            }
-        }
-    }
+      }
+    m_removeOldFilesWatcher.setFuture (
+      QtConcurrent::run ([directoryPath, daysOld] () -> QPair<int, int> {
+        int removed {0};
+        int failed {0};
+        QDir dir {directoryPath};
+        if (!dir.exists ())
+          {
+            return {0, 0};
+          }
+        dir.setFilter (QDir::Files);
+        auto const timeThreshold = QDateTime::currentDateTime ().addDays (-daysOld);
+        auto const fileList = dir.entryInfoList ();
+        for (auto const& fileInfo : fileList)
+          {
+            if (fileInfo.lastModified () < timeThreshold)
+              {
+                if (QFile::remove (fileInfo.absoluteFilePath ()))
+                  {
+                    ++removed;
+                  }
+                else
+                  {
+                    ++failed;
+                  }
+              }
+          }
+        return {removed, failed};
+      }));
 }
 
 void MainWindow::alertQSYmessage ()

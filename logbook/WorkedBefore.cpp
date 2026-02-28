@@ -279,8 +279,12 @@ namespace
     return QString {};
   }
 
-  worked_before_database_type loader (QString const& path, AD1CCty const * prefixes)
+  worked_before_database_type loader (QString const& path
+                                      , Configuration const * configuration
+                                      , AD1CCty * prefixes)
   {
+    prefixes->reload (configuration);
+
     worked_before_database_type worked;
     QFile inputFile {path};
     if (inputFile.exists ())
@@ -375,8 +379,12 @@ public:
 
   void reload ()
   {
-    prefixes_.reload (configuration_);
-    async_loader_ = QtConcurrent::run (loader, path_, &prefixes_);
+    if (loader_watcher_.isRunning ())
+      {
+        LOG_WARN ("WorkedBefore::reload ignored because previous load is still running");
+        return;
+      }
+    async_loader_ = QtConcurrent::run (loader, path_, configuration_, &prefixes_);
     loader_watcher_.setFuture (async_loader_);
   }
 

@@ -15,20 +15,22 @@ security fixes, and release automation for:
 ## Current Baseline
 
 - Source branch: `master`
-- Latest stable release: `v1.3.1`
+- Latest stable release: `v1.3.2`
 - App bundle/executable: `ft2.app` / `ft2`
 
-## Key Notes for v1.3.1
+## Key Notes for v1.3.2
 
 - Shared memory on macOS moved to file-backed `mmap` path (`SharedMemorySegment`), reducing System V fragility.
 - Hardened NTP/DT behavior and mode-specific tuning for FT2/FT4/FT8.
 - CAT reconnection and startup mode-selection robustness improvements.
 - Security fixes applied on TLS handling and network paths documented in changelog/release notes.
+- Startup freeze/hang mitigation: expensive startup file loading moved off the main UI thread.
+- CTY/grid/satellite/comments file parsing hardened with size/bounds guards and fallback recovery.
 
 ## Quick Start (macOS)
 
 ```bash
-cmake -S . -B build -DFORK_RELEASE_VERSION=v1.3.1
+cmake -S . -B build -DFORK_RELEASE_VERSION=v1.3.2
 cmake --build build -j8
 ./build/ft2.app/Contents/MacOS/ft2
 ```
@@ -38,13 +40,13 @@ cmake --build build -j8
 Local release script:
 
 ```bash
-scripts/release-macos.sh v1.3.1 --publish --repo elisir80/decodium3-build-macos
+scripts/release-macos.sh v1.3.2 --publish --repo elisir80/decodium3-build-macos
 ```
 
 Per-platform suffix example:
 
 ```bash
-scripts/release-macos.sh v1.3.1 --compat-macos 15.0 --asset-suffix macos-sequoia-arm64
+scripts/release-macos.sh v1.3.2 --compat-macos 15.0 --asset-suffix macos-sequoia-arm64
 ```
 
 Generated assets:
@@ -78,9 +80,9 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 ## Documentation
 
 - `README.md`
-- `RELEASE_NOTES_v1.3.1.md`
+- `RELEASE_NOTES_v1.3.2.md`
 - `CHANGELOG.md`
-- `doc/GITHUB_RELEASE_BODY_v1.3.1.md`
+- `doc/GITHUB_RELEASE_BODY_v1.3.2.md`
 - `doc/SECURITY_BUG_ANALYSIS_REPORT.md`
 
 ## Licence

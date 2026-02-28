@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. v1.3.1)"
+        description: "Release version (e.g. v1.3.2)"
         required: true
-        default: "v1.3.1"
+        default: "v1.3.2"
       publish_release:
         description: "Publish GitHub release"
         required: true
@@ -152,13 +152,10 @@ jobs:
             echo "## English (UK)"
             echo "This release includes:"
             echo "- Program title/version alignment to fork release ${VERSION}."
-            echo "- Linux compatibility fixes (Hamlib fallback, libudev alignment, ft2 executable packaging path)."
-            echo "- Audio output auto-rebind recovery on runtime failures."
-            echo "- Improved output-device resilience for underruns."
-            echo "- UDP/network interface reliability improvements."
-            echo "- NTP protocol hardening and improved fallback handling."
-            echo "- NTP status bar improvements with last-sync age."
-            echo "- DT timing improvements for remote stations with configurable clamp limits in Settings -> Advanced."
+            echo "- Startup freeze/hang mitigation by moving expensive file I/O off the main UI thread."
+            echo "- Async/safe loading for wsjtx.log, ignore.list, ALLCALL7.TXT, and old-file cleanup."
+            echo "- CTY.DAT loader hardening with fallback recovery, size guards, and parser validation."
+            echo "- Additional startup file hardening for grid.dat, sat.dat, and comments.txt."
             echo "- Apple Silicon build for macOS Tahoe."
             echo "- Apple Silicon build for macOS Sequoia."
             echo "- Apple Intel build for macOS Sequoia."
@@ -177,13 +174,10 @@ jobs:
             echo "## Italiano"
             echo "Questa release include:"
             echo "- Allineamento titolo/versione programma alla release fork ${VERSION}."
-            echo "- Fix compatibilita' Linux (fallback Hamlib, allineamento libudev, path packaging eseguibile ft2)."
-            echo "- Recupero automatico auto-rebind dell'uscita audio su errori runtime."
-            echo "- Maggiore robustezza delle periferiche audio in uscita sugli underrun."
-            echo "- Miglioramenti affidabilita' UDP/interfacce di rete."
-            echo "- NTP piu' robusto e fallback migliorato."
-            echo "- Miglioramenti barra stato NTP con eta' ultima sincronizzazione."
-            echo "- Miglioramenti timing DT per stazioni remote con limiti configurabili in Impostazioni -> Avanzate."
+            echo "- Mitigazione freeze/hang in avvio spostando I/O pesante fuori dal thread UI."
+            echo "- Caricamento asincrono/sicuro per wsjtx.log, ignore.list, ALLCALL7.TXT e pulizia file vecchi."
+            echo "- Hardening loader CTY.DAT con recovery fallback, limiti dimensione e validazione parser."
+            echo "- Hardening file di startup aggiuntivi: grid.dat, sat.dat e comments.txt."
             echo "- Build Apple Silicon per macOS Tahoe."
             echo "- Build Apple Silicon per macOS Sequoia."
             echo "- Build Apple Intel per macOS Sequoia."

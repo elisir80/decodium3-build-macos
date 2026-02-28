@@ -10,8 +10,8 @@ Usage:
                                  [--asset-suffix macos-sequoia-arm64]
 
 Examples:
-  scripts/release-macos.sh v1.3.1
-  scripts/release-macos.sh v1.3.1 --publish --repo elisir80/decodium3-build-macos
+  scripts/release-macos.sh v1.3.2
+  scripts/release-macos.sh v1.3.2 --publish --repo elisir80/decodium3-build-macos
 
 What it does:
   1) Configures the project in ./build

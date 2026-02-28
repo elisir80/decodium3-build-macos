@@ -1,13 +1,13 @@
-# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.3.1
+# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.3.2
 
 English and Italian documentation for this fork is included in this repository.
 
 ## English
 
-Fork release `v1.3.1` is based on upstream `iu8lmc/Decodium-3.0-Codename-Raptor` and adds macOS-focused operational hardening.
+Fork release `v1.3.2` is based on upstream `iu8lmc/Decodium-3.0-Codename-Raptor` and adds macOS-focused operational hardening.
 
 - Upstream base: Decodium v3.0 SE "Raptor"
-- Fork release: `v1.3.1`
+- Fork release: `v1.3.2`
 - App bundle/executable on macOS: `ft2.app` / `ft2`
 - License: GPLv3
 
@@ -19,6 +19,8 @@ Fork release `v1.3.1` is based on upstream `iu8lmc/Decodium-3.0-Codename-Raptor`
 - Startup microphone permission preflight to avoid delayed popup during operation.
 - Robust DT/NTP strategy (weak-sync + deadband + confirmations + sparse jump guard + hold mode).
 - Shared-memory path on macOS migrated to `mmap` backend; `.pkg` sysctl bootstrap is no longer required in standard release artifacts.
+- Startup freeze/hang mitigation by moving heavy startup file I/O off the UI thread.
+- CTY/grid/satellite/comments data loaders hardened with size limits, parser guards, and fallback recovery.
 - Raptor baseline maintained with fork integrations from previous 1.1.x work.
 
 ### Build (macOS)
@@ -49,12 +51,12 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ### Documentation
 
-- Release notes (EN/IT): [RELEASE_NOTES_v1.3.1.md](RELEASE_NOTES_v1.3.1.md)
+- Release notes (EN/IT): [RELEASE_NOTES_v1.3.2.md](RELEASE_NOTES_v1.3.2.md)
 - Changelog (EN/IT): [CHANGELOG.md](CHANGELOG.md)
 - Security and bug analysis report: [doc/SECURITY_BUG_ANALYSIS_REPORT.md](doc/SECURITY_BUG_ANALYSIS_REPORT.md)
 - macOS porting details (EN/IT): [doc/MACOS_PORTING_v1.2.0.md](doc/MACOS_PORTING_v1.2.0.md)
 - DT/NTP architecture (EN/IT): [doc/DT_NTP_ROBUST_SYNC_v1.2.0.md](doc/DT_NTP_ROBUST_SYNC_v1.2.0.md)
-- GitHub release body template (EN/IT): [doc/GITHUB_RELEASE_BODY_v1.3.1.md](doc/GITHUB_RELEASE_BODY_v1.3.1.md)
+- GitHub release body template (EN/IT): [doc/GITHUB_RELEASE_BODY_v1.3.2.md](doc/GITHUB_RELEASE_BODY_v1.3.2.md)
 
 ### CI release targets
 
@@ -77,10 +79,10 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ## Italiano
 
-La release fork `v1.3.1` e' basata su `iu8lmc/Decodium-3.0-Codename-Raptor` e aggiunge hardening operativo specifico per macOS.
+La release fork `v1.3.2` e' basata su `iu8lmc/Decodium-3.0-Codename-Raptor` e aggiunge hardening operativo specifico per macOS.
 
 - Base upstream: Decodium v3.0 SE "Raptor"
-- Versione fork: `v1.3.1`
+- Versione fork: `v1.3.2`
 - Bundle/eseguibile su macOS: `ft2.app` / `ft2`
 - Licenza: GPLv3
 
@@ -92,6 +94,8 @@ La release fork `v1.3.1` e' basata su `iu8lmc/Decodium-3.0-Codename-Raptor` e ag
 - Preflight permesso microfono all'avvio per evitare popup tardivo durante l'uso.
 - Strategia DT/NTP robusta (weak-sync + deadband + conferme + filtro sparse jump + hold mode).
 - Path shared memory su macOS migrato a backend `mmap`; bootstrap sysctl via `.pkg` non piu' richiesto negli artifact release standard.
+- Mitigazione freeze/hang in avvio spostando I/O pesante di startup fuori dal thread UI.
+- Loader dati CTY/grid/satellite/comments irrobustiti con limiti di dimensione, guardie parser e recovery fallback.
 - Baseline Raptor mantenuta con integrazioni fork ereditate dal lavoro 1.1.x.
 
 ### Compilazione (macOS)
@@ -122,12 +126,12 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ### Documentazione
 
-- Note di rilascio (EN/IT): [RELEASE_NOTES_v1.3.1.md](RELEASE_NOTES_v1.3.1.md)
+- Note di rilascio (EN/IT): [RELEASE_NOTES_v1.3.2.md](RELEASE_NOTES_v1.3.2.md)
 - Changelog (EN/IT): [CHANGELOG.md](CHANGELOG.md)
 - Report analisi sicurezza e bug: [doc/SECURITY_BUG_ANALYSIS_REPORT.md](doc/SECURITY_BUG_ANALYSIS_REPORT.md)
 - Porting macOS (EN/IT): [doc/MACOS_PORTING_v1.2.0.md](doc/MACOS_PORTING_v1.2.0.md)
 - Architettura DT/NTP (EN/IT): [doc/DT_NTP_ROBUST_SYNC_v1.2.0.md](doc/DT_NTP_ROBUST_SYNC_v1.2.0.md)
-- Template release GitHub (EN/IT): [doc/GITHUB_RELEASE_BODY_v1.3.1.md](doc/GITHUB_RELEASE_BODY_v1.3.1.md)
+- Template release GitHub (EN/IT): [doc/GITHUB_RELEASE_BODY_v1.3.2.md](doc/GITHUB_RELEASE_BODY_v1.3.2.md)
 
 ### Target CI release
 
