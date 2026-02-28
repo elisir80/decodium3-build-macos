@@ -60,8 +60,8 @@ jobs:
       - name: Verify executables
         run: |
           echo "=== Built executables ==="
-          file build-linux/wsjtx build-linux/jt9 build-linux/wsprd build-linux/message_aggregator
-          ls -lh build-linux/wsjtx build-linux/jt9 build-linux/wsprd build-linux/message_aggregator
+          file build-linux/ft2 build-linux/jt9 build-linux/wsprd build-linux/message_aggregator
+          ls -lh build-linux/ft2 build-linux/jt9 build-linux/wsprd build-linux/message_aggregator
 
       - name: Create distribution package
         run: |
@@ -70,7 +70,7 @@ jobs:
           mkdir -p "$DIST_DIR/bin" "$DIST_DIR/share/wsjtx"
 
           # Executables
-          cp build-linux/wsjtx build-linux/jt9 build-linux/wsprd build-linux/message_aggregator "$DIST_DIR/bin/"
+          cp build-linux/ft2 build-linux/jt9 build-linux/wsprd build-linux/message_aggregator "$DIST_DIR/bin/"
           strip "$DIST_DIR/bin/"*
 
           # Data files
@@ -79,14 +79,14 @@ jobs:
           cp -r Palettes "$DIST_DIR/share/wsjtx/" 2>/dev/null || true
 
           # Launcher script
-          cat > "$DIST_DIR/wsjtx.sh" << 'LAUNCHER'
+          cat > "$DIST_DIR/ft2.sh" << 'LAUNCHER'
           #!/bin/bash
           DIR="$(cd "$(dirname "$0")" && pwd)"
           export PATH="$DIR/bin:$PATH"
           export WSJTX_DATA_DIR="$DIR/share/wsjtx"
-          exec "$DIR/bin/wsjtx" "$@"
+          exec "$DIR/bin/ft2" "$@"
           LAUNCHER
-          chmod +x "$DIST_DIR/wsjtx.sh"
+          chmod +x "$DIST_DIR/ft2.sh"
 
           # Runtime dependency installer for target machines
           cat > "$DIST_DIR/install-deps.sh" << 'DEPS'
@@ -114,7 +114,7 @@ jobs:
               libportaudio2 \
               libgfortran5 \
               libgomp1
-          echo "Done. Run ./wsjtx.sh to start."
+          echo "Done. Run ./ft2.sh to start."
           DEPS
           chmod +x "$DIST_DIR/install-deps.sh"
 
