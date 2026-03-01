@@ -21,6 +21,8 @@
 #include <QFile>
 #include <QTextStream>
 #include <QDateTime>
+#include <QMutex>
+#include <QMutexLocker>
 #include "Configuration.hpp"
 #include "revision_utils.hpp"
 #include "Logger.hpp"
@@ -30,6 +32,15 @@
 #include "moc_WorkedBefore.cpp"
 
 using namespace boost::multi_index;
+
+namespace
+{
+QMutex& adif_append_mutex ()
+{
+  static QMutex mutex;
+  return mutex;
+}
+}
 
 // hash function for QString members in hashed indexes
 inline
@@ -451,6 +462,7 @@ bool WorkedBefore::add (QString const& call
 {
   if (call.size ())
     {
+      QMutexLocker lock {&adif_append_mutex ()};
       auto const& entity = m_->prefixes_.lookup (call);
       QFile file {m_->path_};
       if (!file.open(QIODevice::Text | QIODevice::Append))
@@ -464,15 +476,18 @@ bool WorkedBefore::add (QString const& call
             {
               auto ts = QDateTime::currentDateTimeUtc ().toString ("yyyyMMdd HHmmss");
               auto ver = version (true);
+              auto const program_id = QString {"Decodium FT2 %1"}.arg (version (false));
               out <<            // new file
                 QString {
                   "ADIF Export\n"
                   "<adif_ver:5>3.1.1\n"
                   "<created_timestamp:15>%0\n"
-                  "<programid:20>Decodium v3.0 SE KP5\n"
-                  "<programversion:%1>%2\n"
+                  "<programid:%1>%2\n"
+                  "<programversion:%3>%4\n"
                   "<eoh>"
-                    }.arg (ts).arg (ver.size ()).arg (ver)
+                    }.arg (ts)
+                     .arg (program_id.size ()).arg (program_id)
+                     .arg (ver.size ()).arg (ver)
                   <<
 #if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
                  endl

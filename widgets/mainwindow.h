@@ -1109,6 +1109,7 @@ private:
   void set_application_font (QFont const&);
   void setDecodedTextFont (QFont const&);
   void writeSettings();
+  void applyNtpEnabledState(bool enabled, char const * source, bool syncPanel = true);
   void createStatusBar();
   void updateStatusBar();
   void genStdMsgs(QString rpt, bool unconditional = false);

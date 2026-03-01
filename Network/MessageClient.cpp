@@ -13,10 +13,12 @@
 #include <QByteArray>
 #include <QColor>
 #include <QDebug>
+#include <QSet>
 
 #include "NetworkMessage.hpp"
 #include "qt_helpers.hpp"
 #include "pimpl_impl.hpp"
+#include "revision_utils.hpp"
 
 #include "moc_MessageClient.cpp"
 
@@ -67,10 +69,14 @@ public:
   Q_SLOT void host_info_results (QHostInfo);
   void start ();
   void parse_message (QByteArray const&);
+  void parse_message (QByteArray const&, QHostAddress const&, port_type);
   void pending_datagrams ();
   void heartbeat ();
   void closedown ();
   StreamStatus check_status (QDataStream const&) const;
+  void rebuild_trusted_senders ();
+  bool is_trusted_sender (QHostAddress const&, port_type) const;
+  bool message_target_matches (QString const&) const;
   void send_message (QByteArray const&, bool queue_if_pending = true, bool allow_duplicates = false);
   void send_message (QDataStream const& out, QByteArray const& message, bool queue_if_pending = true, bool allow_duplicates = false)
   {
@@ -97,6 +103,8 @@ public:
   quint32 schema_;
   QTimer * heartbeat_timer_;
   std::vector<QHostAddress> blocked_addresses_;
+  QSet<QHostAddress> trusted_senders_;
+  bool warned_untrusted_sender_ {false};
 
   // hold messages sent before host lookup completes asynchronously
   QQueue<QByteArray> pending_messages_;
@@ -114,6 +122,7 @@ void MessageClient::impl::set_server (QString const& server_name, QStringList co
     {
       network_interfaces_.push_back (QNetworkInterface::interfaceFromName (net_if_name));
     }
+  warned_untrusted_sender_ = false;
 
   if (server_.isNull () && server_name.size ()) // DNS lookup required
     {
@@ -147,11 +156,13 @@ void MessageClient::impl::host_info_results (QHostInfo host_info)
           server_ = server_addresses[0];
         }
     }
+  rebuild_trusted_senders ();
   start ();
 }
 
 void MessageClient::impl::start ()
 {
+  rebuild_trusted_senders ();
   if (server_.isNull ())
     {
       Q_EMIT self_->close ();
@@ -213,12 +224,17 @@ void MessageClient::impl::pending_datagrams ()
       if (0 <= readDatagram (datagram.data (), datagram.size (), &sender_address, &sender_port))
         {
           TRACE_UDP ("message received from:" << sender_address << "port:" << sender_port);
-          parse_message (datagram);
+          parse_message (datagram, sender_address, sender_port);
         }
     }
 }
 
 void MessageClient::impl::parse_message (QByteArray const& msg)
+{
+  parse_message (msg, QHostAddress {}, 0u);
+}
+
+void MessageClient::impl::parse_message (QByteArray const& msg, QHostAddress const& sender_address, port_type sender_port)
 {
   try
     {
@@ -228,6 +244,18 @@ void MessageClient::impl::parse_message (QByteArray const& msg)
       NetworkMessage::Reader in {msg};
       if (OK == check_status (in))
         {
+          if (!sender_address.isNull () && !is_trusted_sender (sender_address, sender_port))
+            {
+              if (!warned_untrusted_sender_)
+                {
+                  warned_untrusted_sender_ = true;
+                  Q_EMIT self_->error (QString {"Rejected UDP control packet from untrusted sender %1:%2"}
+                                       .arg (sender_address.toString ())
+                                       .arg (sender_port));
+                }
+              return;
+            }
+
           if (schema_ < in.schema ()) // one time record of server's
                                       // negotiated schema
             {
@@ -237,6 +265,12 @@ void MessageClient::impl::parse_message (QByteArray const& msg)
           if (!enabled_)
             {
               TRACE_UDP ("message processing disabled for id:" << in.id ());
+              return;
+            }
+
+          if (!message_target_matches (in.id ()))
+            {
+              TRACE_UDP ("ignored message for id:" << in.id ());
               return;
             }
 
@@ -451,6 +485,72 @@ void MessageClient::impl::parse_message (QByteArray const& msg)
     {
       Q_EMIT self_->error ("Unexpected exception in MessageClient");
     }
+}
+
+void MessageClient::impl::rebuild_trusted_senders ()
+{
+  trusted_senders_.clear ();
+  if (!server_.isNull () && !server_.isMulticast ())
+    {
+      trusted_senders_.insert (server_);
+    }
+  trusted_senders_.insert (QHostAddress::LocalHost);
+  trusted_senders_.insert (QHostAddress::LocalHostIPv6);
+
+  auto const add_interface = [this] (QNetworkInterface const& net_if) {
+    for (auto const& entry : net_if.addressEntries ())
+      {
+        auto const address = entry.ip ();
+        if (!address.isNull () && !address.isMulticast ())
+          {
+            trusted_senders_.insert (address);
+          }
+      }
+  };
+
+  if (!network_interfaces_.empty ())
+    {
+      for (auto const& net_if : network_interfaces_)
+        {
+          add_interface (net_if);
+        }
+    }
+  else
+    {
+      for (auto const& net_if : QNetworkInterface::allInterfaces ())
+        {
+          add_interface (net_if);
+        }
+    }
+}
+
+bool MessageClient::impl::is_trusted_sender (QHostAddress const& sender, port_type sender_port) const
+{
+  if (sender.isNull ())
+    {
+      return false;
+    }
+  if (server_port_ && sender_port != server_port_)
+    {
+      return false;
+    }
+  if (server_.isLoopback () && sender.isLoopback ())
+    {
+      return true;
+    }
+  return trusted_senders_.contains (sender);
+}
+
+bool MessageClient::impl::message_target_matches (QString const& incoming_id) const
+{
+  auto const trimmed = incoming_id.trimmed ();
+  if (trimmed.isEmpty () || trimmed == id_)
+    {
+      return true;
+    }
+  return trimmed.compare ("ALLCALL", Qt::CaseInsensitive) == 0
+      || trimmed.compare ("BROADCAST", Qt::CaseInsensitive) == 0
+      || trimmed == "*";
 }
 
 void MessageClient::impl::heartbeat ()
@@ -723,7 +823,13 @@ void MessageClient::logged_ADIF (QByteArray const& ADIF_record)
     {
       QByteArray message;
       NetworkMessage::Builder out {&message, NetworkMessage::LoggedADIF, m_->id_, m_->schema_};
-      QByteArray ADIF {"\n<adif_ver:5>3.1.0\n<programid:20>Decodium v3.0 SE KP5\n<EOH>\n" + ADIF_record + " <EOR>"};
+      auto const program_id = QString {"Decodium FT2 %1"}.arg (version (false));
+      QByteArray ADIF {
+        QString {"\n<adif_ver:5>3.1.0\n<programid:%1>%2\n<EOH>\n"}
+          .arg (program_id.size ())
+          .arg (program_id)
+          .toLatin1 ()
+        + ADIF_record + " <EOR>"};
       out << ADIF;
       TRACE_UDP ("ADIF:" << ADIF);
       m_->send_message (out, message);

@@ -1,8 +1,8 @@
 #define MyAppName "Decodium 3.0 FT2 Raptor x86"
 #define MyAppVersion "3.0"
 #define MyAppPublisher "IU8LMC"
-#define MyAppExeName "wsjtx.exe"
-#define MyBuildTag "2602281900"
+#define MyAppExeName "decodium.exe"
+#define MyBuildTag "2603010503"
 #define DistDir "dist_32bit"
 
 [Setup]
@@ -16,11 +16,11 @@ DefaultDirName={autopf}\Decodium_3.0_FT2_x86
 DefaultGroupName=Decodium 3.0 FT2
 OutputDir=.
 OutputBaseFilename=Decodium_3.0_{#MyBuildTag}_FT2_x86_Setup
-SetupIconFile=icons\windows-icons\wsjtx.ico
+SetupIconFile=icons\windows-icons\decodium.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
-UninstallDisplayIcon={app}\wsjtx.exe
+UninstallDisplayIcon={app}\decodium.exe
 PrivilegesRequired=lowest
 ; SignTool and SignedUninstaller require IDE config; exes are already signed
 
@@ -33,14 +33,16 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; Main executables
-Source: "{#DistDir}\wsjtx.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#DistDir}\decodium.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#DistDir}\jt9.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#DistDir}\message_aggregator.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#DistDir}\wsprd.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#DistDir}\rigctl-wsjtx.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#DistDir}\rigctld-wsjtx.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#DistDir}\rigctlcom-wsjtx.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#DistDir}\rigctl-decodium.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#DistDir}\rigctld-decodium.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#DistDir}\rigctlcom-decodium.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#DistDir}\udp_daemon.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#DistDir}\ChronoGPS.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#DistDir}\chronogps_icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 ; DLLs
 Source: "{#DistDir}\*.dll"; DestDir: "{app}"; Flags: ignoreversion

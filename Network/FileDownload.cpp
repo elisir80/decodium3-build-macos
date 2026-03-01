@@ -131,6 +131,10 @@ void FileDownload::replyComplete()
 
 void FileDownload::downloadComplete(QNetworkReply *data)
 {
+  if (data != reply_)
+  {
+    return;
+  }
   // make a temp file in the same place as the file we're downloading. Needs to be on the same
   // filesystem as where we eventually want to 'mv' it.
 
@@ -148,7 +152,10 @@ void FileDownload::downloadComplete(QNetworkReply *data)
       LOG_INFO(QString{ "%1 -> %2"}.arg(QString(hdr)).arg(QString(reply_->rawHeader(hdr))));
   }
 #endif
-  data->deleteLater();
+  if (data && data->isFinished())
+  {
+    data->deleteLater();
+  }
 }
 
 void FileDownload::start_download()
@@ -184,7 +191,6 @@ void FileDownload::download(QUrl qurl)
     reply_ = manager_->get (request_);
   }
 
-  QObject::connect(manager_, &QNetworkAccessManager::finished, this, &FileDownload::downloadComplete, Qt::UniqueConnection);
   QObject::connect(reply_, &QNetworkReply::downloadProgress, this, &FileDownload::downloadProgress, Qt::UniqueConnection);
   QObject::connect(reply_, &QNetworkReply::finished, this, &FileDownload::replyComplete, Qt::UniqueConnection);
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)

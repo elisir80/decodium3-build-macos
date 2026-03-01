@@ -16,6 +16,8 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QDebug>
+#include <QSslSocket>
+#include <QMetaObject>
 #include "qt_helpers.hpp"
 #include "Logger.hpp"
 #include "FileDownload.hpp"
@@ -45,24 +47,33 @@ public:
   {
   }
 
-  void load (QString const& url, bool fetch, bool forced_fetch)
+	  void load (QString const& url, bool fetch, bool forced_fetch)
   {
     abort ();                   // abort any active download
     auto csv_file_name = csv_file_.fileName ();
     auto exists = QFileInfo::exists (csv_file_name);
     if (fetch && (!exists || forced_fetch))
     {
-      current_url_.setUrl(url);
+      current_url_.setUrl(url.trimmed());
+      if (current_url_.scheme().isEmpty())
+      {
+        current_url_.setScheme("https");
+      }
+      if (current_url_.isValid() && current_url_.scheme().compare("https", Qt::CaseInsensitive) != 0)
+      {
+        current_url_.setScheme("https");
+      }
       if (current_url_.isValid() && !QSslSocket::supportsSsl())
       {
-        current_url_.setScheme("http");
+        Q_EMIT self_->LotW_users_error (QObject::tr ("SSL/TLS support is required for LotW downloads"));
+        return;
       }
       redirect_count_ = 0;
 
-      Q_EMIT self_->progress (QString("Starting download from %1").arg(url));
+      Q_EMIT self_->progress (QString("Starting download from %1").arg(current_url_.toString()));
 
       lotw_downloader_.configure(network_manager_,
-                                 url,
+                                 current_url_.toString(),
                                  csv_file_name,
                                  "Decodium v3.0 SE KP5 LotW User Downloader");
       if (!connected_)
@@ -120,8 +131,11 @@ public:
         throw std::runtime_error {QObject::tr ("Failed to open LotW users CSV file: '%1'").arg (f.fileName ()).toStdString ()};
       }
     LOG_INFO(QString{"LotWUsers: Loaded %1 records from %2"}.arg(result.size()).arg(lotw_csv_file));
-    Q_EMIT self_->progress (QString{"Loaded %1 records from LotW."}.arg(result.size()));
-    Q_EMIT self_->load_finished();
+    auto const loaded_count = result.size ();
+    QMetaObject::invokeMethod (self_, [this, loaded_count] () {
+      Q_EMIT self_->progress (QString {"Loaded %1 records from LotW."}.arg (loaded_count));
+      Q_EMIT self_->load_finished ();
+    }, Qt::QueuedConnection);
     return result;
   }
 

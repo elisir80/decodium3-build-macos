@@ -1401,6 +1401,15 @@ bool TCITransceiver::wait_for_tci_event (QTimer * timer, int index, int ms)
       return false;
     }
 
+  // Never spin-wait from the GUI thread: this path is intended for the
+  // transceiver worker thread only.
+  if (QCoreApplication::instance ()
+      && QThread::currentThread () == QCoreApplication::instance ()->thread ())
+    {
+      qWarning () << "TCI wait requested on GUI thread; refusing blocking wait";
+      return false;
+    }
+
   tci_done_flags_[static_cast<size_t> (index)] = false;
   if (ms > 0)
     {
@@ -1413,7 +1422,7 @@ bool TCITransceiver::wait_for_tci_event (QTimer * timer, int index, int ms)
 
   while (true)
     {
-      QCoreApplication::processEvents (QEventLoop::AllEvents, 20);
+      QCoreApplication::processEvents (QEventLoop::ExcludeUserInputEvents, 20);
       if (tci_done_flags_[static_cast<size_t> (index)])
         {
           finished = true;
@@ -1427,7 +1436,6 @@ bool TCITransceiver::wait_for_tci_event (QTimer * timer, int index, int ms)
         {
           break; // fail-safe timeout
         }
-      QThread::msleep (2);
     }
 
   if (timer->isActive ())

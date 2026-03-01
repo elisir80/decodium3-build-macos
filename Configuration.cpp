@@ -2163,11 +2163,18 @@ Configuration::impl::impl (Configuration * self, QNetworkAccessManager * network
   // avt 2/10/26 prevent crash, wait until very large logbook read
   QTimer::singleShot (30000, [=] {lotw_users_.load (ui_->LotW_CSV_URL_line_edit->text (), fetch_if_needed);});
 
-  // Auto-update cty.dat if older than 30 days or missing
+  // Auto-update cty.dat at startup:
+  // - missing file: download immediately
+  // - stale file (>30 days): delayed background refresh
   {
     QDir dataPath {QStandardPaths::writableLocation (QStandardPaths::DataLocation)};
     QFileInfo ctyInfo (dataPath.absoluteFilePath ("cty.dat"));
-    if (!ctyInfo.exists () || ctyInfo.lastModified ().daysTo (QDateTime::currentDateTime ()) > 30) {
+    bool const missing = !ctyInfo.exists ();
+    bool const stale = ctyInfo.exists ()
+                       && ctyInfo.lastModified ().daysTo (QDateTime::currentDateTime ()) > 30;
+    if (missing) {
+      QTimer::singleShot (0, this, [this] { on_CTY_download_button_clicked (true); });
+    } else if (stale) {
       QTimer::singleShot (5000, this, [this] { on_CTY_download_button_clicked (true); });
     }
   }
@@ -3846,7 +3853,7 @@ void Configuration::impl::on_CTY_download_button_clicked (bool /*clicked*/)
   ui_->CTY_download_button->setEnabled (false); // disable button until download is complete
   QDir dataPath {QStandardPaths::writableLocation (QStandardPaths::DataLocation)};
   cty_download.configure(network_manager_,
-                         "http://www.country-files.com/bigcty/cty.dat",
+                         "https://www.country-files.com/bigcty/cty.dat",
                          dataPath.absoluteFilePath("cty.dat"),
                          "Decodium v3.0 SE KP5 CTY Downloader");
 

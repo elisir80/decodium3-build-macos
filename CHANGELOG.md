@@ -1,5 +1,85 @@
 # Changelog / Registro Modifiche
 
+## [1.3.5] - 2026-03-01
+
+### English
+
+Release focused on closing network/security findings, improving FT2 decode behavior, and stabilizing NTP + startup CTY flow.
+
+#### Changed
+
+- FT2 decoder upgraded with multi-period soft averaging path (`avemsg.txt`, averaging clear hook, averaged retry when single-period decode fails).
+- FT2 message-averaging UI path enabled consistently in mode-specific visibility logic.
+- NTP state handling centralized in MainWindow to avoid desync between status bar/panel toggles.
+- NTP bootstrap strategy hardened with:
+  - reliable server prioritization (`time.apple.com`, Cloudflare, Google, pool),
+  - single-server bootstrap confirmations,
+  - IPv4/IPv6-mapped sender key normalization,
+  - adaptive RTT gate at bootstrap,
+  - automatic pin to `time.apple.com` after repeated UDP no-response.
+- Startup `cty.dat` policy refined:
+  - immediate auto-download when file is missing,
+  - delayed background refresh only when stale (>30 days),
+  - HTTPS endpoint enforced for CTY download.
+- Release/version metadata aligned to `v1.3.5` across CMake defaults, UI title/about labels, scripts, workflow defaults, and documentation.
+
+#### Fixed
+
+- Cloudlog upload/auth now enforces HTTPS endpoint normalization and avoids blocking nested modal dialogs in network callbacks.
+- LotW download no longer silently downgrades TLS to HTTP; cross-thread completion/progress emissions marshaled safely into Qt event loop.
+- UDP remote-control surface reduced in MessageClient:
+  - sender trust list enforcement,
+  - destination id filtering,
+  - warning path for untrusted packets.
+- ADIF/log integrity hardening:
+  - field sanitization before ADIF assembly in `LogBook`,
+  - mutex-protected append path in `WorkedBefore`,
+  - dynamic `programid` string generation from active fork version.
+- FileDownload callback handling hardened to ignore stale replies and avoid manager-level finished fan-out races.
+- PSKReporter timer arithmetic fixed (`(MIN_SEND_INTERVAL + 1) * 1000`) and global spot cache protected with mutex.
+- Settings trace output now redacts sensitive keys (passwords/tokens/api keys/cloudlog/lotw credentials).
+- Windows `killbyname` process enumeration now uses dynamic buffer sizing (no fixed 1000-process truncation).
+- NTP status label now reflects active offset during weak-sync hold (no stale `NTP: --` while synced).
+
+### Italiano
+
+Release focalizzata sulla chiusura di finding rete/sicurezza, sul miglioramento del comportamento decode FT2 e sulla stabilita' NTP + CTY in avvio.
+
+#### Modificato
+
+- Decoder FT2 aggiornato con percorso di media multi-periodo (`avemsg.txt`, hook di reset media, retry su media quando il decode single-period fallisce).
+- Percorso UI message-averaging FT2 reso coerente nella logica di visibilita' per modalita'.
+- Gestione stato NTP centralizzata in MainWindow per evitare desincronizzazioni tra toggle status bar/pannello.
+- Strategia bootstrap NTP irrobustita con:
+  - priorita' server affidabili (`time.apple.com`, Cloudflare, Google, pool),
+  - conferme bootstrap con singolo server,
+  - normalizzazione chiavi mittente IPv4/IPv6-mapped,
+  - soglia RTT adattiva in bootstrap,
+  - pin automatico a `time.apple.com` dopo no-response UDP ripetuti.
+- Policy startup `cty.dat` rifinita:
+  - auto-download immediato se il file manca,
+  - refresh background ritardato solo se stale (>30 giorni),
+  - endpoint HTTPS forzato per download CTY.
+- Metadati release/versione allineati a `v1.3.5` su default CMake, title/about UI, script, default workflow e documentazione.
+
+#### Corretto
+
+- Upload/auth Cloudlog ora con normalizzazione HTTPS e senza dialog modale bloccante nei callback rete.
+- Download LotW non degrada piu' silenziosamente da TLS a HTTP; emissioni completion/progress cross-thread instradate in sicurezza nel loop Qt.
+- Superficie controllo remoto UDP ridotta in MessageClient:
+  - enforcement sender trusted list,
+  - filtro id destinazione,
+  - warning su pacchetti non trusted.
+- Hardening integrita' ADIF/log:
+  - sanitizzazione campi prima della composizione ADIF in `LogBook`,
+  - append protetto da mutex in `WorkedBefore`,
+  - generazione dinamica `programid` dalla versione fork attiva.
+- Gestione callback FileDownload irrobustita per ignorare reply stale e prevenire race da fan-out `finished` del manager.
+- Correzione aritmetica timer PSKReporter (`(MIN_SEND_INTERVAL + 1) * 1000`) e protezione mutex per cache spot globale.
+- Output trace impostazioni ora con redazione chiavi sensibili (password/token/api key/credenziali cloudlog/lotw).
+- Enumerazione processi Windows in `killbyname` ora con buffer dinamico (niente troncamento fisso a 1000 processi).
+- Label stato NTP ora mostra l'offset attivo anche durante weak-sync hold (niente `NTP: --` stale quando e' synced).
+
 ## [1.3.4] - 2026-02-28
 
 ### English

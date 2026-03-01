@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <tlhelp32.h>
 #include <iostream>
+#include <vector>
 
 int killbyname(const char *szToTerminate)
 // Created: 6/23/2000  (Ravi Kochhar)
@@ -29,7 +30,8 @@ int killbyname(const char *szToTerminate)
 
 {
   BOOL bResult,bResultm;
-  DWORD aiPID[1000],iCb=1000,iNumProc;  //,iV2000=0;
+  std::vector<DWORD> aiPID (1024);
+  DWORD iNumProc;  //,iV2000=0;
   DWORD iCbneeded,i,iFound=0;
   char szName[MAX_PATH],szToTermUpper[MAX_PATH];
   HANDLE hProc,hSnapShot,hSnapShotm;
@@ -97,11 +99,22 @@ int killbyname(const char *szToTerminate)
       return 700;
     }
 
-    bResult=lpfEnumProcesses(aiPID,iCb,&iCbneeded);
-    if(!bResult) {
-      // Unable to get process list, EnumProcesses failed
-      FreeLibrary(hInstLib);
-      return 701;
+    while (true) {
+      DWORD const cb = static_cast<DWORD> (aiPID.size () * sizeof (DWORD));
+      bResult=lpfEnumProcesses(aiPID.data(), cb, &iCbneeded);
+      if(!bResult) {
+        // Unable to get process list, EnumProcesses failed
+        FreeLibrary(hInstLib);
+        return 701;
+      }
+      if (iCbneeded < cb) {
+        break;
+      }
+      aiPID.resize(aiPID.size() * 2);
+      if (aiPID.size() > 65536) {
+        FreeLibrary(hInstLib);
+        return 701;
+      }
     }
 
     // How many processes are there?
@@ -113,7 +126,7 @@ int killbyname(const char *szToTerminate)
       strcpy(szName,"Unknown");
       // First, get a handle to the process
       hProc=OpenProcess(PROCESS_QUERY_INFORMATION|PROCESS_VM_READ,FALSE,
-                        aiPID[i]);
+                        aiPID[static_cast<size_t>(i)]);
       // Now, get the process name
       if(hProc) {
         if(lpfEnumProcessModules(hProc,&hMod,sizeof(hMod),&iCbneeded) ) {
@@ -127,7 +140,7 @@ int killbyname(const char *szToTerminate)
         // Process found, now terminate it
         iFound=1;
         // First open for termination
-        hProc=OpenProcess(PROCESS_TERMINATE,FALSE,aiPID[i]);
+        hProc=OpenProcess(PROCESS_TERMINATE,FALSE,aiPID[static_cast<size_t>(i)]);
         if(hProc) {
           if(TerminateProcess(hProc,0)) {
             // process terminated

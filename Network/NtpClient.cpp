@@ -15,6 +15,21 @@ namespace
 {
   constexpr double HTTP_COARSE_ABS_LIMIT_MS = 180.0;
   constexpr int NTP_INITIAL_MIN_SERVERS = 2;
+  constexpr int NTP_SINGLE_SERVER_BOOTSTRAP_CONFIRM = 2;
+  constexpr double NTP_SINGLE_SERVER_STABILITY_WINDOW_MS = 120.0;
+  constexpr char const * NTP_AUTO_FALLBACK_SERVER = "time.apple.com";
+
+  QString normalized_address_key(QHostAddress const& address)
+  {
+    if (address.protocol() == QAbstractSocket::IPv6Protocol) {
+      bool ok = false;
+      quint32 const v4 = address.toIPv4Address(&ok);
+      if (ok) {
+        return QHostAddress(v4).toString();
+      }
+    }
+    return address.toString();
+  }
 
   double median_of(QVector<double> values)
   {
@@ -135,8 +150,15 @@ void NtpClient::setEnabled(bool enabled)
     m_activeLookupIds.clear();
     m_queriedAddresses.clear();
     m_synced = false;
+    if (m_autoPinnedCustomServer) {
+      m_customServer.clear();
+      m_autoPinnedCustomServer = false;
+    }
     resetWeakSyncState();
     resetSparseJumpState();
+    m_singleServerConfirmCount = 0;
+    m_singleServerHasCandidate = false;
+    m_singleServerLastCandidateMs = 0.0;
     m_lastGoodSyncMs = 0;
     m_socket.close();
   }
@@ -154,6 +176,7 @@ void NtpClient::setInitialOffset(double offsetMs)
 void NtpClient::setCustomServer(QString const& server)
 {
   m_customServer = server.trimmed();
+  m_autoPinnedCustomServer = false;
 }
 
 void NtpClient::setRefreshInterval(int ms)
@@ -177,16 +200,40 @@ void NtpClient::syncNow()
   m_activeLookupIds.clear();
   m_queriedAddresses.clear();
 
-  // Select a random subset of servers (max 8) to avoid overloading
-  QStringList selected = m_servers;
+  // Build query list:
+  // 1) custom server (if set)
+  // 2) reliable bootstrap servers (stable on most networks)
+  // 3) randomized remainder of configured servers
+  QStringList selected;
+  auto appendUnique = [&selected](QString const& server) {
+    if (server.isEmpty()) return;
+    if (!selected.contains(server)) selected.append(server);
+  };
+
+  if (!m_customServer.isEmpty()) {
+    appendUnique(m_customServer);
+  }
+
+  static const QStringList bootstrapServers{
+    "time.apple.com",
+    "time.cloudflare.com",
+    "time.google.com",
+    "time1.google.com",
+    "0.pool.ntp.org",
+    "1.pool.ntp.org",
+    "2.pool.ntp.org",
+    "3.pool.ntp.org",
+  };
+  for (auto const& s : bootstrapServers) {
+    appendUnique(s);
+  }
+
+  QStringList randomized = m_servers;
   std::random_device rd;
   std::mt19937 rng(rd());
-  std::shuffle(selected.begin(), selected.end(), rng);
-
-  // Optional preferred server (queried first).
-  if (!m_customServer.isEmpty()) {
-    selected.removeAll(m_customServer);
-    selected.prepend(m_customServer);
+  std::shuffle(randomized.begin(), randomized.end(), rng);
+  for (auto const& s : randomized) {
+    appendUnique(s);
   }
 
   int queryCount = qMin(selected.size(), SERVERS_PER_QUERY);
@@ -245,7 +292,7 @@ void NtpClient::onDnsLookupResult(QHostInfo hostInfo)
 
 void NtpClient::sendQuery(QHostAddress const& address)
 {
-  auto key = address.toString();
+  auto key = normalized_address_key(address);
   if (m_queriedAddresses.contains(key)) {
     return;
   }
@@ -289,7 +336,7 @@ void NtpClient::onReadyRead()
     // Record T4 (client receive time)
     qint64 t4Ms = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
 
-    QString senderKey = datagram.senderAddress().toString();
+    QString senderKey = normalized_address_key(datagram.senderAddress());
     if (!m_pendingQueries.contains(senderKey)) continue;
 
     qint64 t1Ms = m_pendingQueries.value(senderKey).t1Ms;
@@ -330,7 +377,9 @@ void NtpClient::onReadyRead()
     double offset = ((t2Ms - t1Ms) + (t3Ms - t4Ms)) / 2.0;
     double rtt = (t4Ms - t1Ms) - (t3Ms - t2Ms);
 
-    if (rtt < 0.0 || rtt > m_maxRttMs) continue;
+    // Bootstrap must tolerate slower WAN paths; once locked keep tighter RTT.
+    double const rttLimit = m_hasOffsetLock ? m_maxRttMs : qMax(m_maxRttMs, 500.0);
+    if (rtt < 0.0 || rtt > rttLimit) continue;
 
     // Sanity gate: discard offsets > 1 hour
     if (std::abs(offset) > MAX_OFFSET_MS) continue;
@@ -362,6 +411,19 @@ void NtpClient::onQueryTimeout()
   if (m_collectedOffsets.isEmpty()) {
     // NTP failed — track consecutive failures
     ++m_ntpConsecutiveFailures;
+    if (m_ntpConsecutiveFailures >= 2 && m_customServer.isEmpty() && !m_autoPinnedCustomServer) {
+      m_customServer = QString::fromLatin1(NTP_AUTO_FALLBACK_SERVER);
+      m_autoPinnedCustomServer = true;
+      m_synced = false;
+      m_refreshTimer.setInterval(REFRESH_RETRY_MS);
+      Q_EMIT syncStatusChanged(
+          false,
+          QString("NTP auto-fallback: forcing %1 after repeated UDP no-response")
+              .arg(m_customServer));
+      QTimer::singleShot(0, this, &NtpClient::syncNow);
+      return;
+    }
+
     if (m_ntpConsecutiveFailures >= 3) {
       auto const nowMs = QDateTime::currentDateTimeUtc().toMSecsSinceEpoch();
       bool const holdByRecentLock =
@@ -391,6 +453,9 @@ void NtpClient::onQueryTimeout()
 
     // Use faster retry interval when not synced
     m_refreshTimer.setInterval(REFRESH_RETRY_MS);
+    m_singleServerConfirmCount = 0;
+    m_singleServerHasCandidate = false;
+    m_singleServerLastCandidateMs = 0.0;
     return;
   }
 
@@ -484,8 +549,54 @@ void NtpClient::onQueryTimeout()
       resetSparseJumpState();
     }
   } else {
+    bool bootstrapReady = true;
     if (n < NTP_INITIAL_MIN_SERVERS) {
+      bootstrapReady = false;
+
+      if (n == 1) {
+        // Some networks only allow one reachable NTP server.
+        // Accept initial lock after repeated stable single-server readings.
+        double const candidate = coherent.isEmpty() ? 0.0 : coherent.first();
+        if (m_singleServerHasCandidate
+            && std::abs(candidate - m_singleServerLastCandidateMs) <= NTP_SINGLE_SERVER_STABILITY_WINDOW_MS) {
+          ++m_singleServerConfirmCount;
+        } else {
+          m_singleServerConfirmCount = 1;
+        }
+        m_singleServerHasCandidate = true;
+        m_singleServerLastCandidateMs = candidate;
+
+        if (m_singleServerConfirmCount >= NTP_SINGLE_SERVER_BOOTSTRAP_CONFIRM) {
+          bootstrapReady = true;
+        } else {
+          m_synced = false;
+          m_refreshTimer.setInterval(REFRESH_RETRY_MS);
+          Q_EMIT syncStatusChanged(
+              false,
+              QString("NTP waiting: single-server bootstrap %1/%2 (offset %3 ms)")
+                  .arg(m_singleServerConfirmCount)
+                  .arg(NTP_SINGLE_SERVER_BOOTSTRAP_CONFIRM)
+                  .arg(candidate, 0, 'f', 1));
+          return;
+        }
+      } else {
+        m_singleServerConfirmCount = 0;
+        m_singleServerHasCandidate = false;
+        m_singleServerLastCandidateMs = 0.0;
+        m_synced = false;
+        m_refreshTimer.setInterval(REFRESH_RETRY_MS);
+        Q_EMIT syncStatusChanged(
+            false,
+            QString("NTP waiting: only %1 server response, need >=%2 for initial lock")
+                .arg(n)
+                .arg(NTP_INITIAL_MIN_SERVERS));
+        return;
+      }
+    }
+
+    if (!bootstrapReady) {
       m_synced = false;
+      m_refreshTimer.setInterval(REFRESH_RETRY_MS);
       Q_EMIT syncStatusChanged(
           false,
           QString("NTP waiting: only %1 server response, need >=%2 for initial lock")
@@ -494,6 +605,9 @@ void NtpClient::onQueryTimeout()
       return;
     }
     resetSparseJumpState();
+    m_singleServerConfirmCount = 0;
+    m_singleServerHasCandidate = false;
+    m_singleServerLastCandidateMs = 0.0;
   }
 
   m_synced = true;

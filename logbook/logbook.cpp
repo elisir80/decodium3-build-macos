@@ -10,6 +10,27 @@
 
 #include "moc_logbook.cpp"
 
+namespace
+{
+QString sanitize_adif_value (QString const& in, bool preserve_spaces = true)
+{
+  QString out;
+  out.reserve (in.size ());
+  for (auto const& ch : in)
+    {
+      if (ch.isNull () || ch == QChar {'<'} || ch == QChar {'>'} || ch == QChar {'\r'} || ch == QChar {'\n'})
+        {
+          continue;
+        }
+      if (ch.isPrint () || (preserve_spaces && ch.isSpace ()))
+        {
+          out.append (ch);
+        }
+    }
+  return out.trimmed ();
+}
+}
+
 LogBook::LogBook (Configuration const * configuration)
   : config_ {configuration}
   , worked_before_ {configuration}
@@ -82,38 +103,58 @@ QByteArray LogBook::QSOToADIF (QString const& hisCall, QString const& hisGrid, Q
                                QString const& xSent, QString const& xRcvd, QString const& propmode,
                                QString const& satellite, QString const& satmode, QString const& freqRx)
 {
+  auto const safeHisCall = sanitize_adif_value (hisCall, false);
+  auto const safeHisGrid = sanitize_adif_value (hisGrid, false);
+  auto const safeMode = sanitize_adif_value (mode, false);
+  auto const safeRptSent = sanitize_adif_value (rptSent, false);
+  auto const safeRptRcvd = sanitize_adif_value (rptRcvd, false);
+  auto const safeBand = sanitize_adif_value (band, false);
+  auto const safeComments = sanitize_adif_value (comments, true);
+  auto const safeName = sanitize_adif_value (name, true);
+  auto const safeDialFreq = sanitize_adif_value (strDialFreq, false);
+  auto const safeMyCall = sanitize_adif_value (myCall, false);
+  auto const safeMyGrid = sanitize_adif_value (myGrid, false);
+  auto const safeTxPower = sanitize_adif_value (txPower, false);
+  auto const safeOperator = sanitize_adif_value (operator_call, false);
+  auto const safeXSent = sanitize_adif_value (xSent, true);
+  auto const safeXRcvd = sanitize_adif_value (xRcvd, true);
+  auto const safePropmode = sanitize_adif_value (propmode, false);
+  auto const safeSatellite = sanitize_adif_value (satellite, false);
+  auto const safeSatmode = sanitize_adif_value (satmode, false);
+  auto const safeFreqRx = sanitize_adif_value (freqRx, false);
+
   QString t;
-  t = "<call:" + QString::number(hisCall.size()) + ">" + hisCall;
-  t += " <gridsquare:" + QString::number(hisGrid.size()) + ">" + hisGrid;
-  if (mode != "FT4" && mode != "FST4" && mode != "Q65")
+  t = "<call:" + QString::number(safeHisCall.size()) + ">" + safeHisCall;
+  t += " <gridsquare:" + QString::number(safeHisGrid.size()) + ">" + safeHisGrid;
+  if (safeMode != "FT4" && safeMode != "FST4" && safeMode != "Q65")
     {
-      t += " <mode:" + QString::number(mode.size()) + ">" + mode;
+      t += " <mode:" + QString::number(safeMode.size()) + ">" + safeMode;
     }
   else
     {
-      t += " <mode:4>MFSK <submode:" + QString::number(mode.size()) + ">" + mode;
+      t += " <mode:4>MFSK <submode:" + QString::number(safeMode.size()) + ">" + safeMode;
     }
-  t += " <rst_sent:" + QString::number(rptSent.size()) + ">" + rptSent;
-  t += " <rst_rcvd:" + QString::number(rptRcvd.size()) + ">" + rptRcvd;
+  t += " <rst_sent:" + QString::number(safeRptSent.size()) + ">" + safeRptSent;
+  t += " <rst_rcvd:" + QString::number(safeRptRcvd.size()) + ">" + safeRptRcvd;
   t += " <qso_date:8>" + dateTimeOn.date().toString("yyyyMMdd");
   t += " <time_on:6>" + dateTimeOn.time().toString("hhmmss");
   t += " <qso_date_off:8>" + dateTimeOff.date().toString("yyyyMMdd");
   t += " <time_off:6>" + dateTimeOff.time().toString("hhmmss");
-  t += " <band:" + QString::number(band.size()) + ">" + band;
-  t += " <freq:" + QString::number(strDialFreq.size()) + ">" + strDialFreq;
-  t += " <station_callsign:" + QString::number(myCall.size()) + ">" + myCall;
-  if(myGrid!="") t += " <my_gridsquare:" + QString::number(myGrid.size()) + ">" + myGrid;
-  if(txPower!="") t += " <tx_pwr:" + QString::number(txPower.size()) + ">" + txPower;
-  if(comments!="") t += " <comment:" + QString::number(comments.size()) + ">" + comments;
-  if(name!="") t += " <name:" + QString::number(name.size()) + ">" + name;
-  if(operator_call!="") t+=" <operator:" + QString::number(operator_call.size()) + ">" + operator_call;
-  if(propmode!="") t += " <prop_mode:" + QString::number(propmode.size()) + ">" + propmode;
-  if(satellite!="") t += " <sat_name:" + QString::number(satellite.size()) + ">" + satellite;
-  if(satmode!="") t += " <sat_mode:" + QString::number(satmode.size()) + ">" + satmode;
-  if(freqRx!="") t += " <freq_rx:" + QString::number(freqRx.size()) + ">" + freqRx;
-  if (xSent.size ())
+  t += " <band:" + QString::number(safeBand.size()) + ">" + safeBand;
+  t += " <freq:" + QString::number(safeDialFreq.size()) + ">" + safeDialFreq;
+  t += " <station_callsign:" + QString::number(safeMyCall.size()) + ">" + safeMyCall;
+  if(!safeMyGrid.isEmpty()) t += " <my_gridsquare:" + QString::number(safeMyGrid.size()) + ">" + safeMyGrid;
+  if(!safeTxPower.isEmpty()) t += " <tx_pwr:" + QString::number(safeTxPower.size()) + ">" + safeTxPower;
+  if(!safeComments.isEmpty()) t += " <comment:" + QString::number(safeComments.size()) + ">" + safeComments;
+  if(!safeName.isEmpty()) t += " <name:" + QString::number(safeName.size()) + ">" + safeName;
+  if(!safeOperator.isEmpty()) t+=" <operator:" + QString::number(safeOperator.size()) + ">" + safeOperator;
+  if(!safePropmode.isEmpty()) t += " <prop_mode:" + QString::number(safePropmode.size()) + ">" + safePropmode;
+  if(!safeSatellite.isEmpty()) t += " <sat_name:" + QString::number(safeSatellite.size()) + ">" + safeSatellite;
+  if(!safeSatmode.isEmpty()) t += " <sat_mode:" + QString::number(safeSatmode.size()) + ">" + safeSatmode;
+  if(!safeFreqRx.isEmpty()) t += " <freq_rx:" + QString::number(safeFreqRx.size()) + ">" + safeFreqRx;
+  if (safeXSent.size ())
     {
-      auto words = xSent.split (' '
+      auto words = safeXSent.split (' '
 #if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
                                 , QString::SkipEmptyParts
 #else
@@ -141,8 +182,8 @@ QByteArray LogBook::QSOToADIF (QString const& hisCall, QString const& hisGrid, Q
             }
         }
     }
-  if (xRcvd.size ()) {
-    auto words = xRcvd.split (' '
+  if (safeXRcvd.size ()) {
+    auto words = safeXRcvd.split (' '
 #if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
                               , QString::SkipEmptyParts
 #else
@@ -167,7 +208,7 @@ QByteArray LogBook::QSOToADIF (QString const& hisCall, QString const& hisGrid, Q
                 // include DX as an ARRL_SECT value even though it is
                 // not in the ADIF spec ARRL_SECT enumeration, done
                 // because N1MM does the same
-                t += " <contest_id:14>ARRL-FIELD-DAY <SRX_STRING:" + QString::number (xRcvd.size ()) + '>' + xRcvd
+                t += " <contest_id:14>ARRL-FIELD-DAY <SRX_STRING:" + QString::number (safeXRcvd.size ()) + '>' + safeXRcvd
                   + " <class:" + QString::number (words.at (0).size ()) + '>'
                   + words.at (0) + " <arrl_sect:" + QString::number (words.at (1).size ()) + '>' + words.at (1);
               }

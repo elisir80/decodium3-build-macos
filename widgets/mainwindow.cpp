@@ -5263,7 +5263,7 @@ void MainWindow::statusChanged()
   if (m_specOp==SpecOp::FOX) {
     if (m_config.superFox()) ui->comboBoxCQ->setCurrentIndex(0);    // No directional calls supported yet for SuperFox mode
   }
-  if (m_config.enable_VHF_features() && (m_mode=="JT4" or m_mode=="Q65" or m_mode=="JT65")) {
+  if (m_config.enable_VHF_features() && (m_mode=="JT4" or m_mode=="Q65" or m_mode=="JT65" or m_mode=="FT2")) {
     ui->actionInclude_averaging->setVisible(true);
     ui->actionAuto_Clear_Avg->setVisible(true);
   } else {
@@ -5275,7 +5275,7 @@ void MainWindow::statusChanged()
   } else {
     ui->actionDisable_clicks_on_waterfall->setVisible(false);
   }
-  if (m_mode=="JT4" or m_mode=="Q65" or m_mode=="JT65") {
+  if (m_mode=="JT4" or m_mode=="Q65" or m_mode=="JT65" or m_mode=="FT2") {
     if (ui->actionInclude_averaging->isVisible() && ui->actionInclude_averaging->isChecked()) {
       ui->lh_decodes_title_label->setText(tr ("Single-Period Decodes"));
       ui->rh_decodes_title_label->setText(tr ("Average Decodes"));
@@ -5378,6 +5378,42 @@ bool MainWindow::eventFilter (QObject * object, QEvent * event)
   return QObject::eventFilter(object, event);
 }
 
+void MainWindow::applyNtpEnabledState(bool enabled, char const * source, bool syncPanel)
+{
+  bool const changed = (m_ntpEnabled != enabled);
+  m_ntpEnabled = enabled;
+
+  if (ntp_checkbox.isChecked() != enabled) {
+    QSignalBlocker blocker{&ntp_checkbox};
+    ntp_checkbox.setChecked(enabled);
+  }
+
+  if (m_ntpClient && changed) {
+    m_ntpClient->setEnabled(enabled);
+  }
+
+  if (!enabled) {
+    ntp_status_label.setText("NTP: OFF");
+    ntp_status_label.setStyleSheet("QLabel{color:#888;background:#333}");
+    ntp_status_label.setToolTip("NTP disabled");
+    m_ntpOffset_ms = 0.0;
+    setGlobalNtpOffsetMs(0.0);
+  } else if (changed) {
+    ntp_status_label.setText("NTP: --");
+    ntp_status_label.setStyleSheet("QLabel{color:#888;background:#333}");
+    ntp_status_label.setToolTip("NTP initializing");
+  }
+
+  if (syncPanel && m_timeSyncPanel) {
+    m_timeSyncPanel->syncNtpEnabled(enabled);
+  }
+
+  if (changed) {
+    qInfo() << "NTP state changed" << (enabled ? "ON" : "OFF")
+            << "source:" << source;
+  }
+}
+
 void MainWindow::createStatusBar()                           //createStatusBar
 {
   tx_status_label.setAlignment (Qt::AlignHCenter);
@@ -5412,19 +5448,8 @@ void MainWindow::createStatusBar()                           //createStatusBar
   ntp_checkbox.setText("NTP");
   ntp_checkbox.setToolTip("Enable/disable internal NTP time synchronization");
   ntp_checkbox.setChecked(m_ntpEnabled);
-  connect(&ntp_checkbox, &QCheckBox::toggled, this, [this](bool checked) {
-    m_ntpEnabled = checked;
-    if (m_ntpClient) {
-      m_ntpClient->setEnabled(checked);
-    }
-    if (!checked) {
-      ntp_status_label.setText("NTP: OFF");
-      ntp_status_label.setStyleSheet("QLabel{color:#888;background:#333}");
-      ntp_status_label.setToolTip("NTP disabled");
-      m_ntpOffset_ms = 0.0;
-      setGlobalNtpOffsetMs (0.0);
-    }
-    if (m_timeSyncPanel) m_timeSyncPanel->syncNtpEnabled(checked);
+  connect(&ntp_checkbox, &QCheckBox::clicked, this, [this](bool checked) {
+    applyNtpEnabledState(checked, "statusbar_checkbox");
   });
   statusBar()->addWidget(&ntp_checkbox);
 
@@ -5954,18 +5979,7 @@ void MainWindow::on_actionTime_Sync_triggered()
     // Panel → MainWindow: NTP enable toggle
     connect(m_timeSyncPanel.data(), &TimeSyncPanel::ntpEnableToggled,
             this, [this](bool en) {
-      m_ntpEnabled = en;
-      ntp_checkbox.setChecked(en);
-      if (m_ntpClient) {
-        m_ntpClient->setEnabled(en);
-      }
-      if (!en) {
-        m_ntpOffset_ms = 0;
-        setGlobalNtpOffsetMs (0.0);
-        ntp_status_label.setText("NTP: OFF");
-        ntp_status_label.setStyleSheet("QLabel{color:#888;background:#333}");
-        ntp_status_label.setToolTip("NTP disabled");
-      }
+      applyNtpEnabledState(en, "timesync_panel");
     });
 
     // Panel → MainWindow: custom server changed
@@ -8818,7 +8832,7 @@ void MainWindow::readFromStdout()                             //readFromStdout
         } else {
           if (stdMsg && okToPost) pskPost(decodedtext);
         }
-        if((m_mode=="JT4" or m_mode=="JT65" or m_mode=="Q65") and
+        if((m_mode=="JT4" or m_mode=="JT65" or m_mode=="Q65" or m_mode=="FT2") and
            m_msgAvgWidget!=NULL) {
           if(m_msgAvgWidget->isVisible()) {
             QFile f(m_config.temp_dir ().absoluteFilePath ("avemsg.txt"));
@@ -12691,7 +12705,7 @@ void MainWindow::on_actionFT2_triggered()
   ui->lh_decodes_title_label->setText(tr ("Band Activity"));
   ui->lh_decodes_headings_label->setText( "  UTC   dB   DT Freq    " + tr ("Message"));
 //                         01234567890123456789012345678901234567
-  displayWidgets(nWidgets("11101000010011100001000000011000100000"));
+  displayWidgets(nWidgets("11101000010011100001000000111000100000"));
   ui->txrb2->setEnabled(true);
   ui->txrb4->setEnabled(true);
   ui->txrb5->setEnabled(true);
@@ -15056,18 +15070,18 @@ void MainWindow::on_sbFtol_valueChanged(int value)
 
 void::MainWindow::VHF_features_enabled(bool b)
 {
-  if(m_mode!="JT4" and m_mode!="JT65" and m_mode!="Q65") b=false;
-  if(b and m_mode!="Q65" and (ui->actionInclude_averaging->isChecked() or
+  if(m_mode!="JT4" and m_mode!="JT65" and m_mode!="Q65" and m_mode!="FT2") b=false;
+  if(b and m_mode!="Q65" and m_mode!="FT2" and (ui->actionInclude_averaging->isChecked() or
              ui->actionInclude_correlation->isChecked())) {
     ui->actionDeepestDecode->setChecked (true);
   }
   ui->actionInclude_averaging->setVisible (b);
-  ui->actionInclude_correlation->setVisible (b && m_mode!="Q65");
-  ui->actionMessage_averaging->setEnabled(b && (m_mode=="JT4" or m_mode=="JT65"));
+  ui->actionInclude_correlation->setVisible (b && m_mode!="Q65" && m_mode!="FT2");
+  ui->actionMessage_averaging->setEnabled(b && (m_mode=="JT4" or m_mode=="JT65" or m_mode=="FT2"));
   ui->actionEnable_AP_JT65->setVisible (b && m_mode=="JT65");
 
   if(!b && m_msgAvgWidget and (SpecOp::FOX != m_specOp) and !m_config.autoLog()) {
-    if(m_msgAvgWidget->isVisible() and m_mode!="JT4" and m_mode!="JT9" and m_mode!="JT65") {
+    if(m_msgAvgWidget->isVisible() and m_mode!="JT4" and m_mode!="JT9" and m_mode!="JT65" and m_mode!="FT2") {
       m_msgAvgWidget->close();
     }
   }
@@ -20780,9 +20794,40 @@ void MainWindow::onNtpOffsetUpdated(double offsetMs)
 
 void MainWindow::onNtpSyncStatusChanged(bool synced, QString const& statusText)
 {
-  if(!synced) {
-    ntp_status_label.setText("NTP: no sync");
-    ntp_status_label.setStyleSheet("QLabel{color:#888;background:#333}");
+  if (ntp_checkbox.isChecked() != m_ntpEnabled) {
+    QSignalBlocker blocker{&ntp_checkbox};
+    ntp_checkbox.setChecked(m_ntpEnabled);
+  }
+
+  if (synced) {
+    int const srvCount = m_ntpClient ? m_ntpClient->lastServerCount() : 0;
+    int const rounded = qRound(m_ntpOffset_ms);
+    QString const text = QString("NTP:%1%2ms(%3srv)")
+      .arg(rounded > 0 ? "+" : "")
+      .arg(rounded)
+      .arg(srvCount);
+    ntp_status_label.setText(text);
+    if (qAbs(m_ntpOffset_ms) < 20.0)
+      ntp_status_label.setStyleSheet("QLabel{color:#000;background:#00ff00}");
+    else if (qAbs(m_ntpOffset_ms) < 100.0)
+      ntp_status_label.setStyleSheet("QLabel{color:#000;background:#ffff00}");
+    else
+      ntp_status_label.setStyleSheet("QLabel{color:#fff;background:#ff0000}");
+  } else {
+    QString statusLabelText{"NTP: no sync"};
+    QString statusStyle{"QLabel{color:#888;background:#333}"};
+    if (statusText.contains("single-server bootstrap")) {
+      auto const re = QRegularExpression{R"((\d+/\d+))"};
+      auto const m = re.match(statusText);
+      statusLabelText = m.hasMatch()
+          ? QString("NTP: bootstrap %1").arg(m.captured(1))
+          : QString("NTP: bootstrap");
+      statusStyle = "QLabel{color:#000;background:#ffff00}";
+    } else if (statusText.contains("only 1 server response")) {
+      statusLabelText = "NTP: no sync(1srv)";
+    }
+    ntp_status_label.setText(statusLabelText);
+    ntp_status_label.setStyleSheet(statusStyle);
   }
   ntp_status_label.setToolTip(statusText);
 

@@ -50,7 +50,7 @@ private:
   static constexpr int NTP_PORT = 123;
   static constexpr int REFRESH_INTERVAL_MS = 300000;  // 5 minutes
   static constexpr int REFRESH_RETRY_MS = 30000;      // 30 seconds when not synced
-  static constexpr int QUERY_TIMEOUT_MS = 5000;       // 5 seconds
+  static constexpr int QUERY_TIMEOUT_MS = 7000;       // 7 seconds
   static constexpr double MAX_OFFSET_MS = 3600000.0;  // 1 hour sanity gate
   static constexpr int SERVERS_PER_QUERY = 8;          // max servers per sync cycle
 
@@ -97,7 +97,8 @@ private:
   QSet<QString> m_queriedAddresses;
   QString m_customServer;
   int m_refreshIntervalMs {REFRESH_INTERVAL_MS};
-  double m_maxRttMs {100.0};  // RTT filter threshold (default 100ms)
+  double m_maxRttMs {250.0};  // RTT filter threshold (default 250ms)
+  bool m_autoPinnedCustomServer {false};
 
   // Weak-sync guard (deadband + confirmation) to suppress jittery offset jumps.
   bool m_weakSyncEnabled {true};
@@ -117,6 +118,9 @@ private:
   int m_weakLastDirection {0};  // -1 / +1
   int m_sparseJumpConfirmCount {0};
   int m_sparseJumpDirection {0};
+  int m_singleServerConfirmCount {0};
+  bool m_singleServerHasCandidate {false};
+  double m_singleServerLastCandidateMs {0.0};
   qint64 m_lastGoodSyncMs {0};
 };
 

@@ -22,6 +22,8 @@
 #include <QDataStream>
 #include <QTimer>
 #include <QDir>
+#include <QMutex>
+#include <QMutexLocker>
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
 #include <QRandomGenerator>
 #endif
@@ -48,6 +50,7 @@ namespace
   int MAX_PAYLOAD_LENGTH {10000};
   int CACHE_TIMEOUT {300}; // default to 5 minutes for repeating spots
   QMap<QString, time_t> spot_cache;
+  QMutex spot_cache_mutex;
 }
 
 static int added;
@@ -179,7 +182,7 @@ public:
 
     if (!report_timer_.isActive ())
       {
-        report_timer_.start (MIN_SEND_INTERVAL+1 * 1000); // we add 1 to give some more randomization
+        report_timer_.start ((MIN_SEND_INTERVAL + 1) * 1000); // add one second for small jitter
       }
     if (!descriptor_timer_.isActive ())
       {
@@ -301,7 +304,7 @@ bool PSKReporter::impl::eclipse_active(QDateTime timeutc)
 #ifdef DEBUGECLIPSE
     std::ofstream mylog("/temp/eclipse.log", std::ios_base::app);
 #endif
-    QDateTime dateNow =  QDateTime::currentDateTimeUtc();
+    QDateTime const dateNow = timeutc.toUTC ();
     for (int i=0; i< eclipseDates.size(); ++i)
     {
         QDateTime check = eclipseDates.at(i); // already in UTC time
@@ -648,6 +651,7 @@ bool PSKReporter::addRemoteStation (QString const& call, QString const& grid, Ra
       added++;
 
       QDateTime qdateNow = QDateTime::currentDateTime().toUTC();
+      QMutexLocker cache_lock {&spot_cache_mutex};
       // we allow all spots through +/- 6 hours around an eclipse for the HamSCI group
       if (!spot_cache.contains(call) || freq > 49000000 || eclipse_active(qdateNow)) // then it's a new spot
       {
@@ -675,9 +679,14 @@ bool PSKReporter::addRemoteStation (QString const& call, QString const& grid, Ra
       // remove cached items over 10 minutes old to save a little memory
       QMapIterator<QString, time_t> i(spot_cache);
       time_t tmptime = time(NULL);
+      QList<QString> expired;
       while(i.hasNext()) {
           i.next();
-          if (tmptime - i.value() > 600) spot_cache.remove(i.key());
+          if (tmptime - i.value() > 600) expired.append (i.key ());
+      }
+      for (auto const& key : expired)
+      {
+        spot_cache.remove (key);
       }
       return true;
     }

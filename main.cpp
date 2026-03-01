@@ -105,6 +105,14 @@ namespace
       }
   }
 
+  bool is_sensitive_setting_key (QString const& key)
+  {
+    static QRegularExpression const sensitive_pattern {
+      R"((password|passwd|secret|token|api[_-]?key|apikey|cloudlog|lotw.*(pass|password)))",
+      QRegularExpression::CaseInsensitiveOption};
+    return key.contains (sensitive_pattern);
+  }
+
 #if defined (Q_OS_DARWIN)
   QString make_macos_shm_key (QString app_name)
   {
@@ -364,19 +372,33 @@ int main(int argc, char *argv[])
                       auto const& value = multi_settings.settings ()->value (key);
                       if (value.canConvert<QVariantList> ())
                         {
-                          auto const sequence = value.value<QSequentialIterable> ();
                           strm << key << ":\n";
-                          for (auto const& item: sequence)
+                          if (is_sensitive_setting_key (key))
                             {
-                              strm << "\t";
-                              safe_stream_QVariant (strm, item);
-                              strm << '\n';
+                              strm << "\t<redacted>\n";
+                            }
+                          else
+                            {
+                              auto const sequence = value.value<QSequentialIterable> ();
+                              for (auto const& item: sequence)
+                                {
+                                  strm << "\t";
+                                  safe_stream_QVariant (strm, item);
+                                  strm << '\n';
+                                }
                             }
                         }
                       else
                         {
                           strm << key << ": ";
-                          safe_stream_QVariant (strm, value);
+                          if (is_sensitive_setting_key (key))
+                            {
+                              strm << "<redacted>";
+                            }
+                          else
+                            {
+                              safe_stream_QVariant (strm, value);
+                            }
                           strm << '\n';
                         }
                     }
