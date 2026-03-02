@@ -6,7 +6,7 @@ Repository-specific notes for the macOS fork.
 
 ## Current Release Context
 
-- Latest stable release: `v1.3.4`
+- Latest stable release: `v1.3.6`
 - Targets: macOS Tahoe ARM64, Sequoia ARM64, Sequoia Intel, Monterey Intel (experimental), Linux x86_64 AppImage
 
 ## Build and Runtime Notes
@@ -21,7 +21,7 @@ Repository-specific notes for the macOS fork.
 - This fork now uses `SharedMemorySegment` with file-backed `mmap` on Darwin.
 - The release flow no longer depends on System V shared-memory `sysctl` tuning (`kern.sysv.shmmax/shmall`).
 
-### Security/concurrency hardening and UI/runtime updates (v1.3.4)
+### Security/concurrency hardening and UI/runtime updates (v1.3.6)
 
 - TCI binary frame parser now validates header/payload size before access.
 - TCI pseudo-sync waits no longer rely on nested `QEventLoop::exec()` loops.
@@ -29,6 +29,11 @@ Repository-specific notes for the macOS fork.
 - TCI audio path clamps `kin` and bounds shared-buffer writes at the C++/Fortran boundary.
 - macOS audio stop/underrun handling improved for Sequoia-era behavior.
 - TOTP now uses NTP-corrected time source.
+- Diagnostic mode menu action now works as true ON/OFF.
+- CLI language override (`--language`) now wins over locale autoload.
+- `cty.dat` large prefix-detail parsing limit increased for modern data snapshots.
+- Normal (non-contest) country display restored by limiting FT points append to ARRL Digi mode.
+- PSKReporter `Using:` identifier now follows app title branding.
 
 ### Release artifacts
 
@@ -54,6 +59,6 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 ## References
 
 - `CHANGELOG.md`
-- `RELEASE_NOTES_v1.3.4.md`
-- `doc/GITHUB_RELEASE_BODY_v1.3.4.md`
+- `RELEASE_NOTES_v1.3.6.md`
+- `doc/GITHUB_RELEASE_BODY_v1.3.6.md`
 - `doc/SECURITY_BUG_ANALYSIS_REPORT.md`

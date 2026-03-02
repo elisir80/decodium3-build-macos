@@ -391,7 +391,10 @@ void AD1CCty::impl::load_cty(QFile &file, entities_type& entities, prefixes_type
             }
           ++line_number;
           detail += line;
-          if (detail.size () > 65536)
+          // Newer cty.dat snapshots can contain very large prefix-detail blocks
+          // (for heavily enumerated entities). Keep a safety cap, but high
+          // enough to accept valid modern files.
+          if (detail.size () > 4 * 1024 * 1024)
             {
               throw std::domain_error {"Oversized prefix detail in cty.dat at line "
                                        + boost::lexical_cast<std::string> (line_number)};

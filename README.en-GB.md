@@ -16,10 +16,10 @@ security fixes, and release automation for:
 ## Current Baseline
 
 - Source branch: `master`
-- Latest stable release: `v1.3.5`
+- Latest stable release: `v1.3.6`
 - App bundle/executable: `ft2.app` / `ft2`
 
-## Key Notes for v1.3.5
+## Key Notes for v1.3.6
 
 - TCI binary frame parser hardening with strict header/payload bounds validation.
 - TCI pseudo-sync waits refactored to avoid nested `QEventLoop::exec()` loops in `mysleep1..8`.
@@ -34,11 +34,16 @@ security fixes, and release automation for:
 - NTP reliability upgrades: single-server bootstrap confirmations, adaptive retry/RTT thresholds, auto fallback pin to `time.apple.com`, and consistent live status text in weak-hold states.
 - Startup CTY behavior improved: immediate auto-download when missing and HTTPS source URL.
 - Existing fork baseline retained: mmap shared-memory backend on macOS (no `.pkg`), startup mode/frequency alignment, and small-display UI improvements.
+- Diagnostic mode now behaves as a true ON/OFF toggle and can be disabled immediately.
+- CLI `--language` now correctly overrides locale-based translation autoload.
+- Country-name display restored in normal operation by limiting FT points (`a1/a2/...`) rendering to ARRL Digi mode.
+- `cty.dat` parser limit raised to accept modern large prefix-detail sections.
+- PSKReporter `Using:` branding aligned with app title (no appended legacy `mod by ...` suffix).
 
 ## Quick Start (macOS)
 
 ```bash
-cmake -S . -B build -DFORK_RELEASE_VERSION=v1.3.5
+cmake -S . -B build -DFORK_RELEASE_VERSION=v1.3.6
 cmake --build build -j8
 ./build/ft2.app/Contents/MacOS/ft2
 ```
@@ -48,13 +53,13 @@ cmake --build build -j8
 Local release script:
 
 ```bash
-scripts/release-macos.sh v1.3.5 --publish --repo elisir80/decodium3-build-macos
+scripts/release-macos.sh v1.3.6 --publish --repo elisir80/decodium3-build-macos
 ```
 
 Per-platform suffix example:
 
 ```bash
-scripts/release-macos.sh v1.3.5 --compat-macos 15.0 --asset-suffix macos-sequoia-arm64
+scripts/release-macos.sh v1.3.6 --compat-macos 15.0 --asset-suffix macos-sequoia-arm64
 ```
 
 Generated assets:
@@ -88,9 +93,9 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 ## Documentation
 
 - `README.md`
-- `RELEASE_NOTES_v1.3.5.md`
+- `RELEASE_NOTES_v1.3.6.md`
 - `CHANGELOG.md`
-- `doc/GITHUB_RELEASE_BODY_v1.3.5.md`
+- `doc/GITHUB_RELEASE_BODY_v1.3.6.md`
 - `doc/SECURITY_BUG_ANALYSIS_REPORT.md`
 
 ## Licence

@@ -455,14 +455,22 @@ QString DisplayText::appendWorkedB4 (QString message, QString call, QString cons
     }
     m_CQPriority=DecodeHighlightingModel::highlight_name(top_highlight);
 
-    if(((m_points == 00) or (m_points == -1)) and m_bDisplayPoints) return message;
+    const bool points_mode =
+      m_bDisplayPoints
+      && m_config
+      && (m_config->special_op_id () == Configuration::SpecialOperatingActivity::ARRL_DIGI);
+    if(((m_points == 00) or (m_points == -1)) and points_mode) return message;
     return leftJustifyAppendage (message, extra);
 }
 
 QString DisplayText::leftJustifyAppendage (QString message, QString const& appendage0) const
 {
   QString appendage=appendage0;
-  if(m_bDisplayPoints and (m_points>0)) {
+  const bool points_mode =
+    m_bDisplayPoints
+    && m_config
+    && (m_config->special_op_id () == Configuration::SpecialOperatingActivity::ARRL_DIGI);
+  if(points_mode and (m_points>0)) {
     appendage=" " + QString::number(m_points);
     if(m_points<10) appendage=" " + appendage;
   }

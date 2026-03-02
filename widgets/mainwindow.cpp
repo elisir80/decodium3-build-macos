@@ -863,7 +863,7 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
         m_config.udp_server_name (), m_config.udp_server_port (),
         m_config.udp_interface_names (), m_config.udp_TTL (),
         this}},
-  m_psk_Reporter {&m_config, QString {"Decodium v3.0 FT2 Raptor v" + version () + " " + m_revision}.simplified ()},
+  m_psk_Reporter {&m_config, program_title ().simplified ()},
   m_manual {&m_network_manager},
   m_block_udp_status_updates {false},
   m_useDarkStyle {false},
@@ -1279,7 +1279,6 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
 
   QActionGroup* EventLoggingGroup = new QActionGroup(this);
   ui->actionDefault_event_logging->setActionGroup(EventLoggingGroup);
-  ui->actionDiagnostic_mode->setActionGroup(EventLoggingGroup);
   ui->actionDisable_event_logging->setActionGroup(EventLoggingGroup);
 
   QActionGroup* DepthGroup = new QActionGroup(this);
@@ -2248,6 +2247,7 @@ void MainWindow::writeSettings()
   m_settings->setValue ("splitAllTxtMonthly", ui->actionSplit_ALL_TXT_monthly->isChecked() );
   m_settings->setValue ("disableWritingOfAllTxt", ui->actionDisable_writing_of_ALL_TXT->isChecked() );
   m_settings->setValue ("DisableEventLogging", ui->actionDisable_event_logging->isChecked() );
+  m_settings->setValue ("DiagnosticEventLogging", ui->actionDiagnostic_mode->isChecked() );
   m_settings->setValue ("DarkStyle", ui->actionUse_Dark_Style->isChecked() );
   m_settings->setValue ("BandButtons", ui->actionBand_Buttons->isChecked() );
   m_settings->setValue ("VHFUHFButtons", ui->actionVHF_UHF_Buttons->isChecked() );
@@ -2450,6 +2450,22 @@ void MainWindow::readSettings()
   ui->actionSplit_ALL_TXT_monthly->setChecked(m_settings->value("splitAllTxtMonthly", false).toBool());
   ui->actionDisable_writing_of_ALL_TXT->setChecked(m_settings->value("disableWritingOfAllTxt", false).toBool());
   ui->actionDisable_event_logging->setChecked(m_settings->value("DisableEventLogging", false).toBool());
+  bool diagnostic_logging_enabled = m_settings->value("DiagnosticEventLogging", false).toBool();
+#if defined(Q_OS_WIN)
+  QFile log_config_file {QDir {QStandardPaths::writableLocation (QStandardPaths::DataLocation)}.absoluteFilePath ("wsjtx_log_config.ini")};
+#else
+  QFile log_config_file {QDir {QStandardPaths::writableLocation (QStandardPaths::ConfigLocation)}.absoluteFilePath ("wsjtx_log_config.ini")};
+#endif
+  if (log_config_file.open (QIODevice::ReadOnly | QIODevice::Text)) {
+    auto const cfg = QString::fromUtf8 (log_config_file.readAll ());
+    diagnostic_logging_enabled = cfg.contains ("[Sinks.SYSLOG]")
+                                 && cfg.contains ("WSJT-X_RigControl.log");
+  }
+  ui->actionDiagnostic_mode->setChecked (diagnostic_logging_enabled);
+  if (diagnostic_logging_enabled && ui->actionDisable_event_logging->isChecked ()) {
+    ui->actionDisable_event_logging->setChecked (false);
+    ui->actionDefault_event_logging->setChecked (true);
+  }
   ui->actionUse_Dark_Style->setChecked(m_settings->value("DarkStyle", true).toBool());
   ui->actionBand_Buttons->setChecked(m_settings->value("BandButtons", true).toBool());
   ui->actionVHF_UHF_Buttons->setChecked(m_settings->value("VHFUHFButtons", false).toBool());
@@ -7500,8 +7516,10 @@ void MainWindow::readFromStdout()                             //readFromStdout
   m_muted = false;
   QString all_decodes;
   if(m_ActiveStationsWidget!=NULL) {
-    bDisplayPoints=(m_mode=="FT2" or m_mode=="FT4" or m_mode=="FT8") and
-      (m_specOp==SpecOp::ARRL_DIGI or m_ActiveStationsWidget->isVisible());
+    // Contest points must not hide DXCC/country text during normal operation.
+    // Enable points rendering only for ARRL Digi contest mode.
+    bDisplayPoints = (m_mode=="FT2" or m_mode=="FT4" or m_mode=="FT8")
+                     and (m_specOp==SpecOp::ARRL_DIGI);
   }
   while(proc_jt9.canReadLine()) {
     auto line_read = proc_jt9.readLine ();
@@ -14961,7 +14979,8 @@ void MainWindow::pskSetLocal ()
   if (rig_information.contains("OmniRig")) rig_information = "N/A (OmniRig)";
   if (rig_information == "FLRig") rig_information = "N/A (FLRig)";
   if (rig_information.contains("TCI Cli")) rig_information = "N/A (TCI)";
-  m_psk_Reporter.setLocalStation(m_config.my_callsign (), m_config.my_grid (), antenna_description, rig_information, QString {"Decodium v3.0 FT2 Raptor v" + version () + " " + m_revision}.simplified ());
+  m_psk_Reporter.setLocalStation (m_config.my_callsign (), m_config.my_grid (), antenna_description
+                                  , rig_information, program_title ().simplified ());
 }
 
 void MainWindow::transmitDisplay (bool transmitting)
@@ -18756,6 +18775,10 @@ void MainWindow::bandHopping()
 
 void MainWindow::on_actionDefault_event_logging_triggered()
 {
+  if (ui->actionDiagnostic_mode->isChecked ()) {
+    QSignalBlocker blocker {ui->actionDiagnostic_mode};
+    ui->actionDiagnostic_mode->setChecked (false);
+  }
 #if defined(Q_OS_WIN)
     QFile::remove (QDir {QStandardPaths::writableLocation (QStandardPaths::DataLocation)}.absoluteFilePath ("wsjtx_log_config.ini"));
 #else
@@ -18765,15 +18788,26 @@ void MainWindow::on_actionDefault_event_logging_triggered()
 
 void MainWindow::on_actionDiagnostic_mode_triggered()
 {
+    if (!ui->actionDiagnostic_mode->isChecked ()) {
+      on_actionDefault_event_logging_triggered ();
+      return;
+    }
+
+    if (ui->actionDisable_event_logging->isChecked ()) {
+      ui->actionDefault_event_logging->setChecked (true);
+    }
+
 #if defined(Q_OS_WIN)
-    static QFile f {QDir {QStandardPaths::writableLocation (QStandardPaths::DataLocation)}.absoluteFilePath ("wsjtx_log_config.ini")};
+    QFile f {QDir {QStandardPaths::writableLocation (QStandardPaths::DataLocation)}.absoluteFilePath ("wsjtx_log_config.ini")};
 #else
-    static QFile f {QDir {QStandardPaths::writableLocation (QStandardPaths::ConfigLocation)}.absoluteFilePath ("wsjtx_log_config.ini")};
+    QFile f {QDir {QStandardPaths::writableLocation (QStandardPaths::ConfigLocation)}.absoluteFilePath ("wsjtx_log_config.ini")};
 #endif
     if(!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
       QMessageBox mb;
       mb.setText("Cannot write wsjtx_log_config.ini file");
       mb.exec();
+      QSignalBlocker blocker {ui->actionDiagnostic_mode};
+      ui->actionDiagnostic_mode->setChecked (false);
       return;
     }
     QString instance = "";
@@ -18825,6 +18859,10 @@ void MainWindow::on_actionDiagnostic_mode_triggered()
 
 void MainWindow::on_actionDisable_event_logging_triggered()
 {
+    if (ui->actionDiagnostic_mode->isChecked ()) {
+      QSignalBlocker blocker {ui->actionDiagnostic_mode};
+      ui->actionDiagnostic_mode->setChecked (false);
+    }
 #if defined(Q_OS_WIN)
     static QFile f {QDir {QStandardPaths::writableLocation (QStandardPaths::DataLocation)}.absoluteFilePath ("wsjtx_log_config.ini")};
 #else

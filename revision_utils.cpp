@@ -8,7 +8,7 @@
 #include "scs_version.h"
 
 #ifndef FORK_RELEASE_VERSION
-#define FORK_RELEASE_VERSION "v1.3.5"
+#define FORK_RELEASE_VERSION "v1.3.6"
 #endif
 
 namespace
@@ -84,7 +84,7 @@ QString version (bool include_patch)
 
 QString program_title (QString const& revision)
 {
-  QString id {QString {"Decodium v3.0 FT2   Raptor v3.0.2603010503 | Fork %1"}
+  QString id {QString {"Decodium v3.0 FT2 \"Raptor\" v3.0.2603010503 | Fork by Salvatore Raccampo 9H1SR %1"}
                .arg (QStringLiteral (FORK_RELEASE_VERSION))};
   return id + " " + revision;
 }

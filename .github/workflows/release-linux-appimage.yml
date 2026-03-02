@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. v1.3.5)"
+        description: "Release version (e.g. v1.3.6)"
         required: true
-        default: "v1.3.5"
+        default: "v1.3.6"
       publish_release:
         description: "Upload AppImage to GitHub release"
         required: true
@@ -223,7 +223,9 @@ jobs:
               echo
               echo "Linux x86_64 AppImage release for fork ${VERSION}."
               echo
-              echo "Includes TCI/security/concurrency hardening and runtime fixes from ${VERSION}."
+              echo "Includes latest 1.3.6 fixes: diagnostic mode ON/OFF behavior,"
+              echo "language override precedence, CTY parser robustness, country-name display"
+              echo "restoration, and PSKReporter branding alignment."
               echo
               echo "Linux minimum requirements:"
               echo "- x86_64 CPU, 4 GB RAM minimum"

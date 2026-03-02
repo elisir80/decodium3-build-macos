@@ -1,5 +1,53 @@
 # Changelog / Registro Modifiche
 
+## [1.3.6] - 2026-03-02
+
+### English
+
+Release focused on UX correctness, localization behavior, branding consistency, and CTY/country-display data quality.
+
+#### Changed
+
+- UI diagnostic logging controls refactored:
+  - `Diagnostic mode` is no longer locked in an exclusive action group.
+  - It now behaves as a true ON/OFF mode, persisted via `DiagnosticEventLogging`.
+  - Runtime state is reconstructed from `wsjtx_log_config.ini` content at startup.
+- Localization loader behavior updated:
+  - any explicit `--language` override now takes strict precedence over locale autoload.
+- PSKReporter local station software-id now uses `program_title()` branding string.
+
+#### Fixed
+
+- Fixed inability to immediately disable diagnostic mode without restarting.
+- Fixed mixed-language startup when launching with `--language en_GB` on non-English locales.
+- Fixed PSKReporter `Using:` field appending legacy `mod by IU8LMC...` suffix.
+- Fixed title branding regression by restoring `Fork by Salvatore Raccampo 9H1SR` string.
+- Fixed `cty.dat` parser false-failure on large modern prefix-detail blocks by increasing cap from 64 KiB to 4 MiB.
+- Fixed country-name suppression in FT2/FT4/FT8 normal operation by restricting points append (`a1/a2/...`) to ARRL Digi mode.
+
+### Italiano
+
+Release focalizzata su correttezza UX, comportamento localizzazione, coerenza branding e qualita' dati CTY/country display.
+
+#### Modificato
+
+- Refactor controlli logging diagnostico UI:
+  - `Modalita' diagnostica` non e' piu' vincolata in un gruppo azioni esclusivo.
+  - Ora si comporta come ON/OFF reale, persistita via `DiagnosticEventLogging`.
+  - Stato runtime ricostruito in avvio dal contenuto di `wsjtx_log_config.ini`.
+- Aggiornato comportamento loader localizzazione:
+  - qualunque override esplicito `--language` ha ora precedenza rigorosa sull'autoload da locale.
+- Software-id stazione locale PSKReporter ora allineato al branding `program_title()`.
+
+#### Corretto
+
+- Corretto il problema che impediva di disattivare subito la modalita' diagnostica senza riavvio.
+- Corretto l'avvio in lingua mista quando si usa `--language en_GB` su locale non inglese.
+- Corretto il campo `Using:` di PSKReporter che aggiungeva il suffisso legacy `mod by IU8LMC...`.
+- Corretta regressione branding titolo con ripristino stringa `Fork by Salvatore Raccampo 9H1SR`.
+- Corretto falso errore parser `cty.dat` su blocchi prefisso moderni molto grandi (limite portato da 64 KiB a 4 MiB).
+- Corretto oscuramento dei nomi country in FT2/FT4/FT8 uso normale limitando l'append punti (`a1/a2/...`) alla sola modalita' ARRL Digi.
+
 ## [1.3.5] - 2026-03-01
 
 ### English

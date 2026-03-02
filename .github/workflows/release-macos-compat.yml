@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. v1.3.5)"
+        description: "Release version (e.g. v1.3.6)"
         required: true
-        default: "v1.3.5"
+        default: "v1.3.6"
       publish_release:
         description: "Publish GitHub release"
         required: true
@@ -174,14 +174,13 @@ jobs:
             echo
             echo "## English (UK)"
             echo "This release includes:"
-            echo "- TCI binary frame parser hardening with strict header/payload bounds checks."
-            echo "- TCI pseudo-sync wait refactor: nested QEventLoop::exec() loops removed in mysleep1..8."
-            echo "- Protected foxcom_.wave snapshots across UI/audio threads to reduce TX race risk."
-            echo "- TCI C++/Fortran boundary hardening (kin clamps + bounded writes)."
-            echo "- macOS audio resilience updates (Sequoia-safe stop path + improved underrun handling)."
-            echo "- TOTP now aligned to NTP-corrected time source."
-            echo "- QRegExp migration to QRegularExpression in critical runtime/network paths."
-            echo "- macOS shared-memory mmap flow retained (no .pkg required)."
+            echo "- Diagnostic mode now behaves as true ON/OFF (no restart required to disable)."
+            echo "- --language override now has strict precedence over locale autoload."
+            echo "- Country-name visibility fixed for FT2/FT4/FT8 normal operation."
+            echo "- cty.dat parser accepts modern large prefix-detail blocks (safety cap raised)."
+            echo "- PSKReporter Using: branding aligned with app title/fork identity."
+            echo "- Window title branding restored to Fork by Salvatore Raccampo 9H1SR."
+            echo "- Existing mmap shared-memory release flow retained (no .pkg required)."
             echo "- Apple Silicon build for macOS Tahoe."
             echo "- Apple Silicon build for macOS Sequoia."
             echo "- Apple Intel build for macOS Sequoia."
@@ -200,13 +199,12 @@ jobs:
             echo
             echo "## Italiano"
             echo "Questa release include:"
-            echo "- Hardening parser frame binari TCI con controlli rigorosi header/payload."
-            echo "- Refactor attese pseudo-sync TCI: rimossi loop annidati QEventLoop::exec() in mysleep1..8."
-            echo "- Snapshot protetti di foxcom_.wave tra thread UI/audio per ridurre rischio race TX."
-            echo "- Hardening boundary TCI C++/Fortran (clamp kin + scritture limitate)."
-            echo "- Aggiornamenti resilienza audio macOS (stop path Sequoia-safe + gestione underrun migliorata)."
-            echo "- TOTP ora allineato al tempo corretto NTP."
-            echo "- Migrazione QRegExp a QRegularExpression nei percorsi runtime/network critici."
+            echo "- Modalita' diagnostica ora ON/OFF reale (disattivabile senza riavvio)."
+            echo "- Override --language con precedenza rigorosa rispetto all'autoload da locale."
+            echo "- Corretto il display dei nomi country in uso normale FT2/FT4/FT8."
+            echo "- Parser cty.dat aggiornato per blocchi prefisso moderni molto grandi."
+            echo "- Branding Using: di PSKReporter allineato al titolo/app fork."
+            echo "- Branding titolo finestra ripristinato su Fork by Salvatore Raccampo 9H1SR."
             echo "- Flusso shared-memory macOS su mmap confermato (nessun .pkg richiesto)."
             echo "- Build Apple Silicon per macOS Tahoe."
             echo "- Build Apple Silicon per macOS Sequoia."

@@ -6,7 +6,6 @@
 #include <QApplication>
 #include <QLocale>
 #include <QTranslator>
-#include <QRegularExpression>
 #include <QDebug>
 
 #include "qt_helpers.hpp"
@@ -69,11 +68,9 @@ L10nLoader::L10nLoader (QApplication * app, QLocale const& locale, QString const
      .arg (QLocale::countryToString (locale.country ()))
      .arg (locale.uiLanguages ().join (", ")));
 
-  // we  don't load  translators  if the  language  override is  'en',
-  // 'en_US', or 'en-US'. In these cases  we assume the user is trying
-  // to disable translations loaded because of their locale. We cannot
-  // load any locale based translations in this case.
-  auto skip_locale = language_override.contains (QRegularExpression {"^(?:en|en[-_]US)$"});
+  // Any explicit language override must take precedence over locale auto-load.
+  // This avoids mixed-language UI (e.g. locale=it but --language=en_GB).
+  auto skip_locale = !language_override.isEmpty ();
 
   //
   // Enable base i18n

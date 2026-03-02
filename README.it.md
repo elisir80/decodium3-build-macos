@@ -1,10 +1,10 @@
-# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.3.4 (Italiano)
+# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.3.6 (Italiano)
 
 Per la versione bilingue completa (English + Italiano), vedere [README.md](README.md).
 
 ## Sintesi italiana
 
-Questa release fork (`v1.3.4`) e' basata su Decodium v3.0 SE Raptor upstream e introduce hardening operativo specifico per macOS:
+Questa release fork (`v1.3.6`) e' basata su Decodium v3.0 SE Raptor upstream e introduce hardening operativo specifico per macOS:
 
 - hardening parser frame binari TCI con validazione completa header/payload;
 - refactor attese pseudo-sync TCI senza loop annidati `QEventLoop::exec()` in `mysleep1..8`;
@@ -13,7 +13,12 @@ Questa release fork (`v1.3.4`) e' basata su Decodium v3.0 SE Raptor upstream e i
 - stabilita' audio macOS migliorata (path Sequoia-safe in stop + gestione underrun piu robusta);
 - generazione TOTP allineata al tempo corretto NTP;
 - migrazione `QRegExp` -> `QRegularExpression` nei percorsi runtime/network critici (`mainwindow`, `wsprnet`);
-- baseline fork mantenuta: backend shared-memory `mmap` su macOS (nessun `.pkg`), allineamento modalita'/frequenza all'avvio e UI responsive su schermi piccoli.
+- baseline fork mantenuta: backend shared-memory `mmap` su macOS (nessun `.pkg`), allineamento modalita'/frequenza all'avvio e UI responsive su schermi piccoli;
+- `Modalita' diagnostica` resa ON/OFF reale e disattivabile subito;
+- override lingua `--language` con precedenza effettiva sulla lingua locale automatica;
+- ripristino visualizzazione nomi country in uso normale (append punti `a1/a2/...` limitato ad ARRL Digi);
+- limite parser `cty.dat` alzato per gestire blocchi prefissi moderni molto estesi;
+- stringa `Using:` di PSKReporter allineata al branding del titolo finestra.
 
 ## Target release
 
@@ -43,7 +48,7 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ## Documentazione
 
-- [RELEASE_NOTES_v1.3.4.md](RELEASE_NOTES_v1.3.4.md)
+- [RELEASE_NOTES_v1.3.6.md](RELEASE_NOTES_v1.3.6.md)
 - [CHANGELOG.md](CHANGELOG.md)
 - [doc/SECURITY_BUG_ANALYSIS_REPORT.md](doc/SECURITY_BUG_ANALYSIS_REPORT.md)
 - [doc/MACOS_PORTING_v1.2.0.md](doc/MACOS_PORTING_v1.2.0.md)
