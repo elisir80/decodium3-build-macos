@@ -887,6 +887,7 @@ private:
   bool ppfx_;
   bool miles_;
   bool quick_call_;
+  bool map_single_click_starts_tx_;
   bool disable_TX_on_73_;
   bool force_call_1st_;
   bool alternate_bindings_;
@@ -1063,6 +1064,7 @@ bool Configuration::GridMapAll() const { return m_->gridMapAll_;}
 bool Configuration::ppfx() const {return m_->ppfx_;}
 bool Configuration::miles () const {return m_->miles_;}
 bool Configuration::quick_call () const {return !m_externalCtrlMode and m_->quick_call_;}   //avt 10/2/25
+bool Configuration::map_single_click_starts_tx () const {return m_->map_single_click_starts_tx_;}
 bool Configuration::disable_TX_on_73 () const {return m_->disable_TX_on_73_;}
 bool Configuration::force_call_1st() const {return m_->force_call_1st_;}
 bool Configuration::alternate_bindings() const {return m_->alternate_bindings_;}
@@ -2264,6 +2266,7 @@ void Configuration::impl::initialize_models ()
   ui_->Map_All_Messages->setChecked(gridMapAll_);
   ui_->miles_check_box->setChecked (miles_);
   ui_->quick_call_check_box->setChecked (quick_call_);
+  ui_->map_single_click_starts_tx_check_box->setChecked (map_single_click_starts_tx_);
   ui_->disable_TX_on_73_check_box->setChecked (disable_TX_on_73_);
   ui_->force_call_1st_check_box->setChecked (force_call_1st_);
   ui_->alternate_bindings_check_box->setChecked (alternate_bindings_);
@@ -2731,6 +2734,15 @@ void Configuration::impl::read_settings ()
   ppfx_ = settings_->value ("PrincipalPrefix", false).toBool ();
   miles_ = settings_->value ("Miles", false).toBool ();
   quick_call_ = settings_->value ("QuickCall", true).toBool ();
+  if (settings_->contains ("MapSingleClickStartsTx"))
+    {
+      map_single_click_starts_tx_ = settings_->value ("MapSingleClickStartsTx", false).toBool ();
+    }
+  else
+    {
+      SettingsGroup main_window_group {settings_, "MainWindow"};
+      map_single_click_starts_tx_ = settings_->value ("MapSingleClickStartsTx", false).toBool ();
+    }
   disable_TX_on_73_ = settings_->value ("73TxDisable", true).toBool ();
   force_call_1st_ = settings_->value ("ForceCallFirst", false).toBool ();
   alternate_bindings_ = settings_->value ("AlternateBindings", false).toBool ();
@@ -3005,6 +3017,7 @@ void Configuration::impl::write_settings ()
   settings_->setValue ("PrincipalPrefix", ppfx_);
   settings_->setValue ("Miles", miles_);
   settings_->setValue ("QuickCall", quick_call_);
+  settings_->setValue ("MapSingleClickStartsTx", map_single_click_starts_tx_);
   settings_->setValue ("73TxDisable", disable_TX_on_73_);
   settings_->setValue ("ForceCallFirst", force_call_1st_);
   settings_->setValue ("AlternateBindings", alternate_bindings_);
@@ -3608,6 +3621,7 @@ void Configuration::impl::accept ()
   ppfx_ = ui_->ppfx_check_box->isChecked ();
   miles_ = ui_->miles_check_box->isChecked ();
   quick_call_ = ui_->quick_call_check_box->isChecked ();
+  map_single_click_starts_tx_ = ui_->map_single_click_starts_tx_check_box->isChecked ();
   disable_TX_on_73_ = ui_->disable_TX_on_73_check_box->isChecked ();
   force_call_1st_ = ui_->force_call_1st_check_box->isChecked ();
   alternate_bindings_ = ui_->alternate_bindings_check_box->isChecked ();

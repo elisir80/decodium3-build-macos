@@ -1,5 +1,79 @@
 # Changelog / Registro Modifiche
 
+## [1.3.7] - 2026-03-03
+
+### English
+
+Release focused on operational UX upgrades (map-driven workflow + new windows), startup/decode reliability, and release/documentation alignment.
+
+#### Changed
+
+- Added interactive world-map contact selection pipeline:
+  - map click emits selected contact call/grid;
+  - main UI auto-fills DX fields and regenerates standard messages.
+- Added configurable behavior `Map: single click starts Tx`.
+- Added persistent `View -> World Map` visibility state.
+- Added `Ionospheric Forecast` window (HamQSL feed + sun image, timed refresh, persisted geometry).
+- Added `DX Cluster` window (band-aware spots, mode filter, timed refresh, persisted geometry).
+- Improved map day/night rendering and end-of-QSO path downgrade behavior to clear stale lines.
+- Improved compact/two-row top controls layout mapping on small displays.
+- Default Qt style now forced to `Fusion` for consistent rendering on macOS variants.
+- Updated release/docs/workflow defaults to `v1.3.7`, including Linux/AppImage and Monterey best-effort target wording.
+
+#### Fixed
+
+- Fixed startup decode sequencing edge-case by setting sequence-start timestamp at ingest path before decode.
+- Fixed queued cross-thread signal reliability for modulator state updates via explicit Qt metatype registration.
+- Fixed legacy branding residue in runtime revision path by removing hardcoded return that injected `mod by IU8LMC...`.
+
+### Italiano
+
+Release focalizzata su upgrade UX operativi (workflow guidato da mappa + nuove finestre), affidabilita' startup/decode e allineamento release/documentazione.
+
+#### Modificato
+
+- Aggiunto pipeline selezione contatti interattiva da mappa:
+  - click mappa emette call/grid del contatto selezionato;
+  - la UI principale compila automaticamente i campi DX e rigenera i messaggi standard.
+- Aggiunto comportamento configurabile `Map: single click starts Tx`.
+- Aggiunta persistenza stato visibilita' `View -> World Map`.
+- Aggiunta finestra `Ionospheric Forecast` (feed HamQSL + immagine sole, refresh temporizzato, geometria persistita).
+- Aggiunta finestra `DX Cluster` (spot allineati banda corrente, filtro modo, refresh temporizzato, geometria persistita).
+- Migliorato rendering mappa giorno/notte e comportamento downgrade path a fine QSO per pulire linee stale.
+- Migliorata mappatura layout controlli top compatti/2 righe su display piccoli.
+- Stile Qt predefinito forzato a `Fusion` per rendering coerente tra varianti macOS.
+- Aggiornati default release/doc/workflow a `v1.3.7`, inclusa dicitura target Linux/AppImage e Monterey best-effort.
+
+#### Corretto
+
+- Corretto edge-case sequencing decode in startup impostando timestamp sequence-start nel percorso ingest prima del decode.
+- Corretta affidabilita' segnali queued cross-thread per aggiornamenti stato modulator tramite registrazione esplicita metatype Qt.
+- Corretta persistenza residuo branding legacy nel percorso runtime revision rimuovendo la return hardcoded che iniettava `mod by IU8LMC...`.
+
+### Espanol
+
+Release centrada en mejoras UX operativas (flujo guiado por mapa + nuevas ventanas), fiabilidad de arranque/decode y alineacion de release/documentacion.
+
+#### Cambios
+
+- Se anade pipeline de seleccion interactiva de contactos en mapa:
+  - click en mapa emite call/grid del contacto seleccionado;
+  - la UI principal rellena automaticamente campos DX y regenera mensajes estandar.
+- Se anade comportamiento configurable `Map: single click starts Tx`.
+- Se anade persistencia del estado visible `View -> World Map`.
+- Se anade ventana `Ionospheric Forecast` (feed HamQSL + imagen solar, refresco temporizado, geometria persistida).
+- Se anade ventana `DX Cluster` (spots por banda actual, filtro de modo, refresco temporizado, geometria persistida).
+- Se mejora render dia/noche del mapa y limpieza de rutas stale al final de QSO.
+- Se mejora mapeo de layout de controles superiores compactos/2 filas en pantallas pequenas.
+- Estilo Qt por defecto forzado a `Fusion` para consistencia de render entre variantes macOS.
+- Defaults de release/docs/workflows actualizados a `v1.3.7`, incluyendo Linux/AppImage y objetivo Monterey best-effort.
+
+#### Corregido
+
+- Corregido caso limite de secuenciacion decode al arranque fijando timestamp de secuencia en ingest antes del decode.
+- Corregida fiabilidad de senales queued cross-thread del estado del modulador con registro explicito de metatype Qt.
+- Corregido residuo de branding legacy en ruta runtime de revision eliminando return hardcoded que inyectaba `mod by IU8LMC...`.
+
 ## [1.3.6] - 2026-03-02
 
 ### English

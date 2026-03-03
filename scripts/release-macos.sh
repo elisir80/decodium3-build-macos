@@ -10,8 +10,8 @@ Usage:
                                  [--asset-suffix macos-sequoia-arm64]
 
 Examples:
-  scripts/release-macos.sh v1.3.6
-  scripts/release-macos.sh v1.3.6 --publish --repo elisir80/decodium3-build-macos
+  scripts/release-macos.sh v1.3.7
+  scripts/release-macos.sh v1.3.7 --publish --repo elisir80/decodium3-build-macos
 
 What it does:
   1) Configures the project in ./build
@@ -334,6 +334,19 @@ Se l'app non si avvia su macOS, esegui da Terminale:
 Per i dettagli completi, vedi \`CHANGELOG.md\`.
 
 Asset:
+- \`${DMG_OUT}\`
+- \`${ZIP_OUT}\`
+- \`${SHA_OUT}\`
+
+## Espanol
+Esta release incluye actualizaciones del fork hasta \`${VERSION}\`.
+
+Si la app no inicia en macOS, ejecuta en Terminal:
+\`sudo xattr -r -d com.apple.quarantine /Applications/ft2.app\`
+
+Para todos los detalles, ver \`CHANGELOG.md\`.
+
+Artefactos:
 - \`${DMG_OUT}\`
 - \`${ZIP_OUT}\`
 - \`${SHA_OUT}\`

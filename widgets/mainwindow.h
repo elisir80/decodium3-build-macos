@@ -126,6 +126,8 @@ class DecodedText;
 class Cloudlog;
 class WorldMapWidget;
 class SharedMemorySegment;
+class IonosphericForecastWindow;
+class DXClusterWindow;
 
 class MainWindow
   : public MultiGeometryWidget<3, QMainWindow>
@@ -177,6 +179,7 @@ private:
   void showQSYMessage(QString message);
 
 private slots:
+  void onMapContactClicked(QString const& call, QString const& grid);
   void initialize_fonts ();
   void ScrollBarPosition(int n);
   void on_actionUse_Dark_Style_triggered (bool checked);
@@ -256,6 +259,9 @@ private slots:
   void on_actionOnline_User_Guide_triggered();
   void on_actionLocal_User_Guide_triggered();
   void on_actionWide_Waterfall_triggered();
+  void on_actionWorld_Map_triggered(bool checked);
+  void on_actionIonospheric_Forecast_triggered();
+  void on_actionDX_Cluster_triggered();
   void on_actionOpen_triggered();
   void on_actionOpen_next_in_directory_triggered();
   void on_actionDecode_remaining_files_in_directory_triggered();
@@ -580,6 +586,8 @@ private:
   QScopedPointer<QSYMessage> m_QSYMessageWidget;
   QScopedPointer<QSYMonitor> m_qsymonitorWidget;
   QScopedPointer<TimeSyncPanel> m_timeSyncPanel;
+  QScopedPointer<IonosphericForecastWindow> m_ionosphericForecastWindow;
+  QScopedPointer<DXClusterWindow> m_dxClusterWindow;
   QScopedPointer<HelpTextWindow> m_shortcuts;
   QScopedPointer<HelpTextWindow> m_prefixes;
   QScopedPointer<HelpTextWindow> m_mouseCmnds;
@@ -616,6 +624,8 @@ private:
   qint64  m_freqMoon;
   qint64  m_fullFoxCallTime;
   qint64  m_msEchoTxStart=0;
+  qint64  m_mapLastClickMs {0};
+  QString m_mapLastClickCall;
 
   Frequency m_freqNominal;
   Frequency m_freqNominalPeriod;

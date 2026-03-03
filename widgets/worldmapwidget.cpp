@@ -2,6 +2,8 @@
 
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QMouseEvent>
+#include <QDebug>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFileInfo>
@@ -27,6 +29,7 @@ int const kMaxContacts = 40;
 int const kRoleDowngradeHoldSeconds = 75;
 int const kPostTxQueueMs = 10 * 1000;
 int const kPostTxQueueMaxVisible = 6;
+int const kClickHighlightMs = 1600;
 
 qint64 monotonicNowMs()
 {
@@ -84,6 +87,8 @@ WorldMapWidget::WorldMapWidget(QWidget * parent)
 {
   setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
   setMinimumHeight(190);
+  setAttribute(Qt::WA_OpaquePaintEvent, false);
+  setMouseTracking(false);
 
   auto const appDir = QCoreApplication::applicationDirPath();
   auto const cwd = QDir::currentPath();
@@ -394,8 +399,8 @@ void WorldMapWidget::paintEvent(QPaintEvent * event)
   painter.setClipPath(clipPath);
 
   drawBackground(&painter, mapBounds);
-  drawDayNightMask(&painter, mapBounds);
   drawGeoOverlay(&painter, mapBounds);
+  drawDayNightMask(&painter, mapBounds);
   drawGrid(&painter, mapBounds);
 
   QList<Contact> contacts = m_contacts.values();
@@ -596,6 +601,85 @@ void WorldMapWidget::paintEvent(QPaintEvent * event)
 QSize WorldMapWidget::minimumSizeHint() const
 {
   return QSize {280, 200};
+}
+
+void WorldMapWidget::mousePressEvent(QMouseEvent *event)
+{
+  if (event->button() == Qt::LeftButton)
+    {
+      handleMapClick(event->pos());
+      event->accept();
+      return;
+    }
+  QWidget::mousePressEvent(event);
+}
+
+void WorldMapWidget::handleMapClick(QPointF const& clickPos)
+{
+  // Use exact same bounds as paintEvent (frame + 2px adjustment = 5px offset)
+  QRectF frame = QRectF(rect()).adjusted(3, 3, -3, -3);
+  QRectF mapBounds = frame.adjusted(2, 2, -2, -2);
+
+  qDebug() << "[Map] handleMapClick at" << clickPos << "contacts=" << m_contacts.size();
+
+  // Dynamic click radius: adapt to current zoom level and HiDPI scaling.
+  double spanLon = qBound(30.0, m_viewSpanLon, 360.0);
+  double zoomFactor = qBound(1.0, std::sqrt(360.0 / spanLon), 1.9);
+  double dprFactor = qBound(1.0, std::sqrt(devicePixelRatioF()), 1.5);
+  double clickRadiusPx = qBound(11.0, 11.0 * zoomFactor * dprFactor, 30.0);
+  double minDistanceSq = clickRadiusPx * clickRadiusPx;
+  QString closestCall;
+  QString closestGrid;
+
+  for (auto const& contact : m_contacts)
+    {
+      auto normalizedCall = contact.call.trimmed();
+      if (normalizedCall.isEmpty())
+        {
+          // Markers without a callsign are not actionable from map click.
+          continue;
+        }
+
+      // Click target should match the visually relevant marker:
+      // - ME->DX: destination marker (remote station)
+      // - all others: source marker
+      QPointF markerPoint;
+      QString markerGrid;
+      if (contact.role == PathRole::OutgoingFromMe)
+        {
+          markerPoint = projectLonLatToPoint(contact.destinationLonLat, mapBounds);
+          markerGrid = contact.destinationGrid;
+        }
+      else
+        {
+          markerPoint = projectLonLatToPoint(contact.sourceLonLat, mapBounds);
+          markerGrid = contact.sourceGrid;
+        }
+
+      if (markerGrid.isEmpty())
+        {
+          markerGrid = contact.destinationGrid;
+        }
+
+      double distSq = (markerPoint.x() - clickPos.x()) * (markerPoint.x() - clickPos.x()) +
+                      (markerPoint.y() - clickPos.y()) * (markerPoint.y() - clickPos.y());
+
+      if (distSq < minDistanceSq)
+        {
+          minDistanceSq = distSq;
+          closestCall = normalizedCall.toUpper();
+          closestGrid = markerGrid;
+        }
+    }
+
+  if (!closestCall.isEmpty())
+    {
+      m_lastClickedCall = closestCall;
+      m_lastClickedUntilMs = monotonicNowMs() + kClickHighlightMs;
+      update();
+      qDebug() << "[Map] found contact" << closestCall << closestGrid;
+      Q_EMIT contactClicked(closestCall, closestGrid);
+    }
 }
 
 bool WorldMapWidget::maidenheadToLonLat(QString const& locator, QPointF * lonLat) const
@@ -836,22 +920,100 @@ void WorldMapWidget::drawDayNightMask(QPainter * painter, QRectF const& bounds) 
   double utcHours = t.hour() + (t.minute() / 60.0) + (t.second() / 3600.0);
   double subSolarLon = wrapLongitude((12.0 - utcHours) * 15.0);
 
+  int dayOfYear = now.date().dayOfYear();
+  double fractionalYear = (2.0 * M_PI / 365.24) * (dayOfYear - 1 + utcHours / 24.0);
+  double declinationRadians = 0.006918 - 0.399912 * std::cos(fractionalYear) + 0.070257 * std::sin(fractionalYear)
+                              - 0.006758 * std::cos(2.0 * fractionalYear) + 0.000907 * std::sin(2.0 * fractionalYear)
+                              - 0.002697 * std::cos(3.0 * fractionalYear) + 0.00148 * std::sin(3.0 * fractionalYear);
+  double subSolarLat = qRadiansToDegrees(declinationRadians);
+
   double leftLon = m_viewCenterLon - 0.5 * m_viewSpanLon;
+  double topLat = m_viewCenterLat + 0.5 * m_viewSpanLat;
+
   int width = qMax(1, static_cast<int>(bounds.width()));
+  int height = qMax(1, static_cast<int>(bounds.height()));
+
+  double subLatRad = qDegreesToRadians(subSolarLat);
+
+  painter->save();
+  painter->setCompositionMode(QPainter::CompositionMode_SourceOver);
+  painter->setPen(Qt::NoPen);
+
   for (int x = 0; x < width; ++x)
     {
       double lon = leftLon + m_viewSpanLon * static_cast<double>(x) / static_cast<double>(width);
-      double hourAngle = wrapLongitude(lon - subSolarLon);
-      double sunFactor = std::cos(qDegreesToRadians(hourAngle));
+      double dLon = qDegreesToRadians(lon - subSolarLon);
+      double cosDLon = std::cos(dLon);
 
-      if (sunFactor < 0.0)
+      // Find terminator latitude for this column (where sun altitude = 0)
+      // sin(decl)*sin(lat) + cos(decl)*cos(lat)*cos(dlon) = 0
+      // => tan(lat) = -cos(dlon)/tan(decl)
+      // Then find which pixels above/below are in night
+
+      // Scan top-to-bottom to find transition
+      int nightStartY = -1;
+      int nightEndY = height;
+      bool inNight = false;
+
+      // Sample at top pixel
+      {
+        double lat = topLat - m_viewSpanLat * 0.0;
+        double latRad = qDegreesToRadians(lat);
+        double alt = std::sin(subLatRad) * std::sin(latRad) + std::cos(subLatRad) * std::cos(latRad) * cosDLon;
+        inNight = (alt < 0.0);
+      }
+
+      if (inNight)
         {
-          int alpha = static_cast<int>(qBound(0.0, -sunFactor * 155.0, 155.0));
-          painter->setPen(QColor(0, 0, 0, alpha));
-          qreal px = bounds.left() + static_cast<qreal>(x);
-          painter->drawLine(QPointF {px, bounds.top()}, QPointF {px, bounds.bottom()});
+          nightStartY = 0;
+        }
+
+      for (int y = 1; y < height; ++y)
+        {
+          double lat = topLat - m_viewSpanLat * static_cast<double>(y) / static_cast<double>(height);
+          double latRad = qDegreesToRadians(lat);
+          double alt = std::sin(subLatRad) * std::sin(latRad) + std::cos(subLatRad) * std::cos(latRad) * cosDLon;
+          bool nowNight = (alt < 0.0);
+
+          if (!inNight && nowNight)
+            {
+              nightStartY = y;
+              inNight = true;
+            }
+          else if (inNight && !nowNight)
+            {
+              nightEndY = y;
+              inNight = false;
+              // partial column done - draw it
+              if (nightStartY >= 0 && nightEndY > nightStartY)
+                {
+                  painter->setBrush(QColor(0, 5, 30, 145));
+                  painter->drawRect(QRectF(bounds.left() + x, bounds.top() + nightStartY,
+                                          1.0, nightEndY - nightStartY));
+                }
+              nightStartY = -1;
+              nightEndY = height;
+            }
+        }
+
+      // Close any open night region
+      if (inNight && nightStartY >= 0)
+        {
+          painter->setBrush(QColor(0, 5, 30, 145));
+          painter->drawRect(QRectF(bounds.left() + x, bounds.top() + nightStartY,
+                                  1.0, height - nightStartY));
         }
     }
+
+  // Draw the sun indicator
+  QPointF sunPoint = projectLonLatToPoint(QPointF{subSolarLon, subSolarLat}, bounds);
+  painter->setPen(Qt::NoPen);
+  painter->setBrush(QColor(255, 240, 80, 220));
+  painter->drawEllipse(sunPoint, 5.0, 5.0);
+  painter->setBrush(QColor(255, 210, 50, 90));
+  painter->drawEllipse(sunPoint, 9.0, 9.0);
+
+  painter->restore();
 }
 
 void WorldMapWidget::drawContact(QPainter * painter, QRectF const& bounds, Contact const& contact,
@@ -991,6 +1153,33 @@ void WorldMapWidget::drawContact(QPainter * painter, QRectF const& bounds, Conta
   painter->drawEllipse(destination, 4.2, 4.2);
   painter->setBrush(rxColor);
   painter->drawEllipse(destination, 2.6, 2.6);
+
+  // Brief visual feedback for the selected marker.
+  auto normalizeCall = [] (QString call) {
+    call = call.trimmed().toUpper();
+    call.remove('<');
+    call.remove('>');
+    return call;
+  };
+  qint64 nowMs = monotonicNowMs();
+  if (!m_lastClickedCall.isEmpty() && m_lastClickedUntilMs > nowMs
+      && normalizeCall(contact.call) == m_lastClickedCall)
+    {
+      qreal remaining = qBound<qreal>(0.0,
+                                      static_cast<qreal>(m_lastClickedUntilMs - nowMs) / static_cast<qreal>(kClickHighlightMs),
+                                      1.0);
+      QPointF markerPoint = (contact.role == PathRole::OutgoingFromMe) ? destination : source;
+      qreal outerRadius = 7.0 + remaining * 2.2;
+      qreal innerRadius = 4.8 + remaining * 1.4;
+
+      painter->save();
+      painter->setBrush(Qt::NoBrush);
+      painter->setPen(QPen(QColor(255, 108, 52, static_cast<int>(150 + 85 * remaining)), 2.2));
+      painter->drawEllipse(markerPoint, outerRadius, outerRadius);
+      painter->setPen(QPen(QColor(255, 210, 118, static_cast<int>(105 + 85 * remaining)), 1.4));
+      painter->drawEllipse(markerPoint, innerRadius, innerRadius);
+      painter->restore();
+    }
 
   if (drawArrow && projected.size() >= 3)
     {

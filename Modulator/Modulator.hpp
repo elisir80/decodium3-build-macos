@@ -4,6 +4,7 @@
 #include <array>
 
 #include <QAudio>
+#include <QMetaType>
 #include <QPointer>
 #include <QVector>
 
@@ -103,5 +104,7 @@ private:
   std::array<int, NUM_CW_SYMBOLS> m_icw {};
   QVector<float> m_waveSnapshot;
 };
+
+Q_DECLARE_METATYPE (Modulator::ModulatorState);
 
 #endif

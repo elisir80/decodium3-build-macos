@@ -10,6 +10,7 @@
 #include <fftw3.h>
 
 #include <QApplication>
+#include <QStyleFactory>
 #include <QProcessEnvironment>
 #include <QTemporaryFile>
 #include <QDateTime>
@@ -156,6 +157,7 @@ int main(int argc, char *argv[])
   auto const env = QProcessEnvironment::systemEnvironment ();
 
   ExceptionCatchingApplication a(argc, argv);
+  QApplication::setStyle(QStyleFactory::create("Fusion"));
   try
     {
       // LOG_INfO ("+++++++++++++++++++++++++++ Resources ++++++++++++++++++++++++++++");

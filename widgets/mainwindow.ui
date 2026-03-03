@@ -389,7 +389,7 @@
         <number>0</number>
        </property>
        <item>
-        <layout class="QGridLayout" name="Band_buttons_Layout">
+        <layout class="QGridLayout" name="Band_buttons_Layout" columnstretch="1,1,1,1,1,1,1,1,1,1,1,1,1">
          <property name="spacing">
           <number>3</number>
          </property>
@@ -515,7 +515,7 @@
            </property>
           </widget>
          </item>
-         <item row="0" column="13">
+         <item row="0" column="12">
           <widget class="QPushButton" name="pb70">
            <property name="minimumSize">
             <size>
@@ -595,7 +595,7 @@
            </property>
           </widget>
          </item>
-         <item row="1" column="13">
+         <item row="1" column="12">
           <widget class="QPushButton" name="pb24G">
            <property name="minimumSize">
             <size>
@@ -767,8 +767,8 @@
         </layout>
        </item>
        <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="0,0,2,2,2,2,2,0,2,2,2,2,1">
-         <item>
+        <layout class="QGridLayout" name="horizontalLayout_2" columnstretch="1,1,1,1,1,1,1,1,1,1,1,1,1">
+         <item row="0" column="0">
           <widget class="QCheckBox" name="cbCQonly">
            <property name="toolTip">
             <string>CQ messages only.</string>
@@ -778,7 +778,7 @@
            </property>
           </widget>
          </item>
-         <item>
+         <item row="0" column="1">
           <widget class="QCheckBox" name="cbBypass">
            <property name="toolTip">
             <string>Bypass Filters toggled via Settings or the Filters menu.</string>
@@ -788,7 +788,7 @@
            </property>
           </widget>
          </item>
-         <item>
+         <item row="0" column="2">
           <widget class="QPushButton" name="logQSOButton">
            <property name="minimumSize">
             <size>
@@ -804,7 +804,7 @@
            </property>
           </widget>
          </item>
-         <item>
+         <item row="0" column="3">
           <widget class="QPushButton" name="stopButton">
            <property name="minimumSize">
             <size>
@@ -820,7 +820,7 @@
            </property>
           </widget>
          </item>
-         <item>
+         <item row="0" column="4">
           <widget class="QPushButton" name="monitorButton">
            <property name="minimumSize">
             <size>
@@ -854,7 +854,7 @@
            </property>
           </widget>
          </item>
-         <item>
+         <item row="0" column="5">
           <widget class="QPushButton" name="EraseButton">
            <property name="minimumSize">
             <size>
@@ -873,7 +873,7 @@
            </property>
           </widget>
          </item>
-         <item>
+         <item row="0" column="12">
           <widget class="QPushButton" name="ClrAvgButton">
            <property name="enabled">
             <bool>true</bool>
@@ -895,7 +895,7 @@
            </property>
           </widget>
          </item>
-         <item>
+         <item row="0" column="12">
           <widget class="HintedSpinBox" name="sbEchoAvg">
            <property name="prefix">
             <string>Avg </string>
@@ -911,7 +911,7 @@
            </property>
           </widget>
          </item>
-         <item>
+         <item row="0" column="6">
           <widget class="QPushButton" name="DecodeButton">
            <property name="minimumSize">
             <size>
@@ -948,7 +948,7 @@
            </property>
           </widget>
          </item>
-         <item>
+         <item row="0" column="7">
           <widget class="QPushButton" name="autoButton">
            <property name="minimumSize">
             <size>
@@ -985,7 +985,7 @@
            </property>
           </widget>
          </item>
-         <item>
+         <item row="0" column="8">
           <widget class="QPushButton" name="autoCQButton">
            <property name="minimumSize">
             <size>
@@ -1019,7 +1019,7 @@
            </property>
           </widget>
          </item>
-         <item>
+         <item row="0" column="9">
          <widget class="QCheckBox" name="cbAutoTogglePeriod">
            <property name="toolTip">
             <string>Auto CQ: toggle Tx Even/1st after repeated CQ without response</string>
@@ -1035,7 +1035,7 @@
            </property>
           </widget>
          </item>
-         <item>
+         <item row="0" column="10">
           <widget class="QPushButton" name="stopTxButton">
            <property name="minimumSize">
             <size>
@@ -1051,7 +1051,7 @@
            </property>
           </widget>
          </item>
-         <item>
+         <item row="0" column="11">
           <widget class="QPushButton" name="tuneButton">
            <property name="minimumSize">
             <size>
@@ -1088,7 +1088,7 @@
            </property>
           </widget>
          </item>
-         <item>
+         <item row="0" column="12">
           <widget class="QCheckBox" name="cbMenus">
            <property name="text">
             <string>Menus</string>
@@ -4854,6 +4854,9 @@ QPushButton[state=&quot;ok&quot;] {
     <property name="title">
      <string>View</string>
     </property>
+    <addaction name="actionWorld_Map"/>
+    <addaction name="actionIonospheric_Forecast"/>
+    <addaction name="actionDX_Cluster"/>
     <addaction name="actionWide_Waterfall"/>
     <addaction name="actionAstronomical_data"/>
     <addaction name="actionMessage_averaging"/>
@@ -5106,11 +5109,42 @@ QPushButton[state=&quot;ok&quot;] {
     <enum>QAction::AboutRole</enum>
    </property>
   </action>
+  <action name="actionWorld_Map">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>World Map</string>
+   </property>
+  </action>
+  <action name="actionIonospheric_Forecast">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Ionospheric Forecast</string>
+   </property>
+   <property name="toolTip">
+    <string>Open a window with HamQSL solar and ionospheric propagation conditions.</string>
+   </property>
+  </action>
+  <action name="actionDX_Cluster">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>DX Cluster</string>
+   </property>
+   <property name="toolTip">
+    <string>Open a window with live DX cluster spots for the current band.</string>
+   </property>
+  </action>
   <action name="actionWide_Waterfall">
    <property name="text">
     <string>Waterfall</string>
    </property>
   </action>
+
   <action name="actionOpen">
    <property name="text">
     <string>Open</string>

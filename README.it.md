@@ -1,24 +1,22 @@
-# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.3.6 (Italiano)
+# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.3.7 (Italiano)
 
 Per la versione bilingue completa (English + Italiano), vedere [README.md](README.md).
 
 ## Sintesi italiana
 
-Questa release fork (`v1.3.6`) e' basata su Decodium v3.0 SE Raptor upstream e introduce hardening operativo specifico per macOS:
+Questa release fork (`v1.3.7`) e' basata su Decodium v3.0 SE Raptor upstream e introduce i seguenti fix/aggiornamenti rispetto a `v1.3.6`:
 
-- hardening parser frame binari TCI con validazione completa header/payload;
-- refactor attese pseudo-sync TCI senza loop annidati `QEventLoop::exec()` in `mysleep1..8`;
-- sicurezza cross-thread TX: `foxcom_.wave` letto tramite snapshot protetti;
-- boundary audio TCI C++/Fortran rafforzato con clamp `kin` e scritture limitate;
-- stabilita' audio macOS migliorata (path Sequoia-safe in stop + gestione underrun piu robusta);
-- generazione TOTP allineata al tempo corretto NTP;
-- migrazione `QRegExp` -> `QRegularExpression` nei percorsi runtime/network critici (`mainwindow`, `wsprnet`);
-- baseline fork mantenuta: backend shared-memory `mmap` su macOS (nessun `.pkg`), allineamento modalita'/frequenza all'avvio e UI responsive su schermi piccoli;
-- `Modalita' diagnostica` resa ON/OFF reale e disattivabile subito;
-- override lingua `--language` con precedenza effettiva sulla lingua locale automatica;
-- ripristino visualizzazione nomi country in uso normale (append punti `a1/a2/...` limitato ad ARRL Digi);
-- limite parser `cty.dat` alzato per gestire blocchi prefissi moderni molto estesi;
-- stringa `Using:` di PSKReporter allineata al branding del titolo finestra.
+- selezione contatti direttamente dal mappamondo con highlight marker e compilazione DX call/grid;
+- nuova opzione configurazione `Map: single click starts Tx` per invertire logica single/double click mappa;
+- visibilita' `View -> World Map` resa persistente tra riavvii;
+- nuova finestra `Ionospheric Forecast` (dati HamQSL + immagine sole, refresh periodico);
+- nuova finestra `DX Cluster` (spot live con filtro modo e banda corrente);
+- rendering giorno/notte mappa migliorato e pulizia percorsi stale su fine QSO;
+- layout controlli top migliorato in modalita' compatta/2 righe su display piccoli;
+- fix affidabilita' decode all'avvio: timestamp sequence-start impostato su ingest audio prima del decode;
+- fix affidabilita' segnali cross-thread `ModulatorState` (registrazione metatype Qt esplicita);
+- stile UI predefinito impostato a `Fusion` per coerenza grafica cross-macOS;
+- rimozione sorgente hardcoded del suffisso legacy revision: `Using:` su PSKReporter non mostra piu' `mod by IU8LMC...`.
 
 ## Target release
 
@@ -48,8 +46,10 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ## Documentazione
 
-- [RELEASE_NOTES_v1.3.6.md](RELEASE_NOTES_v1.3.6.md)
+- [RELEASE_NOTES_v1.3.7.md](RELEASE_NOTES_v1.3.7.md)
 - [CHANGELOG.md](CHANGELOG.md)
+- [README.es.md](README.es.md)
 - [doc/SECURITY_BUG_ANALYSIS_REPORT.md](doc/SECURITY_BUG_ANALYSIS_REPORT.md)
 - [doc/MACOS_PORTING_v1.2.0.md](doc/MACOS_PORTING_v1.2.0.md)
 - [doc/DT_NTP_ROBUST_SYNC_v1.2.0.md](doc/DT_NTP_ROBUST_SYNC_v1.2.0.md)
+- [doc/README.es.md](doc/README.es.md)

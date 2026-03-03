@@ -8,7 +8,7 @@
 #include "scs_version.h"
 
 #ifndef FORK_RELEASE_VERSION
-#define FORK_RELEASE_VERSION "v1.3.6"
+#define FORK_RELEASE_VERSION "v1.3.7"
 #endif
 
 namespace
@@ -30,7 +30,6 @@ namespace
 
 QString revision (QString const& scs_rev_string)
 {
-  return "100 (mod by IU8LMC, qrz.com/db/IU8LMC)";
   QString result;
   auto revision_from_scs = revision_extract_number (scs_rev_string);
 
@@ -84,7 +83,7 @@ QString version (bool include_patch)
 
 QString program_title (QString const& revision)
 {
-  QString id {QString {"Decodium v3.0 FT2 \"Raptor\" v3.0.2603010503 | Fork by Salvatore Raccampo 9H1SR %1"}
+  QString id {QString {"Decodium v3.0 FT2 \"Raptor\" | Fork by Salvatore Raccampo 9H1SR %1"}
                .arg (QStringLiteral (FORK_RELEASE_VERSION))};
   return id + " " + revision;
 }

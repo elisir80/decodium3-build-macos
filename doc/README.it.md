@@ -6,7 +6,7 @@ Note specifiche del fork macOS nel repository.
 
 ## Contesto release attuale
 
-- Ultima release stabile: `v1.3.6`
+- Ultima release stabile: `v1.3.7`
 - Target: macOS Tahoe ARM64, Sequoia ARM64, Sequoia Intel, Monterey Intel (sperimentale), Linux x86_64 AppImage
 
 ## Note build e runtime
@@ -21,19 +21,18 @@ Note specifiche del fork macOS nel repository.
 - Il fork usa `SharedMemorySegment` con backend `mmap` su Darwin.
 - Il flusso release non dipende piu' da tuning `sysctl` System V (`kern.sysv.shmmax/shmall`).
 
-### Hardening sicurezza/concorrenza e aggiornamenti UI/runtime (v1.3.6)
+### Hardening sicurezza/concorrenza e aggiornamenti UI/runtime (v1.3.7)
 
-- Parser frame binari TCI con validazione dimensione header/payload prima dell'accesso.
-- Attese pseudo-sync TCI senza loop annidati `QEventLoop::exec()`.
-- Percorso TX `foxcom_.wave` con snapshot protetti tra thread UI/audio.
-- Boundary audio TCI con clamp `kin` e scritture buffer limitate lato C++/Fortran.
-- Gestione audio macOS migliorata su comportamento Sequoia (stop/underrun).
-- TOTP allineato a sorgente tempo corretta NTP.
-- Azione menu `Modalita' diagnostica` aggiornata a ON/OFF reale.
-- Override lingua CLI (`--language`) ora prioritario rispetto all'autoload da locale.
-- Limite parser blocchi prefisso in `cty.dat` aumentato per snapshot moderni.
-- Ripristino visualizzazione country in uso normale limitando i punti FT ad ARRL Digi.
-- Identificativo PSKReporter `Using:` allineato al branding titolo app.
+- Aggiunta gestione click contatti mappa con highlight marker e trasferimento DX call/grid.
+- Aggiunta opzione configurabile click mappa (`Map: single click starts Tx`).
+- Aggiunta persistenza stato visibilita' `View -> World Map`.
+- Aggiunte nuove finestre strumenti: `Ionospheric Forecast` e `DX Cluster`.
+- Migliorato rendering giorno/notte mappa e logica pulizia path a fine QSO.
+- Migliorato comportamento controlli top in modalita' compatta/2 righe su display piccoli.
+- Timestamp sequence-start decode ora acquisito prima dell'avvio decode per evitare disallineamenti in startup.
+- Registrazione esplicita metatype Qt per `ModulatorState` per delivery cross-thread affidabile.
+- Stile Qt predefinito impostato a `Fusion` per rendering macOS coerente.
+- Rimossa sorgente hardcoded del suffisso revision legacy che contaminava `Using:` su PSKReporter.
 
 ### Artifact release
 
@@ -59,6 +58,7 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 ## Riferimenti
 
 - `CHANGELOG.md`
-- `RELEASE_NOTES_v1.3.6.md`
-- `doc/GITHUB_RELEASE_BODY_v1.3.6.md`
+- `RELEASE_NOTES_v1.3.7.md`
+- `doc/GITHUB_RELEASE_BODY_v1.3.7.md`
+- `doc/README.es.md`
 - `doc/SECURITY_BUG_ANALYSIS_REPORT.md`

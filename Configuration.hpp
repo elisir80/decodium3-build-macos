@@ -192,6 +192,7 @@ public:
   bool ppfx() const;
   bool miles () const;
   bool quick_call () const;
+  bool map_single_click_starts_tx () const;
   bool disable_TX_on_73 () const;
   bool force_call_1st() const;
   bool alternate_bindings() const;

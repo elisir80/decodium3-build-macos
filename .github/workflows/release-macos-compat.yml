@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. v1.3.6)"
+        description: "Release version (e.g. v1.3.7)"
         required: true
-        default: "v1.3.6"
+        default: "v1.3.7"
       publish_release:
         description: "Publish GitHub release"
         required: true
@@ -174,12 +174,14 @@ jobs:
             echo
             echo "## English (UK)"
             echo "This release includes:"
-            echo "- Diagnostic mode now behaves as true ON/OFF (no restart required to disable)."
-            echo "- --language override now has strict precedence over locale autoload."
-            echo "- Country-name visibility fixed for FT2/FT4/FT8 normal operation."
-            echo "- cty.dat parser accepts modern large prefix-detail blocks (safety cap raised)."
-            echo "- PSKReporter Using: branding aligned with app title/fork identity."
-            echo "- Window title branding restored to Fork by Salvatore Raccampo 9H1SR."
+            echo "- Interactive world-map contact click handling with DX call/grid transfer."
+            echo "- Configurable map click behavior (single-click can start TX if enabled)."
+            echo "- New Ionospheric Forecast and DX Cluster windows in View menu."
+            echo "- Improved world-map day/night rendering and stale path cleanup."
+            echo "- Improved compact/two-row top controls behavior for small displays."
+            echo "- Decode startup timing fix (sequence timestamp set before decode)."
+            echo "- ModulatorState queued signal robustness via explicit Qt metatype registration."
+            echo "- Legacy hardcoded revision suffix removed (clean PSKReporter Using: branding)."
             echo "- Existing mmap shared-memory release flow retained (no .pkg required)."
             echo "- Apple Silicon build for macOS Tahoe."
             echo "- Apple Silicon build for macOS Sequoia."
@@ -199,12 +201,14 @@ jobs:
             echo
             echo "## Italiano"
             echo "Questa release include:"
-            echo "- Modalita' diagnostica ora ON/OFF reale (disattivabile senza riavvio)."
-            echo "- Override --language con precedenza rigorosa rispetto all'autoload da locale."
-            echo "- Corretto il display dei nomi country in uso normale FT2/FT4/FT8."
-            echo "- Parser cty.dat aggiornato per blocchi prefisso moderni molto grandi."
-            echo "- Branding Using: di PSKReporter allineato al titolo/app fork."
-            echo "- Branding titolo finestra ripristinato su Fork by Salvatore Raccampo 9H1SR."
+            echo "- Gestione click contatti su mappa con trasferimento nominativo/griglia DX."
+            echo "- Comportamento click mappa configurabile (single-click puo' avviare TX)."
+            echo "- Nuove finestre Ionospheric Forecast e DX Cluster nel menu View."
+            echo "- Migliorato rendering giorno/notte mappa e pulizia linee stale."
+            echo "- Migliorata gestione controlli top compatti/2 righe su schermi piccoli."
+            echo "- Fix timing startup decode (timestamp sequenza impostato prima del decode)."
+            echo "- Robustezza segnali queued ModulatorState con metatype Qt esplicito."
+            echo "- Rimossa sorgente hardcoded del suffisso legacy revision (Using: PSKReporter pulito)."
             echo "- Flusso shared-memory macOS su mmap confermato (nessun .pkg richiesto)."
             echo "- Build Apple Silicon per macOS Tahoe."
             echo "- Build Apple Silicon per macOS Sequoia."
@@ -221,6 +225,28 @@ jobs:
             echo "\`sudo xattr -r -d com.apple.quarantine /Applications/ft2.app\`"
             echo
             echo "Per i dettagli completi, vedi \`CHANGELOG.md\`."
+            echo
+            echo "## Espanol"
+            echo "Esta release incluye:"
+            echo "- Click interactivo en mapa con transferencia de indicativo/cuadricula DX."
+            echo "- Comportamiento de click en mapa configurable (click simple puede iniciar TX)."
+            echo "- Nuevas ventanas Ionospheric Forecast y DX Cluster en el menu View."
+            echo "- Render dia/noche del mapa mejorado y limpieza de rutas stale."
+            echo "- Mejoras de controles superiores compactos/2 filas en pantallas pequenas."
+            echo "- Fix de timing decode al arranque (timestamp de secuencia antes del decode)."
+            echo "- Robustez de senales queued ModulatorState con metatype Qt explicito."
+            echo "- Eliminada fuente hardcoded del sufijo legacy de revision (Using: PSKReporter limpio)."
+            echo "- Flujo mmap compartido en macOS confirmado (no se requiere .pkg)."
+            echo
+            echo "Requisitos minimos Linux:"
+            echo "- CPU x86_64, 4 GB RAM minimo"
+            echo "- glibc >= 2.35"
+            echo "- libfuse2/FUSE2 + ALSA/PulseAudio/PipeWire"
+            echo
+            echo "Si la app no inicia en macOS, ejecutar:"
+            echo "\`sudo xattr -r -d com.apple.quarantine /Applications/ft2.app\`"
+            echo
+            echo "Para detalles completos, ver \`CHANGELOG.md\`."
           } > "${NOTES_FILE}"
 
           ASSETS=(

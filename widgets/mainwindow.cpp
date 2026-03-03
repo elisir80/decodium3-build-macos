@@ -126,6 +126,8 @@
 #include "widgets/QSYMessage.h"
 #include "widgets/QSYMessageCreator.h"
 #include "widgets/qsymonitor.h"
+#include "widgets/IonosphericForecastWindow.h"
+#include "widgets/DXClusterWindow.h"
 
 #define FCL fortran_charlen_t
 //avt 10/1/25
@@ -887,7 +889,9 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   ui->decodedTextBrowser->set_configuration (&m_config, true);
   ui->decodedTextBrowser2->set_configuration (&m_config);
   m_worldMapWidget = new WorldMapWidget {ui->map_container_widget};
+  connect(m_worldMapWidget.data(), &WorldMapWidget::contactClicked, this, &MainWindow::onMapContactClicked);
   ui->map_container_layout->addWidget(m_worldMapWidget);
+
   ui->decodes_splitter->setStretchFactor(0, 4);
   ui->decodes_splitter->setStretchFactor(1, 4);
   ui->decodes_splitter->setStretchFactor(2, 5);
@@ -946,6 +950,9 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   connect (&m_audioThread, &QThread::finished, m_soundOutput, &QObject::deleteLater);
 
   // hook up Modulator slots and disposal
+  // Ensure queued cross-thread delivery for Modulator::stateChanged works on all Qt builds.
+  qRegisterMetaType<Modulator::ModulatorState> ("Modulator::ModulatorState");
+  qRegisterMetaType<Modulator::ModulatorState> ("ModulatorState");
   connect (this, &MainWindow::transmitFrequency, m_modulator, &Modulator::setFrequency);
   connect (this, &MainWindow::endTransmitMessage, m_modulator, &Modulator::stop);
   connect (this, &MainWindow::tune, m_modulator, &Modulator::tune);
@@ -2042,6 +2049,8 @@ MainWindow::~MainWindow()
   if(m_QSYMessageCreatorWidget) m_QSYMessageCreatorWidget.reset ();
   if(m_QSYMessageWidget) m_QSYMessageWidget.reset ();
   if(m_qsymonitorWidget) m_qsymonitorWidget.reset ();
+  if(m_ionosphericForecastWindow) m_ionosphericForecastWindow.reset ();
+  if(m_dxClusterWindow) m_dxClusterWindow.reset ();
   auto fname {QDir::toNativeSeparators(m_config.writeable_data_dir ().absoluteFilePath ("wsjtx_wisdom.dat"))};
   fftwf_export_wisdom_to_filename (fname.toLocal8Bit ());
   m_audioThread.quit ();
@@ -2087,6 +2096,7 @@ void MainWindow::writeSettings()
   m_settings->setValue("DXcall",ui->dxCallEntry->text());
   m_settings->setValue("DXgrid",ui->dxGridEntry->text());
   m_settings->setValue("AstroDisplayed", m_astroWidget && m_astroWidget->isVisible());
+  m_settings->setValue("WorldMapDisplayed", ui->actionWorld_Map->isChecked());
   m_settings->setValue("MsgAvgDisplayed", m_msgAvgWidget && m_msgAvgWidget->isVisible ());
   m_settings->setValue("FoxLogDisplayed", m_foxLogWindow && m_foxLogWindow->isVisible ());
   m_settings->setValue("ContestLogDisplayed", m_contestLogWindow && m_contestLogWindow->isVisible ());
@@ -2094,6 +2104,8 @@ void MainWindow::writeSettings()
   m_settings->setValue("QSYMessageCreatorDisplayed", m_QSYMessageCreatorWidget && m_QSYMessageCreatorWidget->isVisible ());
   m_settings->setValue("ShowQSYMessages", ui->actionEnable_QSY_Popups->isChecked());
   m_settings->setValue("QSYMonitorDisplayed", m_qsymonitorWidget && m_qsymonitorWidget->isVisible ());
+  m_settings->setValue("IonosphericForecastDisplayed", m_ionosphericForecastWindow && m_ionosphericForecastWindow->isVisible ());
+  m_settings->setValue("DXClusterDisplayed", m_dxClusterWindow && m_dxClusterWindow->isVisible ());
   m_settings->setValue("RespondCQ",ui->respondComboBox->currentIndex());
   m_settings->setValue("HoundSort",ui->comboBoxHoundSort->currentIndex());
   m_settings->setValue("FoxNlist",ui->sbNlist->value());
@@ -2333,12 +2345,15 @@ void MainWindow::readSettings()
   m_path = m_settings->value("MRUdir", m_config.save_directory ().absolutePath ()).toString ();
   m_txFirst = m_settings->value("TxFirst",false).toBool();
   auto displayAstro = m_settings->value ("AstroDisplayed", false).toBool ();
+  auto displayWorldMap = m_settings->value ("WorldMapDisplayed", true).toBool ();
   auto displayMsgAvg = m_settings->value ("MsgAvgDisplayed", false).toBool ();
   auto displayFoxLog = m_settings->value ("FoxLogDisplayed", false).toBool ();
   auto displayContestLog = m_settings->value ("ContestLogDisplayed", false).toBool ();
   bool displayActiveStations = m_settings->value ("ActiveStationsDisplayed", false).toBool ();
   bool displayQSYMessageCreator = m_settings->value ("QSYMessageCreatorDisplayed", false).toBool ();
   bool displayQSYMonitor = m_settings->value("QSYMonitorDisplayed", false).toBool ();
+  bool displayIonosphericForecast = m_settings->value("IonosphericForecastDisplayed", false).toBool ();
+  bool displayDXCluster = m_settings->value("DXClusterDisplayed", false).toBool ();
   bool enableQSYpopups = m_settings->value("ShowQSYMessages", true).toBool ();
   ui->respondComboBox->setCurrentIndex(m_settings->value("RespondCQ",0).toInt());
   ui->comboBoxHoundSort->setCurrentIndex(m_settings->value("HoundSort",3).toInt());
@@ -2360,6 +2375,10 @@ void MainWindow::readSettings()
 
   // do this outside of settings group because it uses groups internally
   ui->actionAstronomical_data->setChecked (displayAstro);
+  ui->actionWorld_Map->setChecked (displayWorldMap);
+  ui->actionIonospheric_Forecast->setChecked(displayIonosphericForecast);
+  ui->actionDX_Cluster->setChecked(displayDXCluster);
+  ui->map_panel_widget->setVisible (displayWorldMap);
   ui->actionEnable_QSY_Popups->setChecked (enableQSYpopups);
 
   // do this in the General group because we save the parameters from various places
@@ -2690,6 +2709,8 @@ void MainWindow::readSettings()
   if (displayActiveStations) on_actionActiveStations_triggered();
   if (displayQSYMessageCreator) on_actionQSYMessage_Creator_triggered();
   if (displayQSYMonitor) on_actionQSY_Monitor_triggered();
+  if (displayIonosphericForecast) on_actionIonospheric_Forecast_triggered();
+  if (displayDXCluster) on_actionDX_Cluster_triggered();
 
 #ifdef WIN32
   if (m_config.alert_Enabled()) {  // testing and initializing the default audio device for playing audible alerts
@@ -3161,6 +3182,9 @@ void MainWindow::dataSink(qint64 frames)
     m_dateTime = now.toString ("yyyy-MMM-dd hh:mm");
     if(m_mode!="WSPR") {
       if (m_mode=="FT8" && m_multithreadFT8 && m_ihsym>47) last=now;  // ft8md
+      if (!m_diskData) {
+        m_dateTimeSeqStart = qt_truncate_date_time_to (now, m_TRperiod * 1.e3);
+      }
       decode(); //Start decoder
     }
 
@@ -5373,11 +5397,38 @@ bool MainWindow::eventFilter (QObject * object, QEvent * event)
   switch (event->type())
     {
     case QEvent::KeyPress:
-      // fall through
-    case QEvent::MouseButtonPress:
-      // reset the Tx watchdog
+      // reset the Tx watchdog on keyboard activity
       tx_watchdog (false);
       break;
+
+    case QEvent::MouseButtonPress:
+      {
+        // reset the Tx watchdog
+        tx_watchdog (false);
+
+        // Handle click on world map panel - works even for native child widgets.
+        // Skip direct clicks on m_worldMapWidget because it already handles its own mousePressEvent.
+        if (m_worldMapWidget)
+          {
+            auto * me = static_cast<QMouseEvent *>(event);
+            auto * sourceWidget = qobject_cast<QWidget *>(object);
+            if (me->button() == Qt::LeftButton && sourceWidget && sourceWidget != m_worldMapWidget.data())
+              {
+#if QT_VERSION >= QT_VERSION_CHECK (6, 0, 0)
+                QPoint localPos = me->position().toPoint();
+#else
+                QPoint localPos = me->pos();
+#endif
+                QPoint globalPos = sourceWidget->mapToGlobal(localPos);
+                QPoint mapPos = m_worldMapWidget->mapFromGlobal(globalPos);
+                if (m_worldMapWidget->rect().contains(mapPos))
+                  {
+                    m_worldMapWidget->handleMapClick(mapPos);
+                  }
+              }
+          }
+        break;
+      }
 
     case QEvent::ChildAdded:
       // ensure our child widgets get added to our event filter
@@ -5928,6 +5979,11 @@ void MainWindow::trim_view (bool checked)
   applyCompactTopControls (m_compactTopControls);
 }
 
+void MainWindow::on_actionWorld_Map_triggered (bool checked)
+{
+  ui->map_panel_widget->setVisible(checked);
+}
+
 void MainWindow::on_actionAstronomical_data_toggled (bool checked)
 {
   if (checked)
@@ -6029,6 +6085,62 @@ void MainWindow::on_actionTime_Sync_triggered()
   m_timeSyncPanel->showNormal();
   m_timeSyncPanel->raise();
   m_timeSyncPanel->activateWindow();
+}
+
+void MainWindow::on_actionIonospheric_Forecast_triggered()
+{
+  if (!m_ionosphericForecastWindow)
+    {
+      m_ionosphericForecastWindow.reset(new IonosphericForecastWindow {m_settings, this});
+      connect(this, &MainWindow::finished,
+              m_ionosphericForecastWindow.data(), &IonosphericForecastWindow::close);
+      connect(m_ionosphericForecastWindow.data(), &IonosphericForecastWindow::windowVisibleChanged,
+              this, [this](bool visible) {
+                ui->actionIonospheric_Forecast->setChecked(visible);
+              });
+    }
+
+  if (ui->actionIonospheric_Forecast->isChecked())
+    {
+      m_ionosphericForecastWindow->showNormal();
+      m_ionosphericForecastWindow->raise();
+      m_ionosphericForecastWindow->activateWindow();
+    }
+  else
+    {
+      m_ionosphericForecastWindow->close();
+    }
+}
+
+void MainWindow::on_actionDX_Cluster_triggered()
+{
+  if (!m_dxClusterWindow)
+    {
+      m_dxClusterWindow.reset(new DXClusterWindow {m_settings, this});
+      connect(this, &MainWindow::finished,
+              m_dxClusterWindow.data(), &DXClusterWindow::close);
+      connect(m_dxClusterWindow.data(), &DXClusterWindow::windowVisibleChanged,
+              this, [this](bool visible) {
+                ui->actionDX_Cluster->setChecked(visible);
+              });
+    }
+
+  if (ui->actionDX_Cluster->isChecked())
+    {
+      auto band = m_config.bands()->find(m_freqNominal);
+      if (band.isEmpty())
+        {
+          band = ui->bandComboBox->currentText();
+        }
+      m_dxClusterWindow->setBand(band);
+      m_dxClusterWindow->showNormal();
+      m_dxClusterWindow->raise();
+      m_dxClusterWindow->activateWindow();
+    }
+  else
+    {
+      m_dxClusterWindow->close();
+    }
 }
 
 void MainWindow::on_fox_log_action_triggered()
@@ -6581,7 +6693,7 @@ void MainWindow::decode()                                       //decode()
     dec_data.params.nutc=dec_data.params.nutc/100;
   }
   if(dec_data.params.nagain==0 && dec_data.params.newdat==1 && (!m_diskData)) {
-    m_dateTimeSeqStart = qt_truncate_date_time_to (QDateTime::currentDateTimeUtc (), m_TRperiod * 1.e3);
+    // m_dateTimeSeqStart is set in dataSink() right before decode()
     auto t = m_dateTimeSeqStart.time ();
     dec_data.params.nutc = t.hour () * 100 + t.minute ();
     if (m_TRperiod < 60.)
@@ -13986,6 +14098,10 @@ void MainWindow::band_changed (Frequency f)
   static QString band_save;
   if (m_config.bands()->find(f) == band_save) return; // band didn't change
   band_save = m_config.bands()->find(f);
+  if (m_dxClusterWindow && m_dxClusterWindow->isVisible())
+    {
+      m_dxClusterWindow->setBand(band_save);
+    }
   m_band_changed = true;
 /*
   //ft8md
@@ -15629,6 +15745,9 @@ void MainWindow::updateWorldMapFromDecode(DecodedText const& decoded_text)
   bool outgoingFromMe = !isCqLike && !word1.isEmpty() && !word2.isEmpty() && isMine(word2) && !isMine(word1);
   bool incomingToMe = !isCqLike && !word1.isEmpty() && !word2.isEmpty() && isMine(word1) && !isMine(word2);
 
+  // Downgrade end-of-QSO messages (73, RR73) to BandOnly to clear the connection line.
+  bool isEndOfQso = words.contains("73") || words.contains("RR73");
+
   bool txMessageActive = decoded_text.isTX() && m_transmitting;
   if (outgoingFromMe || txMessageActive)
     {
@@ -15700,6 +15819,11 @@ void MainWindow::updateWorldMapFromDecode(DecodedText const& decoded_text)
           remoteCall = word2;
           remoteGrid = word3;
         }
+      role = WorldMapWidget::PathRole::BandOnly;
+    }
+
+  if (isEndOfQso)
+    {
       role = WorldMapWidget::PathRole::BandOnly;
     }
 
@@ -16509,9 +16633,10 @@ void MainWindow::setTopControlsTwoRows (bool enabled)
 
   if (enabled)
     {
+      int col = 0;
       for (auto * widget : row1_widgets)
         {
-          ui->horizontalLayout_2->addWidget (widget);
+          ui->horizontalLayout_2->addWidget (widget, 0, col++);
         }
       for (auto * widget : row2_widgets)
         {
@@ -16521,10 +16646,24 @@ void MainWindow::setTopControlsTwoRows (bool enabled)
     }
   else
     {
-      for (auto * widget : all_widgets)
-        {
-          ui->horizontalLayout_2->addWidget (widget);
-        }
+      // Map widgets back to their specific columns to match the 2x13 grid with band buttons above
+      // Column spacing: 0-11, skip 12, 13
+      ui->horizontalLayout_2->addWidget (ui->cbCQonly, 0, 0);
+      ui->horizontalLayout_2->addWidget (ui->cbBypass, 0, 1);
+      ui->horizontalLayout_2->addWidget (ui->logQSOButton, 0, 2);
+      ui->horizontalLayout_2->addWidget (ui->stopButton, 0, 3);
+      ui->horizontalLayout_2->addWidget (ui->monitorButton, 0, 4);
+      ui->horizontalLayout_2->addWidget (ui->EraseButton, 0, 5);
+      ui->horizontalLayout_2->addWidget (ui->DecodeButton, 0, 6);
+      ui->horizontalLayout_2->addWidget (ui->autoButton, 0, 7);
+      ui->horizontalLayout_2->addWidget (ui->autoCQButton, 0, 8);
+      ui->horizontalLayout_2->addWidget (ui->cbAutoTogglePeriod, 0, 9);
+      ui->horizontalLayout_2->addWidget (ui->stopTxButton, 0, 10);
+      ui->horizontalLayout_2->addWidget (ui->tuneButton, 0, 11);
+      ui->horizontalLayout_2->addWidget (ui->ClrAvgButton, 0, 12);
+      ui->horizontalLayout_2->addWidget (ui->sbEchoAvg, 0, 12);
+      ui->horizontalLayout_2->addWidget (ui->cbMenus, 0, 12);
+
       m_topControlsSecondRowWidget->hide ();
     }
 
@@ -20900,4 +21039,66 @@ void MainWindow::onSoundcardDriftUpdated(double driftMsPerPeriod, double driftPp
   */
 
   if (m_timeSyncPanel) m_timeSyncPanel->updateSoundcardDrift(driftMsPerPeriod, driftPpm);
+}
+
+void MainWindow::onMapContactClicked(QString const& call, QString const& grid)
+{
+  auto mapCall = call.trimmed().toUpper();
+  mapCall.remove('<');
+  mapCall.remove('>');
+  auto mapGrid = grid.trimmed().toUpper();
+
+  if (mapCall.isEmpty())
+    {
+      return;
+    }
+
+  qint64 nowMs = QDateTime::currentMSecsSinceEpoch();
+  int dblIntervalMs = qMax(180, QApplication::doubleClickInterval());
+  bool isDoubleClick = !m_mapLastClickCall.isEmpty()
+                       && (m_mapLastClickCall == mapCall)
+                       && (m_mapLastClickMs > 0)
+                       && (nowMs - m_mapLastClickMs) >= 0
+                       && (nowMs - m_mapLastClickMs) <= (dblIntervalMs + 120);
+
+  m_mapLastClickCall = mapCall;
+  m_mapLastClickMs = nowMs;
+
+  // In SuperFox/Hound mode, DX call changes are ignored unless treated as a direct station selection.
+  bool const previousDoubleClick = m_bDoubleClicked;
+  m_bDoubleClicked = true;
+  ui->dxCallEntry->setText(mapCall);
+  if (mapGrid.contains(grid_regexp))
+    {
+      ui->dxGridEntry->setText(mapGrid.left(6));
+    }
+  m_bDoubleClicked = previousDoubleClick;
+
+  on_dxCallEntry_editingFinished();
+
+  // Always prepare standard messages after map selection so single click is actionable.
+  on_genStdMsgsPushButton_clicked();
+
+  // Single click = compile/fill, double click = start TX (or inverted if option enabled).
+  bool singleClickStartsTx = m_config.map_single_click_starts_tx ();
+  bool startTxNow = singleClickStartsTx ? !isDoubleClick : isDoubleClick;
+  if (!startTxNow)
+    {
+      return;
+    }
+  if (m_mode != "WSPR" && m_mode != "FST4W")
+    {
+      if (!m_auto)
+        {
+          auto_tx_mode(true);
+        }
+      if (m_transmitting)
+        {
+          m_restart = true;
+        }
+    }
+
+  // Reset double-click matcher to avoid chaining a third quick click.
+  m_mapLastClickMs = 0;
+  m_mapLastClickCall.clear();
 }

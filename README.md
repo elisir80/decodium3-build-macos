@@ -1,13 +1,13 @@
-# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.3.6
+# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.3.7
 
-English and Italian documentation for this fork is included in this repository.
+English, Italian, and Spanish documentation for this fork is included in this repository.
 
 ## English
 
-Fork release `v1.3.6` is based on upstream `iu8lmc/Decodium-3.0-Codename-Raptor` and adds macOS-focused operational hardening.
+Fork release `v1.3.7` is based on upstream `iu8lmc/Decodium-3.0-Codename-Raptor` and adds macOS-focused operational hardening.
 
 - Upstream base: Decodium v3.0 SE "Raptor"
-- Fork release: `v1.3.6`
+- Fork release: `v1.3.7`
 - App bundle/executable on macOS: `ft2.app` / `ft2`
 - License: GPLv3
 
@@ -48,13 +48,18 @@ Fork release `v1.3.6` is based on upstream `iu8lmc/Decodium-3.0-Codename-Raptor`
   - NTP bootstrap now tolerates constrained networks (single-server confirm mode, retry tuning, auto fallback pin to `time.apple.com`).
   - NTP status bar keeps displaying live offset during weak-sync hold states.
   - Startup `cty.dat` download is immediate when missing and now forced over HTTPS.
-- Fork `v1.3.6` usability and data-quality fixes:
-  - `Diagnostic mode` is now a real ON/OFF action (no forced restart needed to disable).
-  - `--language` override now has strict precedence over locale auto-loading.
-  - PSKReporter `Using:` field now matches fork branding (no extra legacy `mod by ...` suffix).
-  - Window title branding restored to `Fork by Salvatore Raccampo 9H1SR`.
-  - `cty.dat` parser cap increased for modern oversized prefix blocks.
-  - FT2/FT4/FT8 points append (`a1/a2/...`) now shown only in ARRL Digi context, restoring country names in normal operation.
+- Fork `v1.3.7` operational and UI updates (from `v1.3.6`):
+  - Added clickable world map contacts with visual highlight and DX call/grid transfer to main TX controls.
+  - Added configurable map click behavior: default single-click fills/calls, optional single-click starts TX.
+  - Added `View -> World Map` persistent visibility toggle.
+  - Added new `View -> Ionospheric Forecast` window (HamQSL solar/ionospheric feed, refresh timer, saved geometry).
+  - Added new `View -> DX Cluster` window (band-aware, mode filtering, periodic refresh, saved geometry).
+  - Improved day/night overlay rendering and map path lifecycle (end-of-QSO path cleanup to reduce stale lines).
+  - Improved top controls layout management for compact/two-row mode on small displays.
+  - Fixed FT decode sequence-start timestamp initialization to avoid startup decode misalignment.
+  - Fixed cross-thread Qt signal delivery for `ModulatorState` with explicit metatype registration.
+  - Set default Qt style to `Fusion` for more consistent rendering across macOS variants.
+  - Removed hardcoded legacy revision suffix source so PSKReporter `Using:` no longer appends `mod by IU8LMC...`.
 
 ### Build (macOS)
 
@@ -84,12 +89,12 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ### Documentation
 
-- Release notes (EN/IT): [RELEASE_NOTES_v1.3.6.md](RELEASE_NOTES_v1.3.6.md)
-- Changelog (EN/IT): [CHANGELOG.md](CHANGELOG.md)
+- Release notes (EN/IT/ES): [RELEASE_NOTES_v1.3.7.md](RELEASE_NOTES_v1.3.7.md)
+- Changelog (EN/IT/ES for latest release): [CHANGELOG.md](CHANGELOG.md)
 - Security and bug analysis report: [doc/SECURITY_BUG_ANALYSIS_REPORT.md](doc/SECURITY_BUG_ANALYSIS_REPORT.md)
 - macOS porting details (EN/IT): [doc/MACOS_PORTING_v1.2.0.md](doc/MACOS_PORTING_v1.2.0.md)
 - DT/NTP architecture (EN/IT): [doc/DT_NTP_ROBUST_SYNC_v1.2.0.md](doc/DT_NTP_ROBUST_SYNC_v1.2.0.md)
-- GitHub release body template (EN/IT): [doc/GITHUB_RELEASE_BODY_v1.3.6.md](doc/GITHUB_RELEASE_BODY_v1.3.6.md)
+- GitHub release body template (EN/IT/ES): [doc/GITHUB_RELEASE_BODY_v1.3.7.md](doc/GITHUB_RELEASE_BODY_v1.3.7.md)
 
 ### CI release targets
 
@@ -98,6 +103,13 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 - Apple Intel Sequoia
 - Apple Intel Monterey (experimental / best effort)
 - Linux x86_64 AppImage
+
+## Espanol
+
+Tambien esta disponible un resumen en espanol:
+
+- [README.es.md](README.es.md)
+- [doc/README.es.md](doc/README.es.md)
 
 ### Linux minimum requirements
 
@@ -113,10 +125,10 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ## Italiano
 
-La release fork `v1.3.6` e' basata su `iu8lmc/Decodium-3.0-Codename-Raptor` e aggiunge hardening operativo specifico per macOS.
+La release fork `v1.3.7` e' basata su `iu8lmc/Decodium-3.0-Codename-Raptor` e aggiunge hardening operativo specifico per macOS.
 
 - Base upstream: Decodium v3.0 SE "Raptor"
-- Versione fork: `v1.3.6`
+- Versione fork: `v1.3.7`
 - Bundle/eseguibile su macOS: `ft2.app` / `ft2`
 - Licenza: GPLv3
 
@@ -157,13 +169,18 @@ La release fork `v1.3.6` e' basata su `iu8lmc/Decodium-3.0-Codename-Raptor` e ag
   - Bootstrap NTP piu' robusto su reti vincolate (conferma single-server, tuning retry, auto fallback pin su `time.apple.com`).
   - Status bar NTP mantiene la visualizzazione offset live anche durante weak-sync hold.
   - Download startup `cty.dat` immediato se mancante e ora forzato su HTTPS.
-- Fix usabilita' e qualita' dati fork `v1.3.6`:
-  - `Modalita' diagnostica` ora funziona come ON/OFF reale (disattivabile subito, senza riavvio forzato).
-  - Override lingua `--language` con precedenza netta sulla lingua locale automatica.
-  - Campo `Using:` su PSKReporter allineato al branding fork (senza suffisso legacy `mod by ...`).
-  - Branding titolo finestra ripristinato su `Fork by Salvatore Raccampo 9H1SR`.
-  - Limite parser `cty.dat` alzato per gestire blocchi prefisso moderni molto grandi.
-  - Append punti FT2/FT4/FT8 (`a1/a2/...`) limitato al contesto ARRL Digi, con ripristino nomi country in uso normale.
+- Aggiornamenti operativi/UI fork `v1.3.7` (da `v1.3.6`):
+  - Aggiunti click mappa sui contatti con highlight visivo e trasferimento nominativo/griglia nei controlli TX.
+  - Aggiunta opzione configurabile comportamento click mappa: default compila/chiama, opzionale single-click avvia TX.
+  - Aggiunto toggle persistente `View -> World Map`.
+  - Aggiunta nuova finestra `View -> Ionospheric Forecast` (feed HamQSL solar/ionosfera, refresh periodico, geometria salvata).
+  - Aggiunta nuova finestra `View -> DX Cluster` (allineata banda corrente, filtro modo, refresh periodico, geometria salvata).
+  - Migliorato rendering overlay giorno/notte e ciclo vita path mappa (pulizia linee stale su fine QSO).
+  - Migliorata gestione layout controlli top in modalita' compatta/2 righe su schermi piccoli.
+  - Corretto timestamp sequence-start decode FT per evitare disallineamenti all'avvio.
+  - Corretto delivery segnali cross-thread `ModulatorState` con registrazione metatype esplicita.
+  - Impostato stile Qt predefinito `Fusion` per rendering piu' coerente tra varianti macOS.
+  - Rimossa sorgente hardcoded del suffisso revision legacy: PSKReporter `Using:` non appende piu' `mod by IU8LMC...`.
 
 ### Compilazione (macOS)
 
@@ -193,12 +210,12 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ### Documentazione
 
-- Note di rilascio (EN/IT): [RELEASE_NOTES_v1.3.6.md](RELEASE_NOTES_v1.3.6.md)
-- Changelog (EN/IT): [CHANGELOG.md](CHANGELOG.md)
+- Note di rilascio (EN/IT/ES): [RELEASE_NOTES_v1.3.7.md](RELEASE_NOTES_v1.3.7.md)
+- Changelog (EN/IT/ES per release attuale): [CHANGELOG.md](CHANGELOG.md)
 - Report analisi sicurezza e bug: [doc/SECURITY_BUG_ANALYSIS_REPORT.md](doc/SECURITY_BUG_ANALYSIS_REPORT.md)
 - Porting macOS (EN/IT): [doc/MACOS_PORTING_v1.2.0.md](doc/MACOS_PORTING_v1.2.0.md)
 - Architettura DT/NTP (EN/IT): [doc/DT_NTP_ROBUST_SYNC_v1.2.0.md](doc/DT_NTP_ROBUST_SYNC_v1.2.0.md)
-- Template release GitHub (EN/IT): [doc/GITHUB_RELEASE_BODY_v1.3.6.md](doc/GITHUB_RELEASE_BODY_v1.3.6.md)
+- Template release GitHub (EN/IT/ES): [doc/GITHUB_RELEASE_BODY_v1.3.7.md](doc/GITHUB_RELEASE_BODY_v1.3.7.md)
 
 ### Target CI release
 

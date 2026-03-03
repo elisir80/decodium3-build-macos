@@ -33,8 +33,13 @@ public:
                   PathRole role = PathRole::Generic);
   void addContactByLonLat(QString const& call, QPointF const& sourceLonLat, QString const& destinationGrid,
                           PathRole role = PathRole::Generic);
+  void handleMapClick(QPointF const& clickPos);  // called from MainWindow's eventFilter
+
+signals:
+  void contactClicked(QString const& call, QString const& grid);
 
 protected:
+  void mousePressEvent(QMouseEvent *event) override;
   void paintEvent(QPaintEvent * event) override;
   QSize minimumSizeHint() const override;
 
@@ -75,6 +80,8 @@ private:
   QPixmap m_worldOverlay;
   QTimer m_animationTimer;
   qreal m_animationPhase {0.0};
+  QString m_lastClickedCall;
+  qint64 m_lastClickedUntilMs {0};
   bool m_transmitting {false};
   QString m_txTargetCall;
   QString m_txTargetGrid;
