@@ -11,6 +11,10 @@ Release focused on CAT/network hardening, world-map usability, and compact-layou
 - Added optional world-map greyline control in Settings -> General.
 - Added active map-path distance badge rendering (km/mi based on unit preference).
 - Refined compact top-controls layout behavior for small displays, including DX-ped area alignment.
+- Hardened TCI endpoint/command parsing path for safer runtime behavior.
+- Improved LotW/download pipeline (query-builder URLs, safer redirect policy, duplicate-connection prevention).
+- Added window geometry restore safety helper for multi-monitor scenarios.
+- Hardened legacy map65/qmap helpers with bounded string/path handling and device-index checks.
 - Updated release/docs/workflow defaults to `v1.3.8`, keeping macOS Tahoe/Sequoia + Intel Sequoia/Monterey and Linux AppImage targets.
 
 #### Fixed
@@ -18,6 +22,8 @@ Release focused on CAT/network hardening, world-map usability, and compact-layou
 - Fixed external-control mode lock scenario: generic remote Configure traffic no longer forces FT2 mode.
 - Hardened UDP control handling by requiring direct target id on control messages.
 - Improved network diagnostics text when packets are rejected for target-id mismatch.
+- Fixed Linux workflow parsing for Hamlib latest-tag retrieval.
+- Fixed Linux build compatibility when Hamlib 4.x fallback API (`rig_get_conf`) is used under stricter warning flags.
 
 ### Italiano
 
@@ -28,6 +34,10 @@ Release focalizzata su hardening CAT/rete, usabilita' mappa e stabilita' layout 
 - Aggiunto toggle opzionale greyline mappa in Settings -> General.
 - Aggiunto rendering badge distanza sul path mappa attivo (km/mi in base all'unita' selezionata).
 - Rifinito comportamento layout controlli top compatti su schermi piccoli, incluso allineamento area DX-ped.
+- Hardening percorso endpoint/parsing comandi TCI per maggiore robustezza runtime.
+- Migliorato flusso LotW/download (URL su query builder, redirect policy piu' sicura, prevenzione connessioni duplicate).
+- Aggiunto helper sicurezza restore geometria finestre per scenari multi-monitor.
+- Hardening helper legacy map65/qmap con gestione stringhe/path bounded e controlli indici device.
 - Aggiornati default release/doc/workflow a `v1.3.8`, mantenendo target macOS Tahoe/Sequoia + Intel Sequoia/Monterey e Linux AppImage.
 
 #### Corretto
@@ -35,6 +45,8 @@ Release focalizzata su hardening CAT/rete, usabilita' mappa e stabilita' layout 
 - Corretto scenario di lock modalita' con controllo esterno: traffico Configure remoto generico non forza piu' FT2.
 - Hardening gestione controllo UDP richiedendo target id diretto nei messaggi di controllo.
 - Migliorata diagnostica rete quando i pacchetti sono rifiutati per mismatch target-id.
+- Corretto parsing latest-tag Hamlib nei workflow Linux.
+- Corretta compatibilita' build Linux quando viene usato fallback API Hamlib 4.x (`rig_get_conf`) con warning severi.
 
 ### Espanol
 
@@ -45,6 +57,10 @@ Release centrada en hardening CAT/red, usabilidad del mapa y estabilidad del lay
 - Se anade opcion greyline del mapa en Settings -> General.
 - Se anade badge de distancia en la ruta activa del mapa (km/mi segun unidades configuradas).
 - Se ajusta el layout compacto de controles superiores en pantallas pequenas, incluyendo alineacion del area DX-ped.
+- Hardening de ruta de endpoint/parsing de comandos TCI para mayor robustez runtime.
+- Mejorado flujo LotW/descarga (URLs con query builder, redirect policy mas segura, prevencion de conexiones duplicadas).
+- Anadido helper de seguridad para restaurar geometria de ventanas en escenarios multi-monitor.
+- Hardening de helpers legacy map65/qmap con manejo bounded de strings/rutas y control de indices de dispositivo.
 - Defaults de release/docs/workflows actualizados a `v1.3.8`, manteniendo objetivos macOS Tahoe/Sequoia + Intel Sequoia/Monterey y Linux AppImage.
 
 #### Corregido
@@ -52,6 +68,8 @@ Release centrada en hardening CAT/red, usabilidad del mapa y estabilidad del lay
 - Corregido bloqueo de modo con control externo: Configure remoto generico ya no fuerza FT2.
 - Hardening del control UDP requiriendo target id directo para mensajes de control.
 - Mejora de diagnostico de red cuando los paquetes se rechazan por mismatch de target-id.
+- Corregido parsing latest-tag de Hamlib en workflows Linux.
+- Corregida compatibilidad de build Linux cuando se usa fallback API Hamlib 4.x (`rig_get_conf`) con warnings estrictos.
 
 ## [1.3.7] - 2026-03-03
 

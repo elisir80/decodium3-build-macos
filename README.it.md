@@ -8,9 +8,15 @@ Questa release fork (`v1.3.8`) aggiorna e completa i fix dalla `v1.3.7` con focu
 
 - hardening CAT/Configure remoto: pacchetti Configure generici non forzano piu' FT2;
 - hardening UDP controllo: richiesto target id diretto per i comandi di controllo;
+- hardening TCI runtime: normalizzazione endpoint websocket, parsing comandi piu' sicuro, guardie timer/null;
+- hardening LotW/download: URL su query builder, password redatte nei log, policy redirect piu' sicura;
+- stabilita' Auto-CQ/DX-ped migliorata: timeout coda e affinamenti integrazione 2-slot;
 - opzione greyline in `Settings -> General` (disattivabile per mappa sempre illuminata);
 - distanza visualizzata sul path mappa attivo in km/mi in base alle unita' configurate;
 - rifinitura layout controlli top su display piccoli e riallineamento area DX-ped;
+- gestione geometria multi-monitor migliorata per mantenere le finestre visibili dopo cambi display;
+- hardening `map65`/`qmap`: copie stringa bounded, clamp indici device, encoding path/nome file piu' sicuro;
+- fix CI Linux: corretto parsing latest-tag Hamlib e mantenuta compatibilita' fallback Hamlib 4.x;
 - `.pkg` non necessario: release solo DMG/ZIP/SHA256 (macOS) e AppImage/SHA256 (Linux).
 
 ## Target release

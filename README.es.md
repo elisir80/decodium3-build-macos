@@ -8,9 +8,15 @@ Esta version del fork completa los fixes desde `v1.3.7` con enfoque en robustez 
 
 - hardening CAT/Configure remoto: paquetes Configure genericos ya no fuerzan FT2;
 - hardening de control UDP: se exige target id directo en mensajes de control;
+- hardening TCI runtime: normalizacion de endpoint websocket, parsing de comandos mas seguro y guardas timer/null;
+- hardening LotW/descargas: URLs con query builder, password redactada en logs y politica de redirect mas segura;
+- mayor estabilidad Auto-CQ/DX-ped: timeout de cola y ajustes de integracion 2-slot;
 - opcion de greyline en `Settings -> General` (desactivada = mapa siempre iluminado);
 - distancia sobre la ruta activa del mapa en km/mi segun la unidad configurada;
 - ajustes de layout de controles superiores en pantallas pequenas y realineacion del area DX-ped;
+- geometria multi-monitor mejorada para mantener ventanas visibles tras cambios de displays;
+- hardening `map65`/`qmap`: copias bounded, clamp de indices de dispositivos y encoding de rutas mas seguro;
+- fixes CI Linux: parsing latest-tag Hamlib corregido y compatibilidad fallback Hamlib 4.x mantenida;
 - `.pkg` no necesario: releases solo DMG/ZIP/SHA256 (macOS) y AppImage/SHA256 (Linux).
 
 ## Objetivos de release

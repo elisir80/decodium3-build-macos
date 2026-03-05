@@ -63,9 +63,15 @@ Fork release `v1.3.8` is based on upstream `iu8lmc/Decodium-3.0-Codename-Raptor`
 - Fork `v1.3.8` CAT/network/map updates (from `v1.3.7`):
   - CAT/remote Configure hardening: generic Configure packets no longer force FT2 mode.
   - UDP control hardening: control commands now require direct target id matching.
+  - TCI runtime hardening: safer websocket endpoint normalization, safer command parsing, timer/null guards.
+  - LotW/download hardening: query-builder URLs, password redaction in logs, safer redirect policy.
+  - Auto-CQ/DX-ped workflow stability improvements (queue timeout handling + 2-slot flow refinements).
   - Added optional greyline toggle in `Settings -> General` for world map day/night overlay.
   - Added distance badge on active world-map path (km/mi based on current unit setting).
   - Refined compact top-controls layout with DX-ped button alignment improvements.
+  - Multi-monitor geometry safety improvements to keep tool windows visible after display topology changes.
+  - Legacy `map65`/`qmap` safety hardening (bounded strings, device index clamps, safer file path handling).
+  - Linux CI fixes for Hamlib latest-tag parsing + Hamlib 4.x fallback compatibility.
 
 ### Build (macOS)
 
@@ -207,9 +213,15 @@ La release fork `v1.3.8` e' basata su `iu8lmc/Decodium-3.0-Codename-Raptor` e ag
 - Aggiornamenti CAT/rete/mappa fork `v1.3.8` (da `v1.3.7`):
   - Hardening CAT/Configure remoto: pacchetti Configure generici non forzano piu' FT2.
   - Hardening UDP controllo: i comandi di controllo richiedono target id diretto.
+  - Hardening runtime TCI: normalizzazione endpoint websocket, parsing comandi piu' sicuro, guardie timer/null.
+  - Hardening LotW/download: URL su query builder, password redatte nei log, redirect policy piu' sicura.
+  - Migliorata stabilita' workflow Auto-CQ/DX-ped (timeout coda + affinamenti flusso 2-slot).
   - Aggiunto toggle opzionale greyline in `Settings -> General`.
   - Aggiunto badge distanza sul path mappa attivo (km/mi in base all'unita' configurata).
   - Rifinito il layout controlli top compatti con allineamento pulsante DX-ped.
+  - Migliorata resilienza geometria multi-monitor per mantenere le finestre visibili dopo cambi display.
+  - Hardening safety `map65`/`qmap` (stringhe bounded, clamp indici device, gestione path file piu' sicura).
+  - Fix CI Linux su parsing latest-tag Hamlib + compatibilita' fallback Hamlib 4.x.
 
 ### Compilazione (macOS)
 

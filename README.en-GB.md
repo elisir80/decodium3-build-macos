@@ -23,9 +23,15 @@ security fixes, and release automation for:
 
 - CAT/remote Configure hardening: generic broadcast Configure packets no longer force FT2 mode.
 - UDP control hardening: control messages now require direct target ID, reducing cross-app interference.
+- TCI runtime hardening: safer websocket endpoint normalization, safer command parsing, timer/null guards.
+- LotW/download hardening: secure query-builder URLs, password redaction in logs, safer redirect policy.
+- Auto-CQ/DX-ped flow stability improvements: queue timeout handling and 2-slot integration refinements.
 - Optional greyline control in Settings -> General (map can stay fully daylight when disabled).
 - Active world-map path now shows distance badge in km/mi based on configured units.
 - Top controls refined for compact screens, including DX-ped button placement.
+- Multi-monitor geometry handling improved to keep tool windows visible after display layout changes.
+- Legacy `map65`/`qmap` safety updates: bounded string operations, device index clamping, safer filename/path encoding.
+- Linux CI fixes: Hamlib latest-tag parsing repaired and Hamlib 4.x fallback build compatibility maintained.
 - `.pkg` remains unnecessary; release line stays on DMG/ZIP/SHA256 (macOS) and AppImage/SHA256 (Linux).
 
 ## Quick Start (macOS)
