@@ -17,7 +17,6 @@
 #include <QList>
 #include <QAudioDeviceInfo>
 #include <QStringList>
-#include <QResizeEvent>
 #include <QScopedPointer>
 #include <QDir>
 #include <QProgressDialog>
@@ -26,7 +25,6 @@
 #include <QPointer>
 #include <QSet>
 #include <QVector>
-#include <QPair>
 #include <QScrollBar>
 #include <QQueue>
 #include <QFuture>
@@ -59,8 +57,6 @@
 #include "Network/NetworkAccessManager.hpp"
 #include "Network/NtpClient.hpp"
 
-class QHBoxLayout;
-
 #define NUM_JT4_SYMBOLS 206                //(72+31)*2, embedded sync
 #define NUM_JT65_SYMBOLS 126               //63 data + 63 sync
 #define NUM_JT9_SYMBOLS 85                 //69 data + 16 sync
@@ -81,13 +77,13 @@ class QHBoxLayout;
 #define INCR_LOG_FNAME "lotw.adi"           //avt 9/23/25
 #define INCR_LOG_TMP_FNAME "lotw.adi.tmp"   //avt 9/23/25
 #define TEMP_LOG_FNAME "lotwreport.adi"     //avt 9/23/25
-#define FULL_LOG_FNAME "wsjtx_log.adi"      //avt 9/23/25
-#define FULL_LOG_TMP_FNAME "wsjtx_log.adi.tmp"  //avt 9/23/25
+#define FULL_LOG_FNAME "decodium_log.adi"      //avt 9/23/25
+#define FULL_LOG_TMP_FNAME "decodium_log.adi.tmp"  //avt 9/23/25
 //#define DEBUG_LOG_FNAME "debug.txt"
 #define TEMP_LOG_QSL_FNAME "lotwreport_qsl.adi"  //avt 9/23/25
 
-extern int itone[MAX_NUM_SYMBOLS];   // Audio tones for all Tx symbols
-extern int icw[NUM_CW_SYMBOLS];      // Dits for CW ID
+extern int volatile itone[MAX_NUM_SYMBOLS];   //Audio tones for all Tx symbols
+extern int volatile icw[NUM_CW_SYMBOLS];	    //Dits for CW ID
 
 //--------------------------------------------------------------- MainWindow
 namespace Ui {
@@ -95,6 +91,7 @@ namespace Ui {
 }
 
 class QProcessEnvironment;
+class QSharedMemory;
 class QSplashScreen;
 class QSettings;
 class QLineEdit;
@@ -124,10 +121,6 @@ class MultiSettings;
 class EqualizationToolsDialog;
 class DecodedText;
 class Cloudlog;
-class WorldMapWidget;
-class SharedMemorySegment;
-class IonosphericForecastWindow;
-class DXClusterWindow;
 
 class MainWindow
   : public MultiGeometryWidget<3, QMainWindow>
@@ -141,7 +134,7 @@ public:
   using SpecOp = Configuration::SpecialOperatingActivity;
 
   explicit MainWindow(QDir const& temp_directory, bool multiple, MultiSettings *,
-                      SharedMemorySegment *shdmem, unsigned downSampleFactor,
+                      QSharedMemory *shdmem, unsigned downSampleFactor,
                       QSplashScreen *, QProcessEnvironment const&,
                       QWidget *parent = nullptr);
   ~MainWindow();
@@ -162,6 +155,7 @@ public slots:
   void doubleClickOnCall2(Qt::KeyboardModifiers);
   void doubleClickOnFoxQueue(Qt::KeyboardModifiers);
   void doubleClickOnFoxInProgress(Qt::KeyboardModifiers modifiers);
+  void doubleClickOnCallerQueue(Qt::KeyboardModifiers);
   void readFromStdout();
   void p1ReadFromStdout();
   void setXIT(int n, Frequency base = 0u);
@@ -172,14 +166,12 @@ public slots:
 private:
   void change_layout (std::size_t) override;
   void keyPressEvent (QKeyEvent *) override;
-  void resizeEvent (QResizeEvent *) override;
   void closeEvent(QCloseEvent *) override;
   void childEvent(QChildEvent *) override;
   bool eventFilter(QObject *, QEvent *) override;
   void showQSYMessage(QString message);
 
 private slots:
-  void onMapContactClicked(QString const& call, QString const& grid);
   void initialize_fonts ();
   void ScrollBarPosition(int n);
   void on_actionUse_Dark_Style_triggered (bool checked);
@@ -242,6 +234,7 @@ private slots:
   void on_actionSettings_triggered();
   void on_monitorButton_clicked (bool);
   void on_actionAbout_triggered();
+  void on_actionCheck_for_Updates_triggered();
   void on_autoButton_clicked (bool);
   void on_stopTxButton_clicked();
   void on_stopButton_clicked();
@@ -260,14 +253,12 @@ private slots:
   void on_actionOnline_User_Guide_triggered();
   void on_actionLocal_User_Guide_triggered();
   void on_actionWide_Waterfall_triggered();
-  void on_actionWorld_Map_triggered(bool checked);
-  void on_actionIonospheric_Forecast_triggered();
-  void on_actionDX_Cluster_triggered();
   void on_actionOpen_triggered();
   void on_actionOpen_next_in_directory_triggered();
   void on_actionDecode_remaining_files_in_directory_triggered();
   void on_actionDelete_all_wav_files_in_SaveDir_triggered();
   void on_actionOpen_log_directory_triggered ();
+  void on_actionLaunchChronoGPS_triggered ();
   void on_actionNone_triggered();
   void on_actionSave_all_triggered();
   void on_actionDefault_event_logging_triggered();
@@ -376,7 +367,7 @@ private slots:
   void bumpFqso(int n);
   void on_actionErase_ALL_TXT_triggered();
   void on_reset_cabrillo_log_action_triggered ();
-  void on_actionErase_wsjtx_log_adi_triggered();
+  void on_actionErase_decodium_log_adi_triggered();
   void on_actionErase_WSPR_hashtable_triggered();
   void on_actionErase_list_of_Q65_callers_triggered();
   void on_actionExport_Cabrillo_log_triggered();
@@ -406,7 +397,6 @@ private slots:
   void on_RxFreqSpinBox_valueChanged(int n);
   void on_outAttenuation_valueChanged (int);
   void rigOpen ();
-  void attemptRigReconnect ();
   void handle_transceiver_update (Transceiver::TransceiverState const&);
   void handle_transceiver_failure (QString const& reason);
   void handle_leavingSettings();
@@ -482,6 +472,7 @@ private slots:
   void on_pbFreeText_clicked();
   void FoxReset(QString reason);
   void on_comboBoxHoundSort_activated (int index);
+  void not_GA_warning_message ();
   void checkMSK144ContestType();
   void on_pbBestSP_clicked();
   void on_RoundRobin_currentTextChanged(QString text);
@@ -505,7 +496,6 @@ private slots:
   void downloadQslComplete(bool result);  //avt 10/2/25
   void onNtpOffsetUpdated(double offsetMs);
   void onNtpSyncStatusChanged(bool synced, QString const& statusText);
-  void onSoundcardDriftUpdated(double driftMsPerPeriod, double driftPpm);
 
 private:
   Q_SIGNAL void initializeAudioOutputStream (QAudioDeviceInfo,
@@ -528,7 +518,6 @@ private:
       SoundOutput *, AudioDevice::Channel = AudioDevice::Mono,
       bool synchronize = true, bool fastMode = false, double dBSNR = 99.,
                              int TRperiod=60) const;
-  Q_SIGNAL void sendSymbolTables (QVector<int> itone_values, QVector<int> icw_values) const;
   Q_SIGNAL void outAttenuationChanged (qreal) const;
   Q_SIGNAL void toggleShorthand () const;
   Q_SIGNAL void reset_audio_input_stream (bool report_dropped_frames) const;
@@ -546,13 +535,6 @@ private:
   bool elide_tx1_not_allowed () const;
   void readWidebandDecodes();
   void configActiveStations();
-  void updateWorldMapFromDecode(DecodedText const& decoded_text);
-  void log_audio_rebind_event (QString const& message, bool warning = false);
-  void tx_support_log (QString const& message);
-  void stop_modulator_sync (bool quick);
-  void prime_microphone_permission_prompt ();
-  void attempt_audio_output_rebind ();
-  QAudioDeviceInfo select_audio_output_rebind_device ();
   void sfox_tx();
   bool play_DXcall = false;
   bool inSettings = false;
@@ -587,16 +569,11 @@ private:
   QScopedPointer<QSYMessage> m_QSYMessageWidget;
   QScopedPointer<QSYMonitor> m_qsymonitorWidget;
   QScopedPointer<TimeSyncPanel> m_timeSyncPanel;
-  QScopedPointer<IonosphericForecastWindow> m_ionosphericForecastWindow;
-  QScopedPointer<DXClusterWindow> m_dxClusterWindow;
   QScopedPointer<HelpTextWindow> m_shortcuts;
   QScopedPointer<HelpTextWindow> m_prefixes;
   QScopedPointer<HelpTextWindow> m_mouseCmnds;
   QScopedPointer<MessageAveraging> m_msgAvgWidget;
   QScopedPointer<ActiveStations> m_ActiveStationsWidget;
-  QPointer<WorldMapWidget> m_worldMapWidget;
-  QHash<QString, QString> m_worldMapGridByCall;
-  bool m_worldMapCall3Loaded {false};
   QScopedPointer<FoxLogWindow> m_foxLogWindow;
   QScopedPointer<CabrilloLogWindow> m_contestLogWindow;
   QScopedPointer<ColorHighlighting> m_colorHighlighting;
@@ -615,8 +592,6 @@ private:
   SoundOutput * m_soundOutput;
   int m_rx_audio_buffer_frames;
   int m_tx_audio_buffer_frames;
-  qint64 m_last_tx_audio_rebind_ms;
-  qint64 m_ptt_request_ms;
   QThread m_audioThread;
 
   qint64  m_msErase;
@@ -625,8 +600,6 @@ private:
   qint64  m_freqMoon;
   qint64  m_fullFoxCallTime;
   qint64  m_msEchoTxStart=0;
-  qint64  m_mapLastClickMs {0};
-  QString m_mapLastClickCall;
 
   Frequency m_freqNominal;
   Frequency m_freqNominalPeriod;
@@ -726,8 +699,8 @@ private:
   qint32  m_cqRetryCount {0}; // CQ (Tx6) retry counter for period toggle
   static constexpr int MAX_TX_RETRIES = 3;    // Tx2/Tx3/Tx4 retries before returning to CQ
   static constexpr int MAX_CQ_RETRIES = 10;   // CQ retries before toggling Tx Even/1st
-  qint32  m_autoCQPeriodsMissed {0};          // RX periods without reply from current AutoCQ partner
-  bool    m_receivedReplyThisPeriod {false};  // Reset each decode period in AutoCQ
+  int  m_autoCQPeriodsMissed   {0};           // RX periods senza risposta dal caller corrente
+  bool m_receivedReplyThisPeriod {false};     // flag reset ogni periodo RX
   static constexpr int MAX_MISSED_PERIODS = 4;
   qint32  m_kin0=0;
   qint32  m_earlyDecode=41;
@@ -815,24 +788,34 @@ private:
   bool    m_bCallingCQ;
   bool    m_autoCQ;
   QQueue<QString> m_callerQueue;
-  void enqueueCaller (QString const& call, int freq, int snr = -99);
+  void enqueueCaller (QString const& call, int freq, int snr = -99, float dt = 0.0f);
   void processNextInQueue ();
-  // DX-pedition 2-slot (compatible with existing FT8/FT2 flow; separate from Fox/Hound state machine)
+  void refreshCallerQueueDisplay ();
+
+  // DX-pedition 2-slot
   struct DXpedSlot {
-    QString call;
-    int     freq {0};
-    int     txStep {0};        // 2=Tx2, 3=Tx3, 5=Tx5, 0=free slot
-    int     missedPeriods {0};
-    int     snr {-99};
-    DXpedSlot () = default;
-    DXpedSlot (QString c, int f, int t, int m, int s)
-      : call {c}, freq {f}, txStep {t}, missedPeriods {m}, snr {s} {}
+    QString   call;
+    int       freq          {0};
+    int       txStep        {0};  // 2=Tx2, 3=Tx3, 5=Tx5, 0=slot libero
+    int       missedPeriods {0};
+    int       snr           {-99};
+    float     dt            {0.0f}; // DT misurato del caller (seconds)
+    QString   rptSent;
+    QString   rptRcvd;
+    QDateTime dateTimeOn;
+    DXpedSlot() = default;
+    DXpedSlot(QString c, int f, int t, int m, int s, float d = 0.0f)
+      : call{c}, freq{f}, txStep{t}, missedPeriods{m}, snr{s}, dt{d} {}
   };
-  bool      m_bDXpedMode {false};
-  DXpedSlot m_dxpedSlots[2];
-  void dxpedLoadSlot (int slot);
-  void dxpedTxSequencer ();
-  void dxpedRxProcess (QString const& call);
+  bool      m_bDXpedMode      {false};
+  int       m_dxpedCQcounter  {0};   // piggyback CQ ogni N periodi TX
+  DXpedSlot m_dxpedSlots[3];
+  void dxpedLoadSlot   (int slot);
+  int  dxpedTxSequencer();
+  void dxpedRxProcess  (QString const& call, QString const& rptRcvd = QString());
+  void dxpedAutoSequence (DecodedText const& msg);
+  void dxpedLogQSO       (int slot);
+
   bool    m_bAutoReply;
   QString m_lastloggedcall; //ft8md
   bool    m_bCheckedContest;
@@ -908,15 +891,6 @@ private:
   QFutureWatcher<void> m_wav_future_watcher;
   QFutureWatcher<void> watcher3;
   QFutureWatcher<QString> m_saveWAVWatcher;
-  QFutureWatcher<QString> m_txLogLoadWatcher;
-  QFutureWatcher<QString> m_ignoreListLoadWatcher;
-  QFutureWatcher<QString> m_allCall7LoadWatcher;
-  QFutureWatcher<QPair<int, int>> m_removeOldFilesWatcher;
-  QFutureWatcher<QPair<int, QStringList>> m_emeLogLoadWatcher;
-  bool m_txLogReloadPending {false};
-  bool m_ignoreListReloadPending {false};
-  bool m_allCall7ReloadPending {false};
-  bool m_emeLogReloadPending {false};
 
   NonInheritingProcess proc_jt9;
   NonInheritingProcess p1;
@@ -924,9 +898,9 @@ private:
 
   QProcess p2;
   QProcess p4;
-  QPointer<QProcess> upLotw;    //avt 9/23/25
+  QProcess *upLotw;    //avt 9/23/25
 
-  QPointer<WSPRNet> wsprNet;
+  WSPRNet *wsprNet;
 
   QTimer m_guiTimer;
   QTimer m_decoderWatchdog;
@@ -944,7 +918,6 @@ private:
   QTimer splashTimer;
   QTimer p1Timer;
   QTimer externalCtrlTimer;     //avt 12/16/21
-  QTimer m_rigReconnectTimer;
 
   QString m_path;
   QString m_baseCall;
@@ -1067,7 +1040,7 @@ private:
   QDateTime m_dateTimeBestSP;
   QDateTime m_dateTimeSeqStart;        //Nominal start time of Rx sequence about to be decoded
 
-  SharedMemorySegment *mem_jt9;
+  QSharedMemory *mem_jt9;
   QString m_QSOText;
   unsigned m_downSampleFactor;
   QThread::Priority m_audioThreadPriority;
@@ -1098,35 +1071,23 @@ private:
   bool m_useDarkStyle;
   bool m_externalCtrl;         //avt  10/1/25
   bool m_autoButtonState;     //avt 10/2/25
-  bool m_startupModeAutoAligned {false};
-  bool m_compactTopControls {false};
-  bool m_topControlsTwoRows {false};
-  QWidget * m_topControlsSecondRowWidget {nullptr};
-  QHBoxLayout * m_topControlsSecondRowLayout {nullptr};
 
-  //---- DT Feedback Loop ----
+  //---- DT Display (no correction applied) ----
   QVector<double> m_dtSamples;        // DT values collected in current period
-  double m_dtCorrection_ms {0.0};     // accumulated time correction (milliseconds)
-  double m_dtSmoothFactor {0.3};      // EMA smoothing factor (0-1)
-  int m_dtMinSamples {3};             // minimum decodes before applying correction
-  bool m_dtFeedbackEnabled {true};    // enabled — applies NTP+DT correction to Detector
-  int m_dtLastSampleCount {0};        // sample count for status display
+  double m_dtCorrection_ms {0.0};     // accumulated correction (display only)
+  double m_dtSmoothFactor {0.3};      // EMA smoothing factor
+  int m_dtMinSamples {3};             // minimum decodes before computing
+  bool m_dtFeedbackEnabled {true};    // enables DT collection & display
+  int m_dtLastSampleCount {0};        // sample count for display
 
-  // Decode timing statistics
   qint64 m_decodeStartMs {0};         // timestamp when decode was triggered
   double m_lastDecodeLatencyMs {0.0}; // last decode cycle latency
   double m_avgDtValue {0.0};          // EMA of DT values across periods
   int m_totalDecodesForDt {0};        // total decodes used for DT calculation
-
-  // #5: NTP vs DT cross-validation
-  int m_ntpDtDivergenceCount {0};     // consecutive periods where NTP and DT diverge
-
-  // Soundcard clock drift detection
-  double m_soundcardDriftPpm {0.0};
-  double m_soundcardDriftMsPerPeriod {0.0};
+  int m_ntpDtDivergenceCount {0};     // consecutive NTP/DT divergence periods
 
   // NTP Time Synchronization
-  QPointer<NtpClient> m_ntpClient;
+  NtpClient *m_ntpClient {nullptr};
   double m_ntpOffset_ms {0.0};
   bool m_ntpEnabled {false};
   QString m_ntpCustomServer;
@@ -1139,7 +1100,6 @@ private:
   void set_application_font (QFont const&);
   void setDecodedTextFont (QFont const&);
   void writeSettings();
-  void applyNtpEnabledState(bool enabled, char const * source, bool syncPanel = true);
   void createStatusBar();
   void updateStatusBar();
   void genStdMsgs(QString rpt, bool unconditional = false);
@@ -1205,9 +1165,6 @@ private:
   void on_the_minute ();
   void add_child_to_event_filter (QObject *);
   void remove_child_from_event_filter (QObject *);
-  void updateCompactTopControls ();
-  void setTopControlsTwoRows (bool enabled);
-  void applyCompactTopControls (bool compact);
   void setup_status_bar (bool vhf);
   void tx_watchdog (bool triggered);
   qint64  nWidgets(QString t);
