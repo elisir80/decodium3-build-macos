@@ -114,29 +114,6 @@ namespace
     return key.contains (sensitive_pattern);
   }
 
-#if defined (Q_OS_DARWIN)
-  QString make_macos_shm_key (QString app_name)
-  {
-    // Keep a short, stable per-instance key for IPC.
-    app_name = app_name.simplified ();
-    app_name.replace (QRegularExpression {R"([^A-Za-z0-9_.-])"}, "_");
-    if (app_name.isEmpty ())
-      {
-        app_name = "ft2";
-      }
-
-    constexpr int max_native_name_len {30}; // leave room for leading '/'
-    if (app_name.size () > max_native_name_len)
-      {
-        auto const utf8 = app_name.toUtf8 ();
-        auto const checksum = QString::number (qChecksum (utf8.constData (), static_cast<uint> (utf8.size ())), 16)
-          .rightJustified (4, QLatin1Char {'0'});
-        app_name = app_name.left (max_native_name_len - 5) + "_" + checksum.right (4);
-      }
-    return "/" + app_name;
-  }
-#endif
-
 }
 
 int main(int argc, char *argv[])
@@ -412,11 +389,7 @@ int main(int argc, char *argv[])
 
           // Create and initialize shared memory segment
           // Multiple instances: use rig_name as shared memory key
-#if defined (Q_OS_DARWIN)
-          mem_jt9.setKey (make_macos_shm_key (a.applicationName ()));
-#else
           mem_jt9.setKey (a.applicationName ());
-#endif
 
           // try and shut down any orphaned jt9 process
           for (int i = 3; i; --i) // three tries to close old jt9
