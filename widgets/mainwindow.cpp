@@ -331,6 +331,7 @@ namespace
   constexpr int N_WIDGETS {38};
   constexpr int default_rx_audio_buffer_frames {-1}; // lets Qt decide
   constexpr int default_tx_audio_buffer_frames {16384}; // ~341ms @ 48kHz, prevents underrun on Windows
+  constexpr bool kEnableAutoCqCallerQueue {false};
   constexpr int kDecDataSampleCount {static_cast<int> (sizeof (dec_data.d2) / sizeof (dec_data.d2[0]))};
   constexpr int kMaxCwSymbols {static_cast<int> (sizeof (icw) / sizeof (icw[0]))};
   constexpr int kFoxWaveSampleCount {static_cast<int> (sizeof (foxcom_.wave) / sizeof (foxcom_.wave[0]))};
@@ -1481,7 +1482,10 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   connect (ui->decodedTextBrowser2, &DisplayText::selectCallsign, this, &MainWindow::doubleClickOnCall);
   connect (ui->houndQueueTextBrowser, &DisplayText::selectCallsign, this, &MainWindow::doubleClickOnFoxQueue);
   connect (ui->foxTxListTextBrowser, &DisplayText::selectCallsign, this, &MainWindow::doubleClickOnFoxInProgress);
-  connect (ui->houndQueueTextBrowser, &DisplayText::selectCallsign, this, &MainWindow::doubleClickOnCallerQueue);
+  if (kEnableAutoCqCallerQueue)
+    {
+      connect (ui->houndQueueTextBrowser, &DisplayText::selectCallsign, this, &MainWindow::doubleClickOnCallerQueue);
+    }
   connect (ui->decodedTextBrowser, &DisplayText::erased, this, &MainWindow::band_activity_cleared);
   connect (ui->decodedTextBrowser2, &DisplayText::erased, this, &MainWindow::rx_frequency_activity_cleared);
   connect (ui->decodedTextBrowser->horizontalScrollBar(),SIGNAL(sliderMoved(int)),SLOT(ScrollBarPosition(int)));
@@ -2017,11 +2021,6 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   splashTimer.setSingleShot (true);
   splashTimer.start (20 * 1000);
 
-  if(QCoreApplication::applicationVersion().contains("-devel") or
-     QCoreApplication::applicationVersion().contains("-rc")) {
-    QTimer::singleShot (0, this, SLOT (not_GA_warning_message ()));
-  }
-
   m_bMyCallStd=stdCall(m_config.my_callsign ()); //ft8md
   m_bHisCallStd=stdCall(m_hisCall); //ft8md
 
@@ -2090,15 +2089,7 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
 
 void MainWindow::not_GA_warning_message ()
 {
-  if(m_config.my_callsign()=="IU8LMC") return;    //IU8LMC mod
-  MessageBox::critical_message (this,
-                                "This is a pre-release version of Decodium v3.0 FT2 Raptor " + version (false) + " made\n"
-                                "available for testing purposes.  By design it will\n"
-                                "be nonfunctional after April 30, 2026.");
-  auto now = QDateTime::currentDateTimeUtc ();
-  if (now >= QDateTime {{2026, 4, 30}, {23, 59, 59, 999}, Qt::UTC}) {
-    Q_EMIT finished ();
-  }
+  // Pre-release warning disabled.
 }
 
 void MainWindow::handle_leavingSettings ()
@@ -8652,7 +8643,8 @@ void MainWindow::auto_sequence (DecodedText const& message, unsigned start_toler
   if (message_words.size () > 3 && (message.isStandardMessage() || (is_73 or is_OK))) {
     // Auto CQ caller queue: intercept messages directed to us from OTHER stations
     // while we're already in an active QSO — queue them for later processing
-    if (m_autoCQ && m_auto && m_QSOProgress > CALLING && m_QSOProgress < SIGNOFF) {
+    if (kEnableAutoCqCallerQueue
+        && m_autoCQ && m_auto && m_QSOProgress > CALLING && m_QSOProgress < SIGNOFF) {
       if (message_words.at (2).contains (m_baseCall)
           || message_words.at (2).contains (m_config.my_callsign ())) {
         QString newCaller;
@@ -10255,7 +10247,8 @@ void MainWindow::doubleClickOnCall(Qt::KeyboardModifiers modifiers)
         }
       }
       // Auto CQ: double-click enqueues instead of interrupting current QSO
-      if (m_autoCQ && m_QSOProgress > CALLING && m_QSOProgress < SIGNOFF) {
+      if (kEnableAutoCqCallerQueue
+          && m_autoCQ && m_QSOProgress > CALLING && m_QSOProgress < SIGNOFF) {
         QString dxCall;
         QString dxGrid;
         message.deCallAndGrid(dxCall, dxGrid);
@@ -11346,6 +11339,7 @@ void MainWindow::processNextInQueue ()
 
 void MainWindow::refreshCallerQueueDisplay ()
 {
+  if (!kEnableAutoCqCallerQueue && !m_bDXpedMode) return;
   if (!m_autoCQ && !m_bDXpedMode) return;
   ui->houndQueueTextBrowser->erase();
   int n = 0;
@@ -11375,12 +11369,14 @@ void MainWindow::clearDX ()
   m_autoCQPeriodsMissed = 0;
   m_receivedReplyThisPeriod = false;
   // Process next caller in queue before returning to CQ
-  if (m_autoCQ && !m_callerQueue.isEmpty ()) {
+  if (kEnableAutoCqCallerQueue && !m_bDXpedMode
+      && m_autoCQ && !m_callerQueue.isEmpty ()) {
     processNextInQueue ();
     return;
   }
   // Auto CQ con coda vuota: torna a CQ (Tx6)
-  if (m_autoCQ && m_callerQueue.isEmpty ()) {
+  if ((kEnableAutoCqCallerQueue || m_bDXpedMode)
+      && m_autoCQ && m_callerQueue.isEmpty ()) {
     setTxMsg (6);
     m_QSOProgress = CALLING;
   }
@@ -17734,17 +17730,19 @@ void MainWindow::on_autoCQButton_clicked(bool checked)
         ui->autoButton->setChecked(true);
         on_autoButton_clicked(true);
       }
-      // Mostra caller queue nel tab dedicato
-      if (SpecOp::FOX != m_specOp) {
+      if (kEnableAutoCqCallerQueue && SpecOp::FOX != m_specOp) {
+        // Mostra caller queue nel tab dedicato
         ui->tabWidget->setCurrentIndex(1);
+        refreshCallerQueueDisplay();
       }
-      refreshCallerQueueDisplay();
     } else {
       m_bCallingCQ = false;
       m_callerQueue.clear();
-      // Torna al tab principale
-      ui->tabWidget->setCurrentIndex(0);
-      ui->houndQueueTextBrowser->erase();
+      if (kEnableAutoCqCallerQueue) {
+        // Torna al tab principale
+        ui->tabWidget->setCurrentIndex(0);
+        ui->houndQueueTextBrowser->erase();
+      }
     }
     check_button_color();
 }
