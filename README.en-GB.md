@@ -16,28 +16,35 @@ security fixes, and release automation for:
 ## Current Baseline
 
 - Source branch: `master`
-- Latest stable release: `v1.3.8`
+- Latest stable release: `v1.4.0`
 - App bundle/executable: `ft2.app` / `ft2`
 
-## Key Notes for v1.3.8
+## Key Notes for v1.4.0
 
-- CAT/remote Configure hardening: generic broadcast Configure packets no longer force FT2 mode.
-- UDP control hardening: control messages now require direct target ID, reducing cross-app interference.
-- TCI runtime hardening: safer websocket endpoint normalization, safer command parsing, timer/null guards.
-- LotW/download hardening: secure query-builder URLs, password redaction in logs, safer redirect policy.
-- Auto-CQ/DX-ped flow stability improvements: queue timeout handling and 2-slot integration refinements.
-- Optional greyline control in Settings -> General (map can stay fully daylight when disabled).
-- Active world-map path now shows distance badge in km/mi based on configured units.
-- Top controls refined for compact screens, including DX-ped button placement.
-- Multi-monitor geometry handling improved to keep tool windows visible after display layout changes.
-- Legacy `map65`/`qmap` safety updates: bounded string operations, device index clamping, safer filename/path encoding.
-- Linux CI fixes: Hamlib latest-tag parsing repaired and Hamlib 4.x fallback build compatibility maintained.
-- `.pkg` remains unnecessary; release line stays on DMG/ZIP/SHA256 (macOS) and AppImage/SHA256 (Linux).
+This release consolidates the full stabilization cycle from `v1.3.8` to `v1.4.0`:
+
+- FT2 decode flow stabilization:
+  - packed-row split handling to avoid merged/overlapped lines,
+  - near-duplicate suppression (5-second window) with best-SNR preference,
+  - consistent filtering across normal decode and async decode paths.
+- Async L2 behavior correction:
+  - visible only when mode is FT2,
+  - automatically disabled when leaving FT2.
+- Remote web dashboard maturity improvements:
+  - LAN settings from app configuration (bind/port/user/token),
+  - username/password login flow,
+  - mobile/PWA usability improvements,
+  - clearer operator-oriented controls (mode/band/rx/tx/auto-cq).
+- Existing CAT/UDP/TCI hardening retained.
+- Existing map/runtime features retained:
+  - optional greyline toggle,
+  - distance badge on active world-map path (km/mi).
+- No `.pkg` installer flow (DMG/ZIP/SHA256 for macOS, AppImage/SHA256 for Linux).
 
 ## Quick Start (macOS)
 
 ```bash
-cmake -S . -B build -DFORK_RELEASE_VERSION=v1.3.8
+cmake -S . -B build -DFORK_RELEASE_VERSION=v1.4.0
 cmake --build build -j8
 ./build/ft2.app/Contents/MacOS/ft2
 ```
@@ -47,13 +54,13 @@ cmake --build build -j8
 Local release script:
 
 ```bash
-scripts/release-macos.sh v1.3.8 --publish --repo elisir80/decodium3-build-macos
+scripts/release-macos.sh v1.4.0 --publish --repo elisir80/decodium3-build-macos
 ```
 
 Per-platform suffix example:
 
 ```bash
-scripts/release-macos.sh v1.3.8 --compat-macos 15.0 --asset-suffix macos-sequoia-arm64
+scripts/release-macos.sh v1.4.0 --compat-macos 15.0 --asset-suffix macos-sequoia-arm64
 ```
 
 ## Hamlib in Release Builds
@@ -98,9 +105,12 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 - `README.md`
 - `README.it.md`
 - `README.es.md`
-- `RELEASE_NOTES_v1.3.8.md`
+- `RELEASE_NOTES_v1.4.0.md`
 - `CHANGELOG.md`
-- `doc/GITHUB_RELEASE_BODY_v1.3.8.md`
+- `doc/GITHUB_RELEASE_BODY_v1.4.0.md`
+- `doc/WEBAPP_SETUP_GUIDE.en-GB.md`
+- `doc/WEBAPP_SETUP_GUIDE.it.md`
+- `doc/WEBAPP_SETUP_GUIDE.es.md`
 - `doc/SECURITY_BUG_ANALYSIS_REPORT.md`
 
 ## Licence

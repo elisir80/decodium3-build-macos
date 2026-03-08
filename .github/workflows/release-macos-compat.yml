@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. v1.3.8)"
+        description: "Release version (e.g. v1.4.0)"
         required: true
-        default: "v1.3.8"
+        default: "v1.4.0"
       publish_release:
         description: "Publish GitHub release"
         required: true

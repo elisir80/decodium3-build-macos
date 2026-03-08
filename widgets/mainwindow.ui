@@ -1019,22 +1019,6 @@
            </property>
           </widget>
          </item>
-         <item row="0" column="9">
-         <widget class="QCheckBox" name="cbAutoTogglePeriod">
-           <property name="toolTip">
-            <string>Auto CQ: toggle Tx Even/1st after repeated CQ without response</string>
-           </property>
-           <property name="styleSheet">
-            <string notr="true">QCheckBox { margin-left: 8px; }</string>
-           </property>
-           <property name="text">
-            <string>Alt 1/2</string>
-           </property>
-           <property name="checked">
-            <bool>false</bool>
-           </property>
-          </widget>
-         </item>
          <item row="0" column="10">
           <widget class="QPushButton" name="stopTxButton">
            <property name="minimumSize">

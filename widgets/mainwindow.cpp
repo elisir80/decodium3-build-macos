@@ -83,6 +83,7 @@
 #include "about.h"
 #include "messageaveraging.h"
 #include "activeStations.h"
+#include "worldmapwidget.h"
 #include "colorhighlighting.h"
 #include "widegraph.h"
 #include "sleep.h"
@@ -265,6 +266,167 @@ int narg[15];
 QVector<QColor> g_ColorTbl;
 
 using SpecOp = Configuration::SpecialOperatingActivity;
+
+static QRegularExpression const kDecodeLineTimestampPattern {R"(^(\d{6})\s+)"};
+
+static bool has_decode_line_timestamp (QString const& text)
+{
+  return kDecodeLineTimestampPattern.match (text).hasMatch ();
+}
+
+static QStringList split_packed_decode_rows (QString rawLine)
+{
+  rawLine.replace ('\r', ' ');
+  rawLine.replace ('\n', ' ');
+  QString normalized = rawLine.trimmed ();
+  if (normalized.isEmpty () || normalized == "0") {
+    return {};
+  }
+
+  QString tsPrefix;
+  auto const tsMatch = kDecodeLineTimestampPattern.match (normalized);
+  if (tsMatch.hasMatch ()) {
+    tsPrefix = tsMatch.captured (1);
+  }
+
+  QStringList rows;
+  int start = 0;
+  int wsRun = 0;
+  bool sawSplit = false;
+  auto flushChunk = [&] (int endExclusive) {
+    if (endExclusive <= start) {
+      return;
+    }
+    QString chunk = normalized.mid (start, endExclusive - start).trimmed ();
+    if (!chunk.isEmpty ()) {
+      rows << chunk;
+    }
+  };
+
+  for (int i = 0; i < normalized.size (); ++i) {
+    auto const c = normalized.at (i);
+    bool const isWs = (c == QChar (' ') || c == QChar::Nbsp || c == QChar ('\t'));
+    if (isWs) {
+      ++wsRun;
+    } else {
+      if (wsRun >= 6) {
+        sawSplit = true;
+        flushChunk (i - wsRun);
+        start = i;
+      }
+      wsRun = 0;
+    }
+  }
+  flushChunk (normalized.size ());
+
+  if (!sawSplit || rows.size () <= 1) {
+    return {normalized};
+  }
+
+  for (int i = 1; i < rows.size (); ++i) {
+    if (!tsPrefix.isEmpty () && !has_decode_line_timestamp (rows.at (i))) {
+      rows[i].prepend (tsPrefix + " ");
+    }
+  }
+  return rows;
+}
+
+void MainWindow::pruneNearDuplicateDecodeCache (qint64 nowMs)
+{
+  if (m_decodeDedupeLastPruneMs > 0 && (nowMs - m_decodeDedupeLastPruneMs) < 5000) {
+    return;
+  }
+  qint64 const keepMs = qMax (m_decodeDedupeWindowMs * 6, 12000);
+  for (auto it = m_decodeDedupeCache.begin (); it != m_decodeDedupeCache.end (); ) {
+    if ((nowMs - it.value ().lastSeenMs) > keepMs) {
+      it = m_decodeDedupeCache.erase (it);
+    } else {
+      ++it;
+    }
+  }
+  m_decodeDedupeLastPruneMs = nowMs;
+}
+
+bool MainWindow::shouldSuppressNearDuplicateDecode (DecodedText const& decodedtext)
+{
+  if (!(m_mode == "FT2" || m_mode == "FT4" || m_mode == "FT8")) {
+    return false;
+  }
+  if (decodedtext.isTX ()) {
+    return false;
+  }
+
+  QString payload = decodedtext.clean_string ().mid (22).simplified ().toUpper ();
+  if (payload.isEmpty ()) {
+    return false;
+  }
+
+  QString deCall;
+  QString deGrid;
+  decodedtext.deCallAndGrid (deCall, deGrid);
+  QString keyCall = deCall.trimmed ().toUpper ();
+  if (keyCall.isEmpty ()) {
+    keyCall = decodedtext.CQersCall ().trimmed ().toUpper ();
+  }
+  if (keyCall.isEmpty ()) {
+    QString c = decodedtext.call ().trimmed ().toUpper ();
+    if (c != "CQ" && c != "QRZ" && c != "DE") {
+      keyCall = c;
+    }
+  }
+  if (keyCall.isEmpty ()) {
+    keyCall = payload.section (' ', 0, 0).trimmed ();
+  }
+  if (keyCall.isEmpty ()) {
+    return false;
+  }
+
+  int const audioFreq = decodedtext.frequencyOffset ();
+  QString const grid4 = deGrid.left (4).toUpper ();
+  QString const key = QString {"%1|%2|%3|%4|%5"}
+      .arg (m_mode, keyCall, QString::number (audioFreq), grid4, payload);
+
+  qint64 const nowMs = QDateTime::currentMSecsSinceEpoch ();
+  pruneNearDuplicateDecodeCache (nowMs);
+
+  int const snr = decodedtext.snr ();
+  auto it = m_decodeDedupeCache.find (key);
+  if (it == m_decodeDedupeCache.end ()) {
+    DecodeDedupeEntry entry;
+    entry.lastSeenMs = nowMs;
+    entry.bestSnr = snr;
+    m_decodeDedupeCache.insert (key, entry);
+    return false;
+  }
+
+  DecodeDedupeEntry& entry = it.value ();
+  if ((nowMs - entry.lastSeenMs) > m_decodeDedupeWindowMs) {
+    entry.lastSeenMs = nowMs;
+    entry.bestSnr = snr;
+    return false;
+  }
+
+  entry.lastSeenMs = nowMs;
+  if (snr <= entry.bestSnr) {
+    return true;    // duplicate not better than best in the active window
+  }
+  entry.bestSnr = snr;
+  return false;     // allow stronger duplicate
+}
+
+void MainWindow::updateAsyncL2ControlsVisibility ()
+{
+  if (!ui || !ui->cbAsyncDecode || !ui->labelAsyncL2Active) {
+    return;
+  }
+  bool const isFt2 = (m_mode == "FT2");
+  if (!isFt2 && ui->cbAsyncDecode->isChecked ()) {
+    // Force async L2 OFF when leaving FT2 to avoid hidden active state.
+    ui->cbAsyncDecode->setChecked (false);
+  }
+  ui->cbAsyncDecode->setVisible (isFt2);
+  ui->labelAsyncL2Active->setVisible (isFt2 && ui->cbAsyncDecode->isChecked ());
+}
 
 bool verified = false;
 bool blocked = false;
@@ -714,7 +876,6 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   m_saveAll {false},
   m_widebandDecode {false},
   m_dataAvailable {false},
-  m_decodedText2 {false},
   m_sentFirst73 {false},
   m_tci_mod_active {false},  // TCI
   m_tci {false},  // TCI
@@ -847,7 +1008,6 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   m_autoButtonState {false}   //avt 10/2/25
 {
   ui->setupUi(this);
-  ui->cbAutoTogglePeriod->setChecked (false);
   setUnifiedTitleAndToolBarOnMac (true);
   createStatusBar();
 
@@ -864,8 +1024,15 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   ui->dxCallEntry->setValidator (new CallsignValidator {this});
   ui->sbTR->values ({5, 10, 15, 30, 60, 120, 300, 900, 1800});
   ui->sbTR_FST4W->values ({120, 300, 900, 1800});
+  updateAsyncL2ControlsVisibility ();
   ui->decodedTextBrowser->set_configuration (&m_config, true);
   ui->decodedTextBrowser2->set_configuration (&m_config);
+  m_worldMapWidget = new WorldMapWidget {ui->map_container_widget};
+  m_worldMapWidget->setGreylineEnabled(m_config.show_greyline());
+  m_worldMapWidget->setDistanceInMiles(m_config.miles());
+  m_worldMapWidget->setHomeGrid(m_config.my_grid());
+  connect(m_worldMapWidget.data(), &WorldMapWidget::contactClicked, this, &MainWindow::onMapContactClicked);
+  ui->map_container_layout->addWidget(m_worldMapWidget);
 
   m_optimizingProgress.setWindowModality (Qt::WindowModal);
   m_optimizingProgress.setAutoReset (false);
@@ -2161,6 +2328,41 @@ MainWindow::~MainWindow()
   memset(ipc_qmap,0,4096);         //Zero all of QMAP shared memory
 }
 
+DisplayText * MainWindow::secondaryDecodeView () const
+{
+  return ui->decodedTextBrowser2;
+}
+
+void MainWindow::applySingleDecodeColumnFlowLayout ()
+{
+  if (!singleDecodeColumnFlowEnabled () || !ui || !ui->rh_decodes_widget || !ui->decodes_splitter)
+    {
+      return;
+    }
+
+  bool const hideSecondary = (m_mode == "FreqCal" || m_mode == "WSPR" || m_mode == "FST4W");
+  ui->rh_decodes_widget->setVisible (!hideSecondary);
+  if (hideSecondary)
+    {
+      return;
+    }
+
+  auto sizes = ui->decodes_splitter->sizes ();
+  if (sizes.size () >= 3)
+    {
+      int total = 0;
+      for (auto const size : sizes) total += size;
+      if (total <= 0) total = width ();
+      int const map_size = qMax (320, total * 30 / 100);
+      int const secondary_size = qMax (220, total * 18 / 100);
+      int const left_size = qMax (380, total - map_size - secondary_size);
+      sizes[0] = left_size;
+      sizes[1] = secondary_size;
+      sizes[2] = map_size;
+      ui->decodes_splitter->setSizes (sizes);
+    }
+}
+
 //-------------------------------------------------------- writeSettings()
 void MainWindow::writeSettings()
 {
@@ -2728,6 +2930,7 @@ void MainWindow::readSettings()
   ui->actionAuto_Clear_Avg->setChecked (m_settings->value ("AutoClearAvg", false).toBool());
   ui->actionDisable_clicks_on_waterfall->setChecked (m_settings->value ("DisableClicksOnWaterfall", false).toBool());
   ui->decodes_splitter->restoreState(m_settings->value("SplitterState").toByteArray());
+  applySingleDecodeColumnFlowLayout();
   ui->sbNB->setValue(m_settings->value("Blanker",0).toInt());
   ui->sbEchoAvg->setValue(m_settings->value("EchoAvg",10).toInt());
   {
@@ -3998,7 +4201,8 @@ void MainWindow::fastSink(qint64 frames)
         if(m_position != 0) ui->decodedTextBrowser->horizontalScrollBar()->setValue(m_position);
 
         // display "73" messages for us also in the right pane
-        if (m_mode=="MSK144" && text.mid(22).contains(m_baseCall + " " + m_hisCall + " 73")) {
+        if (!singleDecodeColumnFlowEnabled()
+            && m_mode=="MSK144" && text.mid(22).contains(m_baseCall + " " + m_hisCall + " 73")) {
             ui->decodedTextBrowser2->displayDecodedText (decodedtext, m_config.my_callsign (), m_mode, m_config.DXCC (),
               m_logBook, m_currentBand, m_config.ppfx (), false, false, 0.0, false, -99, "", m_muted);
         }
@@ -4380,6 +4584,12 @@ void MainWindow::on_actionSettings_triggered()           // Setup Dialog (Settin
     }
     on_dxGridEntry_textChanged (m_hisGrid); // recalculate distances in case of units change
     enable_DXCC_entity (m_config.DXCC ());  // sets text window proportions and (re)inits the logbook
+    if (m_worldMapWidget)
+      {
+        m_worldMapWidget->setGreylineEnabled(m_config.show_greyline());
+        m_worldMapWidget->setDistanceInMiles(m_config.miles());
+        m_worldMapWidget->setHomeGrid(m_config.my_grid());
+      }
 
     pskSetLocal ();
     // this will close the connection to PSKReporter if it has been
@@ -5256,6 +5466,7 @@ void MainWindow::statusChanged()
   } else {
     ui->actionVHF_UHF_Buttons->setVisible(false);
   }
+  updateAsyncL2ControlsVisibility ();
   check_button_color();
 }
 
@@ -7352,21 +7563,40 @@ void MainWindow::readFromStdout()                             //readFromStdout
     bDisplayPoints=(m_mode=="FT2" or m_mode=="FT4" or m_mode=="FT8") and
       (m_specOp==SpecOp::ARRL_DIGI or m_ActiveStationsWidget->isVisible());
   }
-  while(proc_jt9.canReadLine()) {
-    auto line_read = proc_jt9.readLine ();
+  static QQueue<QByteArray> s_splitDecodeQueue;
+  while(proc_jt9.canReadLine() || !s_splitDecodeQueue.isEmpty()) {
+    QByteArray line_read;
+    if (!s_splitDecodeQueue.isEmpty()) {
+      line_read = s_splitDecodeQueue.dequeue();
+    } else {
+      line_read = proc_jt9.readLine ();
 
-    QString the_line = QString(line_read);
-    if(ui->actionEnable_QSY_Popups->isChecked() || m_qsymonitorWidget) showQSYMessage(the_line);
+      QString the_line = QString::fromUtf8(line_read.constData());
+      if(ui->actionEnable_QSY_Popups->isChecked() || m_qsymonitorWidget) showQSYMessage(the_line);
 
-    if ((m_mode == "FT8" or m_mode == "FT2") and m_specOp == SpecOp::FOX and m_ActiveStationsWidget != NULL) { // see if we should add this to ActiveStations window
-      if (!m_ActiveStationsWidget->wantedOnly() ||
-          (the_line.contains(" " + m_config.my_callsign() + " ") ||
-           the_line.contains(" <" + m_config.my_callsign() + "> ")))
-        all_decodes.append(line_read);
+      if ((m_mode == "FT8" or m_mode == "FT2") and m_specOp == SpecOp::FOX and m_ActiveStationsWidget != NULL) { // see if we should add this to ActiveStations window
+        if (!m_ActiveStationsWidget->wantedOnly() ||
+            (the_line.contains(" " + m_config.my_callsign() + " ") ||
+             the_line.contains(" <" + m_config.my_callsign() + "> ")))
+          all_decodes.append(line_read);
+      }
     }
     if (auto p = std::strpbrk (line_read.constData (), "\n\r")) {
       // truncate before line ending chars
       line_read = line_read.left (p - line_read.constData ());
+    }
+
+    if (singleDecodeColumnFlowEnabled() && (m_mode=="FT2" || m_mode=="FT4" || m_mode=="FT8")) {
+      QStringList rows = split_packed_decode_rows (QString::fromUtf8 (line_read.constData ()));
+      if (rows.isEmpty ()) {
+        continue;
+      }
+      if (rows.size () > 1) {
+        for (int i = 1; i < rows.size (); ++i) {
+          s_splitDecodeQueue.enqueue (rows.at (i).toUtf8 ());
+        }
+      }
+      line_read = rows.first ().toUtf8 ();
     }
     if(bDisplayPoints) line_read=line_read.replace("a7","  ");
     bool haveFSpread {false};
@@ -7502,6 +7732,9 @@ void MainWindow::readFromStdout()                             //readFromStdout
           if(line_read.mid(nq+2,1)=="*") navg=10;
         }
         if(navg>=2) bAvgMsg=true;
+      }
+      if (shouldSuppressNearDuplicateDecode (decodedtext)) {
+        continue;
       }
       write_all("Rx", line_read.trimmed());
     }   // Filtering out some false decodes, and don't write all.txt for such
@@ -8549,7 +8782,7 @@ void MainWindow::readFromStdout()                             //readFromStdout
         }
       }
 
-      if (bDisplayRight && !block_right_display) {
+      if (bDisplayRight && !block_right_display && !singleDecodeColumnFlowEnabled()) {
         // This msg is within 10 hertz of our tuned frequency, or a JT4 or JT65 avg, or contains MyCall
 
         if(!pounce && (!m_bBestSPArmed or (m_mode!="FT4" and m_mode!="FT2"))) {
@@ -8693,6 +8926,28 @@ void MainWindow::auto_sequence (DecodedText const& message, unsigned start_toler
   bool is_OK=false;
   if(m_mode=="MSK144" && msg_no_hash.indexOf(ui->dxCallEntry->text()+" R ")>0) is_OK=true;
   if (message_words.size () > 3 && (message.isStandardMessage() || (is_73 or is_OK))) {
+    // Async L2 manual selection lock:
+    // when user double-clicks in Rx window, keep priority on that call for a short window
+    // so automatic sequencing cannot immediately override it with another caller.
+    if (m_mode == "FT2" && ui->cbAsyncDecode->isChecked() && !m_asyncL2PinnedCall.isEmpty()) {
+      if (!m_asyncL2PinnedUntil.isValid() || QDateTime::currentDateTimeUtc() > m_asyncL2PinnedUntil) {
+        m_asyncL2PinnedCall.clear();
+        m_asyncL2PinnedUntil = QDateTime();
+      } else {
+        QString deCall;
+        QString deGrid;
+        message.deCallAndGrid(deCall, deGrid);
+        QString const pinnedBase = Radio::base_callsign(m_asyncL2PinnedCall);
+        QString const deBase = Radio::base_callsign(deCall);
+        QString const clean = message.clean_string();
+        bool const mentionsPinned = clean.contains(m_asyncL2PinnedCall)
+                                    || (!pinnedBase.isEmpty() && clean.contains(pinnedBase));
+        if (!deBase.isEmpty() && !pinnedBase.isEmpty() && deBase != pinnedBase && !mentionsPinned) {
+          return;
+        }
+      }
+    }
+
     // Auto CQ caller queue: intercept messages directed to us from OTHER stations
     // while we're already in an active QSO — queue them for later processing
     if (kEnableAutoCqCallerQueue
@@ -8853,6 +9108,10 @@ void MainWindow::on_EraseButton_clicked ()
 void MainWindow::band_activity_cleared ()
 {
   m_messageClient->decodes_cleared ();
+  m_decodeDedupeCache.clear ();
+  m_decodeDedupeLastPruneMs = 0;
+  m_asyncDedupeSet.clear ();
+  m_asyncDedupeLastCleared = QDateTime ();
   QFile f(m_config.temp_dir ().absoluteFilePath ("decoded.txt"));
   if(f.exists()) f.remove();
 }
@@ -8956,6 +9215,53 @@ void MainWindow::guiUpdate()
   }
   if(m_tune) m_bTxTime=true;                 //"Tune" takes precedence
 
+  if (!m_pendingAsyncL2MessageLine.isEmpty()
+      && (m_mode != "FT2" || !ui->cbAsyncDecode->isChecked()))
+    {
+      m_pendingAsyncL2MessageLine.clear();
+      m_pendingAsyncL2Call.clear();
+      m_pendingAsyncL2Modifiers = Qt::NoModifier;
+      m_pendingAsyncL2FromRxWindow = false;
+      m_asyncL2PinnedCall.clear();
+      m_asyncL2PinnedUntil = QDateTime();
+    }
+
+  if (!m_pendingAsyncL2MessageLine.isEmpty()
+      && m_pendingAsyncL2FromRxWindow
+      && m_mode == "FT2"
+      && ui->cbAsyncDecode->isChecked()
+      && m_bTxTime
+      && !m_transmitting
+      && !m_tune)
+    {
+      DecodedText queuedMessage {m_pendingAsyncL2MessageLine};
+      QString queuedCall = m_pendingAsyncL2Call;
+      if (queuedCall.isEmpty()) {
+        QString queuedGrid;
+        queuedMessage.deCallAndGrid(queuedCall, queuedGrid);
+      }
+      auto const queuedModifiers = m_pendingAsyncL2Modifiers;
+      m_pendingAsyncL2MessageLine.clear();
+      m_pendingAsyncL2Call.clear();
+      m_pendingAsyncL2Modifiers = Qt::NoModifier;
+      m_pendingAsyncL2FromRxWindow = false;
+      if (!queuedCall.isEmpty()) {
+        m_asyncL2PinnedCall = queuedCall;
+        m_asyncL2PinnedUntil = QDateTime::currentDateTimeUtc().addSecs(8);
+      }
+
+      m_muted = true;
+      m_bDoubleClicked = true;
+      m_hisCall0 = m_hisCall;
+      processMessage(queuedMessage, queuedModifiers);
+      m_muted = false;
+      if (!queuedCall.isEmpty()) {
+        showStatusMessage(tr("Async L2: starting queued call %1").arg(queuedCall));
+      } else {
+        showStatusMessage(tr("Async L2: starting queued call"));
+      }
+    }
+
   if(m_transmitting or m_auto or m_tune) {
     m_dateTimeLastTX = QDateTime::currentDateTimeUtc ();
 
@@ -9046,6 +9352,7 @@ void MainWindow::guiUpdate()
 
     // In DXped: PTT pronto se c'è caller O se tx5 ha il CQ
     bool txReady = m_bDXpedMode ? (!dxpedSilent || dxpedCQmode) : (msgLength > 0);
+    bool asyncBypass = (m_mode == "FT2" && ui->cbAsyncDecode->isChecked());
 
     // DXped CQ mode: forza m_ntx=5 affinché il blocco waveform legga il messaggio CQ da tx5
     if(m_bDXpedMode && dxpedCQmode && m_ntx != 5) {
@@ -9106,9 +9413,18 @@ void MainWindow::guiUpdate()
       setXIT (ui->TxFreqSpinBox->value ());
       m_config.transceiver_ptt (true); //Assert the PTT
       m_tx_when_ready = true;
+
+      // Async FT2: force TX stop when waveform is expected to be complete.
+      if (asyncBypass && !m_tune) {
+        QTimer::singleShot (2800, this, [this] () {
+          if (m_mode == "FT2" && ui->cbAsyncDecode->isChecked () && g_iptt == 1) {
+            m_btxok = false;  // stopTx() handled by m_btxok transition in guiUpdate()
+          }
+        });
+      }
     }
 //    if(!m_bTxTime and !m_tune and m_mode!="FT4") m_btxok=false;       //Time to stop transmitting
-    if(!m_bTxTime and !m_tune) m_btxok=false;       //Time to stop transmitting
+    if(!m_bTxTime and !m_tune && !asyncBypass) m_btxok=false;       //Time to stop transmitting
   }
 
   if((m_mode=="WSPR" or m_mode=="FST4W") and
@@ -9446,8 +9762,8 @@ void MainWindow::guiUpdate()
     if(m_restart) {
       write_all("Tx",m_currentMessage);
       if (m_config.TX_messages () and m_mode!="Echo") {
-        ui->decodedTextBrowser2->displayTransmittedText(m_currentMessage.trimmed(),m_mode,
-                     ui->TxFreqSpinBox->value(),m_bFastMode,m_TRperiod,m_config.superFox());
+        secondaryDecodeView()->displayTransmittedText(m_currentMessage.trimmed(),m_mode,
+              ui->TxFreqSpinBox->value(),m_bFastMode,m_TRperiod,m_config.superFox());
         }
     }
 
@@ -9546,6 +9862,8 @@ void MainWindow::guiUpdate()
   }
 
   if (g_iptt == 1 && m_iptt0 == 0) {
+    m_asyncL2PinnedCall.clear();
+    m_asyncL2PinnedUntil = QDateTime();
     // Auto CQ retry logic (only when Auto CQ mode is active)
     if (m_autoCQ && !m_tune) {
       if (m_ntx >= 2 && m_ntx <= 4) {
@@ -9556,7 +9874,6 @@ void MainWindow::guiUpdate()
             qDebug () << "AutoCQ: Tx" << m_ntx << "sent" << MAX_TX_RETRIES << "times without response, returning to CQ";
             m_txRetryCount = 0;
             m_lastNtx = -1;
-            m_cqRetryCount = 0;
             // Reset to CQ without disabling TX (set CALLING so clearDX skips auto_tx_mode(false))
             QTimer::singleShot (0, this, [this] () {
               m_QSOProgress = CALLING;
@@ -9568,15 +9885,6 @@ void MainWindow::guiUpdate()
           m_lastNtx = m_ntx;
         }
       } else if (m_ntx == 6) {
-        // Rule 2: CQ (Tx6) repeated 10 times without response → toggle Tx Even/1st
-        ++m_cqRetryCount;
-        if (m_cqRetryCount >= MAX_CQ_RETRIES && ui->cbAutoTogglePeriod->isChecked ()) {
-          m_cqRetryCount = 0;
-          m_txFirst = !m_txFirst;
-          ui->txFirstCheckBox->setChecked (m_txFirst);
-          qDebug () << "AutoCQ: CQ sent" << MAX_CQ_RETRIES << "times without response, toggling Tx period to"
-                    << (m_txFirst ? "1st" : "Even");
-        }
         m_txRetryCount = 0;
         m_lastNtx = 6;
       } else {
@@ -9596,7 +9904,7 @@ void MainWindow::guiUpdate()
         if(!m_tune) write_all("Tx",m_currentMessage);
         if (m_config.TX_messages () && !m_tune && SpecOp::FOX!=m_specOp)
           {
-            ui->decodedTextBrowser2->displayTransmittedText(current_message.trimmed(),
+            secondaryDecodeView()->displayTransmittedText(current_message.trimmed(),
                   m_mode,ui->TxFreqSpinBox->value(),m_bFastMode,m_TRperiod,m_config.superFox());
           }
       }
@@ -9618,10 +9926,6 @@ void MainWindow::guiUpdate()
 
   if(!m_btxok && m_btxok0 && g_iptt==1) {
     stopTx();
-    if ("1" == m_env.value ("WSJT_TX_BOTH", "0")) {
-      m_txFirst = !m_txFirst;
-      ui->txFirstCheckBox->setChecked (m_txFirst);
-    }
   }
 
   if(m_startAnother) {
@@ -10208,13 +10512,15 @@ void MainWindow::on_txb6_clicked()
 
 void MainWindow::doubleClickOnCall2(Qt::KeyboardModifiers modifiers)
 {
-//Confusing: come here after double-click on left text window, not right window.
-  m_decodedText2=true;
-  doubleClickOnCall(modifiers);
-  m_decodedText2=false;
+  handleDoubleClickOnCall(modifiers, true);
 }
 
 void MainWindow::doubleClickOnCall(Qt::KeyboardModifiers modifiers)
+{
+  handleDoubleClickOnCall(modifiers, false);
+}
+
+void MainWindow::handleDoubleClickOnCall(Qt::KeyboardModifiers modifiers, bool fromBandActivityWindow)
 {
   debugToFile("doubleClick  ");     //avt 10/2/25
   m_bMyCallStd=stdCall(m_config.my_callsign()); //ft8md
@@ -10226,12 +10532,37 @@ void MainWindow::doubleClickOnCall(Qt::KeyboardModifiers modifiers)
         "Double-click not available for FST4W mode");
     return;
   }
-  if(m_decodedText2) {
+  if(fromBandActivityWindow) {
     cursor=ui->decodedTextBrowser->textCursor();
   } else {
     cursor=ui->decodedTextBrowser2->textCursor();
   }
   DecodedText message {cursor.block().text().trimmed().left(61).remove("TU; ")};
+  QString clickedCall;
+  QString clickedGrid;
+  message.deCallAndGrid(clickedCall, clickedGrid);
+  bool const fromRxWindow = !fromBandActivityWindow;
+  if (fromRxWindow && m_mode == "FT2" && ui->cbAsyncDecode->isChecked())
+    {
+      if (!clickedCall.isEmpty()) {
+        m_asyncL2PinnedCall = clickedCall;
+        m_asyncL2PinnedUntil = QDateTime::currentDateTimeUtc().addSecs(8);
+      }
+      bool const slotReadyNow = m_bTxTime && !m_transmitting && !m_tune;
+      if (!slotReadyNow)
+        {
+          m_pendingAsyncL2MessageLine = message.string();
+          m_pendingAsyncL2Call = clickedCall;
+          m_pendingAsyncL2Modifiers = modifiers;
+          m_pendingAsyncL2FromRxWindow = true;
+          if (!clickedCall.isEmpty()) {
+            showStatusMessage(tr("Async L2: %1 queued, waiting free TX slot").arg(clickedCall));
+          } else {
+            showStatusMessage(tr("Async L2: caller queued, waiting free TX slot"));
+          }
+          return;
+        }
+    }
   if(m_mode=="FT8" && SpecOp::HOUND==m_specOp && (message.string().mid(4,2).contains("15") or message.string().mid(4,2).contains("45"))) return;  // ignore stations calling in the wrong time slot
 //  if(message.string().contains(";") && message.string().contains("<")) {
 //    QVector<qint32> Freq = {1840000,3573000,7074000,10136000,14074000,18100000,21074000,24915000,28074000,50313000,70154000,3575000,7047500,10140000,14080000,18104000,21140000,24919000,28180000,50318000};
@@ -10256,7 +10587,7 @@ void MainWindow::doubleClickOnCall(Qt::KeyboardModifiers modifiers)
   } else {
     cursor.setPosition(cursor.selectionStart());
   }
-  if(SpecOp::FOX==m_specOp and m_decodedText2) {
+  if(SpecOp::FOX==m_specOp and fromBandActivityWindow) {
     if(m_houndQueue.count()<10 and m_nSortedHounds>0) {
       QString t=cursor.block().text();
       selectHound(t, modifiers==(Qt::AltModifier));  // alt double-click gets put at top of queue
@@ -10472,7 +10803,7 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
     if (ok && kHz >= 10 && 3 == parts[6].size ()) {
       // QSY Freq for answering CQ nnn
       setRig (m_freqNominal / 1000000 * 1000000 + 1000 * kHz);
-      ui->decodedTextBrowser2->displayQSY (QString {"QSY %1"}.arg (m_freqNominal / 1e6, 7, 'f', 3));
+      secondaryDecodeView()->displayQSY (QString {"QSY %1"}.arg (m_freqNominal / 1e6, 7, 'f', 3));
       if(m_mode=="MSK144") m_msk144basefreq = m_freqNominal / 1000000 * 1000000 + 1000 * kHz;  // MSK144 QSY
     }
   }
@@ -10702,7 +11033,7 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
              || "RR73" == word_3
              || ("R" == word_3 && m_QSOProgress != REPORT))) {
           if((m_mode=="FT2" or m_mode=="FT4") and "RR73" == word_3) m_dateTimeRcvdRR73=QDateTime::currentDateTimeUtc();
-          m_txRetryCount = 0; m_lastNtx = -1; m_cqRetryCount = 0;  // Reset Tx retry counter on valid response
+          m_txRetryCount = 0; m_lastNtx = -1;  // Reset Tx retry counter on valid response
           m_bTUmsg=false;
           m_nextCall="";   //### Temporary: disable use of "TU;" message
           if(SpecOp::RTTY == m_specOp and m_nextCall!="") {
@@ -10776,7 +11107,7 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
                    (m_mode=="MSK144" or m_mode=="FT8" or m_mode=="FT2" or m_mode=="FT4" || "Q65" == m_mode)))
                   && word_3.startsWith ('R')) {
           m_ntx=4;
-          m_txRetryCount = 0; m_lastNtx = -1; m_cqRetryCount = 0;  // Reset Tx retry counter on R+rpt response
+          m_txRetryCount = 0; m_lastNtx = -1;  // Reset Tx retry counter on R+rpt response
           m_QSOProgress = ROGERS;
           if(SpecOp::RTTY == m_specOp) {
             int n=t.size();
@@ -10910,15 +11241,15 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
     // insert blank line in decodedTextBrowser2 when band was changed for MSK144
     if (m_mode=="MSK144" && m_config.insert_blank () && m_band_changed && (m_currentBandPeriod == m_currentBand) && !BlankLineInserted) {
       if (ui->actionUse_Dark_Style->isChecked()) {
-        ui->decodedTextBrowser2->insertText(("------------------- " + m_currentBandPeriod + " -----------------"), "#a2a2a2", "#000000");
+        secondaryDecodeView()->insertText(("------------------- " + m_currentBandPeriod + " -----------------"), "#a2a2a2", "#000000");
       } else {
-        ui->decodedTextBrowser2->insertLineSpacer ("------------------- " + m_currentBandPeriod + " -----------------");
+        secondaryDecodeView()->insertLineSpacer ("------------------- " + m_currentBandPeriod + " -----------------");
       }
       BlankLineInserted = true;
       m_band_changed = false;
     }
     if (!s2.contains(m_baseCall) or m_mode=="MSK144") {  // Taken care of elsewhere if for_us and slow mode
-      ui->decodedTextBrowser2->displayDecodedText (message, m_config.my_callsign (), m_mode, m_config.DXCC (),
+      secondaryDecodeView()->displayDecodedText (message, m_config.my_callsign (), m_mode, m_config.DXCC (),
         m_logBook, m_currentBand, m_config.ppfx (), false, false, 0.0, false, -99, "", m_muted);
     }
     m_QSOText = s2;
@@ -10982,7 +11313,7 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
 void MainWindow::setTxMsg(int n)
 {
   m_ntx=n;
-  if (n != m_lastNtx) { m_txRetryCount = 0; m_lastNtx = -1; m_cqRetryCount = 0; }  // Reset Tx retry counter when Tx changes
+  if (n != m_lastNtx) { m_txRetryCount = 0; m_lastNtx = -1; }  // Reset Tx retry counter when Tx changes
   if(n==1) ui->txrb1->setChecked(true);
   if(n==2) ui->txrb2->setChecked(true);
   if(n==3) ui->txrb3->setChecked(true);
@@ -11452,7 +11783,13 @@ void MainWindow::clearDX ()
   m_qsoStart.clear ();
   m_qsoStop.clear ();
   m_inQSOwith.clear();
-  m_txRetryCount = 0; m_lastNtx = -1; m_cqRetryCount = 0;  // Reset Tx retry counter on QSO clear
+  m_txRetryCount = 0; m_lastNtx = -1;  // Reset Tx retry counter on QSO clear
+  m_pendingAsyncL2MessageLine.clear();
+  m_pendingAsyncL2Call.clear();
+  m_pendingAsyncL2Modifiers = Qt::NoModifier;
+  m_pendingAsyncL2FromRxWindow = false;
+  m_asyncL2PinnedCall.clear();
+  m_asyncL2PinnedUntil = QDateTime();
   genStdMsgs (QString {});
   if ((m_mode=="FT8" or m_mode=="FT2") and SpecOp::HOUND == m_specOp) {
     m_ntx=1;
@@ -11471,6 +11808,7 @@ void MainWindow::clearDX ()
 void MainWindow::on_dxpedButton_clicked(bool checked)
 {
   m_bDXpedMode = checked;
+  updateQueueTabVisibility();
   if (checked) {
     m_dxpedSlots[0] = DXpedSlot{"", 0, 0, 0, -99};
     m_dxpedSlots[1] = DXpedSlot{"", 0, 0, 0, -99};
@@ -11519,6 +11857,22 @@ void MainWindow::on_dxpedButton_clicked(bool checked)
     ui->autoCQButton->setChecked(false);
     ui->tabWidget->setCurrentIndex(0);
     ui->houndQueueTextBrowser->erase();
+  }
+  updateQueueTabVisibility();
+}
+
+void MainWindow::updateQueueTabVisibility()
+{
+  if (!ui || !ui->tabWidget || ui->tabWidget->count() < 2) return;
+
+  bool const showQueueTab = (SpecOp::FOX == m_specOp) || m_bDXpedMode;
+#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+  ui->tabWidget->setTabVisible(1, showQueueTab);
+#else
+  ui->tabWidget->setTabEnabled(1, showQueueTab);
+#endif
+  if (!showQueueTab && ui->tabWidget->currentIndex() == 1) {
+    ui->tabWidget->setCurrentIndex(0);
   }
 }
 
@@ -13742,12 +14096,13 @@ void MainWindow::switch_mode (Mode mode)
     if (!(m_mode=="Echo" or ((m_mode=="Q65" or m_mode=="JT65") && m_config.decode_at_52s()))
         && ui->actionAstronomical_data->isChecked () && m_config.auto_astro()) ui->actionAstronomical_data->setChecked (false);
   });
+  applySingleDecodeColumnFlowLayout();
   check_button_color();
 }
 
 void MainWindow::WSPR_config(bool b)
 {
-  ui->rh_decodes_widget->setVisible(!b);     // UR disable for AL + widescreen version
+  ui->rh_decodes_widget->setVisible(!b && !singleDecodeColumnFlowEnabled());     // UR disable for AL + widescreen version
   ui->controls_stack_widget->setCurrentIndex (b && m_mode != "Echo" ? 1 : 0);
   if(m_mode=="Echo") ui->controls_stack_widget->setCurrentIndex(2);
   ui->QSO_controls_widget->setVisible (!b);
@@ -13777,6 +14132,11 @@ void MainWindow::WSPR_config(bool b)
       m_bSimplex = false;
     }
   enable_DXCC_entity (m_config.DXCC ());  // sets text window proportions and (re)inits the logbook
+  if (singleDecodeColumnFlowEnabled())
+    {
+      ui->rh_decodes_widget->setVisible(!b && m_mode != "FreqCal");
+    }
+  applySingleDecodeColumnFlowLayout();
 }
 
 void MainWindow::fast_config(bool b)
@@ -14543,6 +14903,8 @@ void MainWindow::handle_transceiver_update (Transceiver::TransceiverState const&
   if (old_state.online () == false && s.online () == true)
     {
       // initializing
+      m_rigAutoRetryCount = 0;
+      m_first_error = true;
       on_monitorButton_clicked (!(m_config.monitor_off_at_startup() or m_mode=="Echo"));
     }
   if (s.frequency () != old_state.frequency () || s.split () != m_splitMode)
@@ -14602,52 +14964,54 @@ void MainWindow::handle_transceiver_failure (QString const& reason)
 
 void MainWindow::rigFailure (QString const& reason)
 {
-  if (m_first_error)
+  // absorb short CAT/Hamlib glitches before showing a blocking dialog
+  if (m_rigAutoRetryCount < 3)
     {
-      // one automatic retry
-      QTimer::singleShot (0, this, SLOT (rigOpen ()));
+      ++m_rigAutoRetryCount;
+      showStatusMessage(tr("CAT disconnected, reconnecting (%1/3)...").arg(m_rigAutoRetryCount));
+      QTimer::singleShot(300 * m_rigAutoRetryCount, this, SLOT (rigOpen ()));
       m_first_error = false;
+      return;
+    }
+
+  m_rigAutoRetryCount = 0;
+  if (m_splash && m_splash->isVisible ()) m_splash->hide ();
+  m_rigErrorMessageBox.setDetailedText (reason + "\n\nTimestamp: "
+#if QT_VERSION >= QT_VERSION_CHECK (5, 8, 0)
+                                        + QDateTime::currentDateTimeUtc ().toString (Qt::ISODateWithMs)
+#else
+                                        + QDateTime::currentDateTimeUtc ().toString ("yyyy-MM-ddTHH:mm:ss.zzzZ")
+#endif
+                                        );
+
+  // don't call slot functions directly to avoid recursion
+  m_rigErrorMessageBox.exec ();
+  auto const clicked_button = m_rigErrorMessageBox.clickedButton ();
+  if (clicked_button == m_configurations_button)
+    {
+      ui->menuConfig->exec (QCursor::pos ());
     }
   else
     {
-      if (m_splash && m_splash->isVisible ()) m_splash->hide ();
-      m_rigErrorMessageBox.setDetailedText (reason + "\n\nTimestamp: "
-#if QT_VERSION >= QT_VERSION_CHECK (5, 8, 0)
-                                            + QDateTime::currentDateTimeUtc ().toString (Qt::ISODateWithMs)
-#else
-                                            + QDateTime::currentDateTimeUtc ().toString ("yyyy-MM-ddTHH:mm:ss.zzzZ")
-#endif
-                                            );
-
-      // don't call slot functions directly to avoid recursion
-      m_rigErrorMessageBox.exec ();
-      auto const clicked_button = m_rigErrorMessageBox.clickedButton ();
-      if (clicked_button == m_configurations_button)
+      switch (m_rigErrorMessageBox.standardButton (clicked_button))
         {
-          ui->menuConfig->exec (QCursor::pos ());
+        case MessageBox::Ok:
+          m_config.select_tab (1);
+          QTimer::singleShot (0, this, SLOT (on_actionSettings_triggered ()));
+          break;
+
+        case MessageBox::Retry:
+          QTimer::singleShot (0, this, SLOT (rigOpen ()));
+          break;
+
+        case MessageBox::Cancel:
+          QTimer::singleShot (0, this, SLOT (close ()));
+          break;
+
+        default: break;     // squashing compile warnings
         }
-      else
-        {
-          switch (m_rigErrorMessageBox.standardButton (clicked_button))
-            {
-            case MessageBox::Ok:
-              m_config.select_tab (1);
-              QTimer::singleShot (0, this, SLOT (on_actionSettings_triggered ()));
-              break;
-
-            case MessageBox::Retry:
-              QTimer::singleShot (0, this, SLOT (rigOpen ()));
-              break;
-
-            case MessageBox::Cancel:
-              QTimer::singleShot (0, this, SLOT (close ()));
-              break;
-
-            default: break;     // squashing compile warnings
-            }
-        }
-      m_first_error = true;     // reset
     }
+  m_first_error = true;     // reset
 }
 
 void MainWindow::transmit (double snr)
@@ -15061,6 +15425,58 @@ void MainWindow::transmitDisplay (bool transmitting)
     // the following are always disallowed in transmit
     ui->menuMode->setEnabled (!transmitting);
   }
+
+  if (m_worldMapWidget)
+    {
+      auto normalizeCall = [] (QString call)
+        {
+          call = call.trimmed().toUpper();
+          call.remove('<');
+          call.remove('>');
+          return call;
+        };
+      auto callKey = [&normalizeCall] (QString const& call)
+        {
+          auto normalized = normalizeCall(call);
+          if (normalized.isEmpty())
+            {
+              return QString {};
+            }
+          auto key = normalizeCall(Radio::base_callsign(normalized));
+          if (key.isEmpty())
+            {
+              key = normalized;
+            }
+          return key;
+        };
+
+      auto myGrid = m_config.my_grid().trimmed().toUpper();
+      auto dxCall = normalizeCall(ui->dxCallEntry->text());
+      auto dxGrid = ui->dxGridEntry->text().trimmed().toUpper();
+      if (dxCall.isEmpty())
+        {
+          dxCall = normalizeCall(m_hisCall);
+        }
+      if (!dxGrid.contains(grid_regexp))
+        {
+          auto hisGrid = m_hisGrid.trimmed().toUpper();
+          if (hisGrid.contains(grid_regexp))
+            {
+              dxGrid = hisGrid.left(6);
+            }
+        }
+
+      if (!dxGrid.contains(grid_regexp) && !dxCall.isEmpty())
+        {
+          dxGrid = m_worldMapGridByCall.value(callKey(dxCall));
+        }
+
+      if (transmitting && myGrid.contains(grid_regexp) && dxGrid.contains(grid_regexp))
+        {
+          m_worldMapWidget->addContact(dxCall, myGrid, dxGrid, WorldMapWidget::PathRole::OutgoingFromMe);
+        }
+      m_worldMapWidget->setTransmitState(transmitting, dxCall, dxGrid, m_mode);
+    }
 }
 
 void MainWindow::on_sbFtol_valueChanged(int value)
@@ -15084,18 +15500,18 @@ void MainWindow::on_sbFtol_valueChanged(int value)
 
 void::MainWindow::VHF_features_enabled(bool b)
 {
-  if(m_mode!="JT4" and m_mode!="JT65" and m_mode!="Q65") b=false;
-  if(b and m_mode!="Q65" and (ui->actionInclude_averaging->isChecked() or
+  if(m_mode!="JT4" and m_mode!="JT65" and m_mode!="Q65" and m_mode!="FT2") b=false;
+  if(b and m_mode!="Q65" and m_mode!="FT2" and (ui->actionInclude_averaging->isChecked() or
              ui->actionInclude_correlation->isChecked())) {
     ui->actionDeepestDecode->setChecked (true);
   }
   ui->actionInclude_averaging->setVisible (b);
-  ui->actionInclude_correlation->setVisible (b && m_mode!="Q65");
-  ui->actionMessage_averaging->setEnabled(b && (m_mode=="JT4" or m_mode=="JT65"));
+  ui->actionInclude_correlation->setVisible (b && m_mode!="Q65" && m_mode!="FT2");
+  ui->actionMessage_averaging->setEnabled(b && (m_mode=="JT4" or m_mode=="JT65" or m_mode=="FT2"));
   ui->actionEnable_AP_JT65->setVisible (b && m_mode=="JT65");
 
   if(!b && m_msgAvgWidget and (SpecOp::FOX != m_specOp) and !m_config.autoLog()) {
-    if(m_msgAvgWidget->isVisible() and m_mode!="JT4" and m_mode!="JT9" and m_mode!="JT65") {
+    if(m_msgAvgWidget->isVisible() and m_mode!="JT4" and m_mode!="JT9" and m_mode!="JT65" and m_mode!="FT2") {
       m_msgAvgWidget->close();
     }
   }
@@ -15442,9 +15858,286 @@ void MainWindow::locationChange (QString const& location)
       pskSetLocal ();
       statusUpdate ();
     }
+    if (m_worldMapWidget)
+      {
+        m_worldMapWidget->setHomeGrid(grid);
+      }
   } else {
     qDebug() << "locationChange: Invalid grid " << grid;
   }
+}
+
+void MainWindow::updateWorldMapFromDecode(DecodedText const& decoded_text)
+{
+  if (!m_worldMapWidget)
+    {
+      return;
+    }
+
+  auto normalizeCall = [] (QString call)
+    {
+      call = call.trimmed().toUpper();
+      call.remove('<');
+      call.remove('>');
+      if (call.endsWith(';'))
+        {
+          call.chop(1);
+        }
+      return call.trimmed();
+    };
+
+  auto callKey = [&normalizeCall] (QString const& call)
+    {
+      auto normalized = normalizeCall(call);
+      if (normalized.isEmpty())
+        {
+          return QString {};
+        }
+      auto key = normalizeCall(Radio::base_callsign(normalized));
+      if (key.isEmpty())
+        {
+          key = normalized;
+        }
+      return key;
+    };
+
+  auto myGrid = m_config.my_grid().trimmed().toUpper();
+  if (!myGrid.contains(grid_regexp))
+    {
+      return;
+    }
+
+  auto myCall = normalizeCall(m_config.my_callsign());
+  auto myBaseCall = normalizeCall(Radio::base_callsign(m_config.my_callsign()));
+  auto const myCallKey = callKey(myCall);
+  auto const myBaseCallKey = callKey(myBaseCall);
+
+  auto isMine = [&callKey, &myCallKey, &myBaseCallKey] (QString const& call)
+    {
+      auto key = callKey(call);
+      return !key.isEmpty() && (key == myCallKey || key == myBaseCallKey);
+    };
+
+  auto rememberGrid = [&] (QString const& call, QString const& grid)
+    {
+      auto key = callKey(call);
+      auto locator = grid.trimmed().toUpper();
+      if (key.isEmpty() || !locator.contains(grid_regexp))
+        {
+          return;
+        }
+      m_worldMapGridByCall.insert(key, locator.left(6));
+    };
+
+  auto loadCall3GridCache = [&] ()
+    {
+      if (m_worldMapCall3Loaded)
+        {
+          return;
+        }
+      m_worldMapCall3Loaded = true;
+
+      QFile fPrimary {m_config.writeable_data_dir().absoluteFilePath("CALL3.TXT")};
+      QFile fFallback {QDir::current().absoluteFilePath("CALL3.TXT")};
+      QFile * f = &fPrimary;
+      if (!f->open(QIODevice::ReadOnly | QIODevice::Text))
+        {
+          f = &fFallback;
+          if (!f->open(QIODevice::ReadOnly | QIODevice::Text))
+            {
+              return;
+            }
+        }
+
+      QTextStream in(f);
+      while (!in.atEnd())
+        {
+          auto line = in.readLine().trimmed();
+          if (line.isEmpty() || line.startsWith('#') || line.startsWith(';'))
+            {
+              continue;
+            }
+
+          int comma1 = line.indexOf(',');
+          if (comma1 <= 0)
+            {
+              continue;
+            }
+          int comma2 = line.indexOf(',', comma1 + 1);
+          if (comma2 < 0)
+            {
+              comma2 = line.size();
+            }
+
+          auto call = normalizeCall(line.left(comma1));
+          auto locator = line.mid(comma1 + 1, comma2 - comma1 - 1).trimmed().toUpper();
+          if (call.isEmpty() || !locator.contains(grid_regexp))
+            {
+              continue;
+            }
+
+          auto key = callKey(call);
+          if (!key.isEmpty() && !m_worldMapGridByCall.contains(key))
+            {
+              m_worldMapGridByCall.insert(key, locator.left(6));
+            }
+        }
+    };
+
+  auto lookupGrid = [&] (QString const& call)
+    {
+      auto key = callKey(call);
+      if (key.isEmpty())
+        {
+          return QString {};
+        }
+      auto locator = m_worldMapGridByCall.value(key);
+      if (locator.isEmpty())
+        {
+          loadCall3GridCache();
+          locator = m_worldMapGridByCall.value(key);
+        }
+      return locator;
+    };
+
+  auto words = decoded_text.messageWords();
+  QString word1 = words.size() > 2 ? normalizeCall(words.at(2)) : QString {};
+  QString word2 = words.size() > 3 ? normalizeCall(words.at(3)) : QString {};
+  QString word3 = words.size() > 4 ? words.at(4).trimmed().toUpper() : QString {};
+  bool hasGrid = word3.contains(grid_regexp);
+  bool isCqLike = (word1 == "CQ" || word1 == "QRZ" || word1 == "DE");
+
+  // In directed messages like "CALL_TO CALL_FROM GRID", the locator belongs to CALL_FROM (word2).
+  // In "CQ CALL GRID", the locator belongs to CALL.
+  if (hasGrid)
+    {
+      if (isCqLike && !word2.isEmpty())
+        {
+          rememberGrid(word2, word3);
+        }
+      else if (!word2.isEmpty())
+        {
+          rememberGrid(word2, word3);
+        }
+    }
+
+  QString deCall;
+  QString deGrid;
+  decoded_text.deCallAndGrid(/*out*/deCall, deGrid);
+  deCall = normalizeCall(deCall);
+  deGrid = deGrid.trimmed().toUpper();
+  if (!deCall.isEmpty() && deGrid.contains(grid_regexp) && !isMine(deCall))
+    {
+      rememberGrid(deCall, deGrid);
+    }
+
+  QString remoteCall;
+  QString remoteGrid;
+  auto role = WorldMapWidget::PathRole::Generic;
+
+  // Standard directed semantics:
+  //   CALL_TO CALL_FROM ...  => CALL_FROM (word2) is TX station, CALL_TO (word1) is RX station.
+  bool outgoingFromMe = !isCqLike && !word1.isEmpty() && !word2.isEmpty() && isMine(word2) && !isMine(word1);
+  bool incomingToMe = !isCqLike && !word1.isEmpty() && !word2.isEmpty() && isMine(word1) && !isMine(word2);
+
+  // Downgrade end-of-QSO messages (73, RR73) to BandOnly to clear the connection line.
+  bool isEndOfQso = words.contains("73") || words.contains("RR73");
+
+  bool txMessageActive = decoded_text.isTX() && m_transmitting;
+  if (outgoingFromMe || txMessageActive)
+    {
+      remoteCall = outgoingFromMe ? word1 : QString {};
+      if (remoteCall.isEmpty() && !word1.isEmpty() && word1 != "CQ" && word1 != "QRZ" && word1 != "DE" && !isMine(word1))
+        {
+          remoteCall = word1;
+        }
+      if (remoteCall.isEmpty() && !word2.isEmpty() && !isMine(word2))
+        {
+          remoteCall = word2;
+        }
+      if (remoteCall.isEmpty())
+        {
+          remoteCall = normalizeCall(ui->dxCallEntry->text());
+        }
+
+      if (!remoteCall.isEmpty())
+        {
+          remoteGrid = lookupGrid(remoteCall);
+          auto dxCall = normalizeCall(ui->dxCallEntry->text());
+          auto dxGrid = ui->dxGridEntry->text().trimmed().toUpper();
+          if (remoteGrid.isEmpty() && callKey(remoteCall) == callKey(dxCall) && dxGrid.contains(grid_regexp))
+            {
+              remoteGrid = dxGrid.left(6);
+              rememberGrid(remoteCall, remoteGrid);
+            }
+        }
+
+      role = WorldMapWidget::PathRole::OutgoingFromMe;
+      if (remoteGrid.contains(grid_regexp))
+        {
+          m_worldMapWidget->addContact(remoteCall, myGrid, remoteGrid, role);
+          return;
+        }
+    }
+  else if (incomingToMe)
+    {
+      remoteCall = word2;
+      remoteGrid = hasGrid ? word3 : lookupGrid(remoteCall);
+      role = WorldMapWidget::PathRole::IncomingToMe;
+      if (remoteGrid.contains(grid_regexp))
+        {
+          m_worldMapWidget->addContact(remoteCall, remoteGrid, myGrid, role);
+          return;
+        }
+      if (!remoteCall.isEmpty())
+        {
+          auto const lookedUp = m_logBook.countries()->lookup(remoteCall);
+          if (std::isfinite(lookedUp.latitude) && std::isfinite(lookedUp.longtitude))
+            {
+              // AD1CCty uses positive west longitudes; convert to standard east-positive.
+              QPointF approxLonLat {-static_cast<double>(lookedUp.longtitude),
+                                    static_cast<double>(lookedUp.latitude)};
+              m_worldMapWidget->addContactByLonLat(remoteCall, approxLonLat, myGrid, role);
+              return;
+            }
+        }
+    }
+  else
+    {
+      if (!deCall.isEmpty() && deGrid.contains(grid_regexp) && !isMine(deCall))
+        {
+          remoteCall = deCall;
+          remoteGrid = deGrid;
+        }
+      else if (isCqLike && !word2.isEmpty() && hasGrid)
+        {
+          remoteCall = word2;
+          remoteGrid = word3;
+        }
+      role = WorldMapWidget::PathRole::BandOnly;
+    }
+
+  if (isEndOfQso)
+    {
+      role = WorldMapWidget::PathRole::BandOnly;
+    }
+
+  if (!remoteGrid.contains(grid_regexp))
+    {
+      return;
+    }
+  if (remoteCall.isEmpty())
+    {
+      remoteCall = deCall;
+    }
+  if (role == WorldMapWidget::PathRole::BandOnly)
+    {
+      m_worldMapWidget->addContact(remoteCall, remoteGrid, remoteGrid, role);
+    }
+  else
+    {
+      m_worldMapWidget->addContact(remoteCall, remoteGrid, myGrid, role);
+    }
 }
 
 void MainWindow::replayDecodes ()
@@ -15496,6 +16189,12 @@ void MainWindow::postDecode (bool is_new, DecodedText decoded_text)      //avt 1
     }
 
   if (!is_new) return;    //avt 8/22/23
+
+  if (m_worldMapWidget)
+    {
+      m_worldMapWidget->setHomeGrid(m_config.my_grid());
+      updateWorldMapFromDecode(decoded_text);
+    }
 
   //avt 1/2/21
   bool callB4;
@@ -17201,8 +17900,7 @@ void MainWindow::doubleClickOnCallerQueue(Qt::KeyboardModifiers modifiers)
 
 void MainWindow::foxQueueTopCallCommand()
 {
-  m_decodedText2 = true;
-  if(SpecOp::FOX==m_specOp && m_decodedText2 && m_houndQueue.count() < MAX_HOUNDS_IN_QUEUE)
+  if(SpecOp::FOX==m_specOp && m_houndQueue.count() < MAX_HOUNDS_IN_QUEUE)
     {
 
       QTextCursor cursor = ui->decodedTextBrowser->textCursor();
@@ -17230,12 +17928,12 @@ void MainWindow::foxGenWaveform(int i,QString fm)
   if(m_config.superFox() && SpecOp::FOX==m_specOp) {
       nfreq=750;
       if(i==0 && ui->cbSendMsg->isChecked()) {
-        ui->decodedTextBrowser2->displayTransmittedText(m_freeTextMsg0, txModeArg,
+        secondaryDecodeView()->displayTransmittedText(m_freeTextMsg0, txModeArg,
                nfreq,m_bFastMode,m_TRperiod,m_config.superFox());
       }
   }
 
-  ui->decodedTextBrowser2->displayTransmittedText(fm.trimmed(), txModeArg,
+  secondaryDecodeView()->displayTransmittedText(fm.trimmed(), txModeArg,
         nfreq,m_bFastMode,m_TRperiod,m_config.superFox());
   foxcom_.i3bit[i]=0;
   if(fm.indexOf("<")>0) foxcom_.i3bit[i]=1;
@@ -17684,6 +18382,7 @@ void MainWindow::on_houndButton_clicked (bool checked)
   m_specOp=m_config.special_op_id();
   if(m_mode=="FT2") on_actionFT2_triggered();
   else on_actionFT8_triggered();
+  updateQueueTabVisibility();
   check_button_color();
 }
 
@@ -17703,12 +18402,24 @@ void MainWindow::on_cbAsyncDecode_toggled (bool checked)
       m_asyncAudioPos = 0;
       m_asyncDedupeSet.clear();
       m_asyncDedupeLastCleared = QDateTime::currentDateTimeUtc();
+      m_pendingAsyncL2MessageLine.clear();
+      m_pendingAsyncL2Call.clear();
+      m_pendingAsyncL2Modifiers = Qt::NoModifier;
+      m_pendingAsyncL2FromRxWindow = false;
+      m_asyncL2PinnedCall.clear();
+      m_asyncL2PinnedUntil = QDateTime();
       m_asyncDecodeTimer.start(750);  // Level 2: sync-triggered every 750ms
       ui->labelAsyncL2Active->setVisible(true);
     } else {
       m_asyncDecodeTimer.stop();
       m_bAsyncDecoding = false;
       ui->labelAsyncL2Active->setVisible(false);
+      m_pendingAsyncL2MessageLine.clear();
+      m_pendingAsyncL2Call.clear();
+      m_pendingAsyncL2Modifiers = Qt::NoModifier;
+      m_pendingAsyncL2FromRxWindow = false;
+      m_asyncL2PinnedCall.clear();
+      m_asyncL2PinnedUntil = QDateTime();
     }
 }
 
@@ -17722,26 +18433,36 @@ void MainWindow::asyncDecodeDone()
       QString raw = QString::fromLatin1(m_asyncMsg[i]);
       m_asyncMsg[i][0] = 0;
       if (raw.trimmed().isEmpty()) continue;
+      QStringList rows = split_packed_decode_rows (raw);
+      if (rows.isEmpty ()) continue;
 
-      // Deduplication: skip if same message decoded within last 10s
-      QString msgKey = raw.mid(14).trimmed();  // message text after freq
-      if (m_asyncDedupeSet.contains(msgKey)) continue;
-      m_asyncDedupeSet.insert(msgKey);
+      for (auto row : rows) {
+        QString message = row.trimmed ();
+        if (message.isEmpty ()) continue;
+        if (!has_decode_line_timestamp (message)) {
+          message.prepend (hhmmss + " ");
+        }
 
-      // Format: prepend UTC timestamp to match standard decode format
-      QString message = hhmmss + raw;
+        // Deduplication: skip if same message decoded within last 10s
+        QString msgKey = message.size () > 14 ? message.mid (14).trimmed () : message.trimmed ();
+        if (msgKey.isEmpty () || m_asyncDedupeSet.contains (msgKey)) continue;
 
-      // Display in left (Band Activity) window
-      DecodedText decodedtext {message.replace(QChar::LineFeed, "")};
-      ui->decodedTextBrowser->displayDecodedText(decodedtext, m_config.my_callsign(),
-          m_mode, m_config.DXCC(), m_logBook, m_currentBandPeriod, m_config.ppfx(),
-          false, false, 0.0, false, -99, "", m_muted);
+        // Display in left (Band Activity) window
+        DecodedText decodedtext {message.replace(QChar::LineFeed, "")};
+        if (shouldSuppressNearDuplicateDecode (decodedtext)) {
+          continue;
+        }
+        m_asyncDedupeSet.insert (msgKey);
+        ui->decodedTextBrowser->displayDecodedText(decodedtext, m_config.my_callsign(),
+            m_mode, m_config.DXCC(), m_logBook, m_currentBandPeriod, m_config.ppfx(),
+            false, false, 0.0, false, -99, "", m_muted);
 
-      postDecode(true, decodedtext);
-      write_all("Rx", message);
+        postDecode(true, decodedtext);
+        write_all("Rx", message);
 
-      // Auto-sequence
-      auto_sequence(decodedtext, ui->sbFtol->value(), ui->sbFtol->value());
+        // Auto-sequence
+        auto_sequence(decodedtext, ui->sbFtol->value(), ui->sbFtol->value());
+      }
     }
 }
 
@@ -18587,6 +19308,7 @@ void MainWindow:: on_actionVHF_UHF_Buttons_triggered ()
 
 void MainWindow::check_button_color()
 {
+    updateQueueTabVisibility();
     //debugToFile(QString{"check_button m_externalCtrl:%1 is_externalCtrlMode:%2 wait_features_enabled:%3"}.arg(m_externalCtrl).arg(is_externalCtrlMode()).arg(m_config.Wait_features_enabled()));    //avt
     //avt 10/1/25
     // Yellow background for the DX Call and Enable Tx buttons when the rig is allowed to Tx automatically

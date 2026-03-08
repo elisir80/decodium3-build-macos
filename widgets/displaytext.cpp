@@ -104,7 +104,10 @@ void DisplayText::setContentFont(QFont const& font)
 
 void DisplayText::mouseDoubleClickEvent(QMouseEvent *e)
 {
+  // Force cursor to the exact clicked block before emitting selection.
+  setTextCursor(cursorForPosition(e->pos()));
   Q_EMIT selectCallsign(e->modifiers ());
+  e->accept();
 }
 
 void DisplayText::insertLineSpacer(QString const& line)

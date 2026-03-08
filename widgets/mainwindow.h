@@ -24,6 +24,7 @@
 #include <QHostAddress>
 #include <QPointer>
 #include <QSet>
+#include <QHash>
 #include <QVector>
 #include <QScrollBar>
 #include <QQueue>
@@ -97,6 +98,7 @@ class QSettings;
 class QLineEdit;
 class QFont;
 class QHostInfo;
+class DisplayText;
 class EchoGraph;
 class FastGraph;
 class WideGraph;
@@ -175,6 +177,13 @@ private:
   void childEvent(QChildEvent *) override;
   bool eventFilter(QObject *, QEvent *) override;
   void showQSYMessage(QString message);
+  void handleDoubleClickOnCall (Qt::KeyboardModifiers modifiers, bool fromBandActivityWindow);
+  bool singleDecodeColumnFlowEnabled () const { return true; }
+  DisplayText * secondaryDecodeView () const;
+  void applySingleDecodeColumnFlowLayout ();
+  void updateAsyncL2ControlsVisibility ();
+  bool shouldSuppressNearDuplicateDecode (DecodedText const& decodedtext);
+  void pruneNearDuplicateDecodeCache (qint64 nowMs);
 
 private slots:
   void initialize_fonts ();
@@ -223,6 +232,7 @@ private slots:
   void on_ft2Button_clicked();
   void on_autoCQButton_clicked(bool checked);
   void on_dxpedButton_clicked(bool checked);
+  void updateQueueTabVisibility();
   void on_msk144Button_clicked();
   void on_q65Button_clicked();
   void on_jt65Button_clicked();
@@ -598,6 +608,9 @@ private:
   QScopedPointer<HelpTextWindow> m_mouseCmnds;
   QScopedPointer<MessageAveraging> m_msgAvgWidget;
   QScopedPointer<ActiveStations> m_ActiveStationsWidget;
+  QPointer<WorldMapWidget> m_worldMapWidget;
+  QHash<QString, QString> m_worldMapGridByCall;
+  bool m_worldMapCall3Loaded {false};
   QScopedPointer<FoxLogWindow> m_foxLogWindow;
   QScopedPointer<CabrilloLogWindow> m_contestLogWindow;
   QScopedPointer<ColorHighlighting> m_colorHighlighting;
@@ -724,9 +737,7 @@ private:
   qint32  m_nSentFoxRrpt=0;    //Serial number for next R+rpt Hound will send to Fox
   qint32  m_txRetryCount {0};  // Consecutive Tx retry counter for auto-sequence timeout
   qint32  m_lastNtx {-1};     // Last Tx number sent (for retry detection)
-  qint32  m_cqRetryCount {0}; // CQ (Tx6) retry counter for period toggle
   static constexpr int MAX_TX_RETRIES = 3;    // Tx2/Tx3/Tx4 retries before returning to CQ
-  static constexpr int MAX_CQ_RETRIES = 10;   // CQ retries before toggling Tx Even/1st
   int  m_autoCQPeriodsMissed   {0};           // RX periods senza risposta dal caller corrente
   bool m_receivedReplyThisPeriod {false};     // flag reset ogni periodo RX
   static constexpr int MAX_MISSED_PERIODS = 4;
@@ -779,7 +790,6 @@ private:
   bool    m_dataAvailable;
   bool    m_bDecoded;
   bool    m_noSuffix;
-  bool    m_decodedText2;
   bool    m_sentFirst73;
   bool	  m_tci_mod_active;
   bool    m_tci;
@@ -901,6 +911,7 @@ private:
   int			m_nsendingsh;
   double	m_onAirFreq0;
   bool		m_first_error;
+  int     m_rigAutoRetryCount {0};
 
   char    m_msg[100][80];
 
@@ -927,6 +938,14 @@ private:
   char m_asyncMsg[100][80];          // async decode results
   QSet<QString> m_asyncDedupeSet;    // deduplication within sliding window
   QDateTime m_asyncDedupeLastCleared;
+  struct DecodeDedupeEntry
+  {
+    qint64 lastSeenMs {0};
+    int bestSnr {-99};
+  };
+  QHash<QString, DecodeDedupeEntry> m_decodeDedupeCache;
+  qint64 m_decodeDedupeLastPruneMs {0};
+  int m_decodeDedupeWindowMs {5000};   // keep strongest duplicate within 5 seconds
   QFutureWatcher<QString> m_saveWAVWatcher;
 
   NonInheritingProcess proc_jt9;
@@ -1102,6 +1121,12 @@ private:
   bool m_remoteWaterfallStreamingEnabled {false};
   QString m_mapLastClickCall;
   qint64 m_mapLastClickMs {0};
+  QString m_pendingAsyncL2MessageLine;
+  QString m_pendingAsyncL2Call;
+  Qt::KeyboardModifiers m_pendingAsyncL2Modifiers {Qt::NoModifier};
+  bool m_pendingAsyncL2FromRxWindow {false};
+  QString m_asyncL2PinnedCall;
+  QDateTime m_asyncL2PinnedUntil;
   PSKReporter m_psk_Reporter;
   DisplayManual m_manual;
   QHash<QString, QVariant> m_pwrBandTxMemory; // Remembers power level by band
@@ -1162,6 +1187,7 @@ private:
   void processMessage(DecodedText const& message, Qt::KeyboardModifiers = Qt::NoModifier);
   void replyToCQ (QTime, qint32 snr, float delta_time, quint32 delta_frequency, QString const& mode, QString const& message_text, bool low_confidence, quint8 modifiers);
   void locationChange(QString const& location);
+  void updateWorldMapFromDecode(DecodedText const& decoded_text);
   void replayDecodes ();
   void postDecode (bool is_new, DecodedText decoded_text);  //avt 12/5/20
   void enqueueDecode (DecodedText decoded_text, bool modifier, bool autoGen, bool isDx, bool isNewCallOnBand, bool isNewCall, bool isNewCountryOnBand, bool isNewCountry, QString country, QString continent, int az, int dist);   //avt 5/7/24

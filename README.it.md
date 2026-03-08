@@ -1,22 +1,28 @@
-# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.3.8 (Italiano)
+# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.4.0 (Italiano)
 
 Per la versione bilingue completa (English + Italiano), vedere [README.md](README.md).
 
-## Sintesi italiana
+## Sintesi italiana (v1.4.0)
 
-Questa release fork (`v1.3.8`) aggiorna e completa i fix dalla `v1.3.7` con focus su robustezza CAT/UDP, mappa e UX:
+Questa release consolida tutti i fix e le nuove feature dal ciclo `v1.3.8 -> v1.4.0`:
 
-- hardening CAT/Configure remoto: pacchetti Configure generici non forzano piu' FT2;
-- hardening UDP controllo: richiesto target id diretto per i comandi di controllo;
-- hardening TCI runtime: normalizzazione endpoint websocket, parsing comandi piu' sicuro, guardie timer/null;
-- hardening LotW/download: URL su query builder, password redatte nei log, policy redirect piu' sicura;
-- stabilita' Auto-CQ/DX-ped migliorata: timeout coda e affinamenti integrazione 2-slot;
-- opzione greyline in `Settings -> General` (disattivabile per mappa sempre illuminata);
-- distanza visualizzata sul path mappa attivo in km/mi in base alle unita' configurate;
-- rifinitura layout controlli top su display piccoli e riallineamento area DX-ped;
-- gestione geometria multi-monitor migliorata per mantenere le finestre visibili dopo cambi display;
-- hardening `map65`/`qmap`: copie stringa bounded, clamp indici device, encoding path/nome file piu' sicuro;
-- fix CI Linux: corretto parsing latest-tag Hamlib e mantenuta compatibilita' fallback Hamlib 4.x;
+- Stabilizzazione flusso decode FT2:
+  - gestione split righe packed (niente righe fuse/disallineate),
+  - soppressione near-duplicate con finestra 5 secondi,
+  - mantenimento preferenziale della riga con SNR migliore,
+  - filtro uniforme su decode normale e async.
+- Correzione comportamento Async L2:
+  - visibile solo in FT2,
+  - disattivazione automatica quando si esce da FT2.
+- Maturazione dashboard web remota:
+  - impostazioni LAN direttamente dal menu app (bind/porta/user/token),
+  - login username/password,
+  - UX mobile/PWA migliorata,
+  - controlli principali piu' chiari (mode/band/rx/tx/auto-cq).
+- Hardening CAT/UDP/TCI delle release precedenti mantenuto.
+- Feature mappa/runtime mantenute:
+  - toggle greyline opzionale,
+  - distanza sul path mappa attivo in km/mi.
 - `.pkg` non necessario: release solo DMG/ZIP/SHA256 (macOS) e AppImage/SHA256 (Linux).
 
 ## Target release
@@ -64,8 +70,11 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ## Documentazione
 
-- [RELEASE_NOTES_v1.3.8.md](RELEASE_NOTES_v1.3.8.md)
+- [RELEASE_NOTES_v1.4.0.md](RELEASE_NOTES_v1.4.0.md)
 - [CHANGELOG.md](CHANGELOG.md)
-- [README.es.md](README.es.md)
-- [doc/GITHUB_RELEASE_BODY_v1.3.8.md](doc/GITHUB_RELEASE_BODY_v1.3.8.md)
+- [doc/GITHUB_RELEASE_BODY_v1.4.0.md](doc/GITHUB_RELEASE_BODY_v1.4.0.md)
+- [doc/README.it.md](doc/README.it.md)
+- [doc/WEBAPP_SETUP_GUIDE.it.md](doc/WEBAPP_SETUP_GUIDE.it.md)
+- [doc/WEBAPP_SETUP_GUIDE.en-GB.md](doc/WEBAPP_SETUP_GUIDE.en-GB.md)
+- [doc/WEBAPP_SETUP_GUIDE.es.md](doc/WEBAPP_SETUP_GUIDE.es.md)
 - [doc/SECURITY_BUG_ANALYSIS_REPORT.md](doc/SECURITY_BUG_ANALYSIS_REPORT.md)

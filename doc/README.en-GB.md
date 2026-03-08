@@ -6,7 +6,7 @@ Repository-specific notes for the macOS fork.
 
 ## Current Release Context
 
-- Latest stable release: `v1.3.8`
+- Latest stable release: `v1.4.0`
 - Targets: macOS Tahoe ARM64, Sequoia ARM64, Sequoia Intel, Monterey Intel (experimental), Linux x86_64 AppImage
 
 ## Build and Runtime Notes
@@ -18,16 +18,15 @@ Repository-specific notes for the macOS fork.
 
 ### Shared memory on macOS
 
-- This fork now uses `SharedMemorySegment` with file-backed `mmap` on Darwin.
+- This fork uses `SharedMemorySegment` with file-backed `mmap` on Darwin.
 - The release flow no longer depends on System V shared-memory `sysctl` tuning (`kern.sysv.shmmax/shmall`).
 
-### Security/concurrency and CAT/network updates (v1.3.8)
+### v1.4.0 consolidated highlights
 
-- CAT/remote Configure is hardened to avoid forced FT2 mode from generic control packets.
-- UDP control commands now require direct target id matching.
-- Optional greyline toggle is available in Settings -> General.
-- Active map path can render a distance badge in km/mi according to user units.
-- Compact top controls were refined for DX-ped alignment on small displays.
+- FT2 decode-flow stabilization with packed-row split + near-duplicate suppression (5-second window).
+- Async L2 control shown only in FT2 mode and auto-disabled outside FT2.
+- Remote web dashboard maturity improvements (LAN config, username/password auth, mobile/PWA behavior).
+- Existing CAT/UDP/TCI hardening and map options (greyline + distance badge) retained.
 
 ### Release artifacts
 
@@ -62,7 +61,9 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 ## References
 
 - `CHANGELOG.md`
-- `RELEASE_NOTES_v1.3.8.md`
-- `doc/GITHUB_RELEASE_BODY_v1.3.8.md`
-- `doc/README.es.md`
+- `RELEASE_NOTES_v1.4.0.md`
+- `doc/GITHUB_RELEASE_BODY_v1.4.0.md`
+- `doc/WEBAPP_SETUP_GUIDE.en-GB.md`
+- `doc/WEBAPP_SETUP_GUIDE.it.md`
+- `doc/WEBAPP_SETUP_GUIDE.es.md`
 - `doc/SECURITY_BUG_ANALYSIS_REPORT.md`
