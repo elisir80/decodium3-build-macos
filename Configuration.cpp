@@ -135,6 +135,7 @@
 #include <cmath>
 
 #include <QApplication>
+#include <QGuiApplication>
 #include <QCursor>
 #include <QMetaType>
 #include <QList>
@@ -173,6 +174,8 @@
 #include <QStandardItem>
 #include <QDebug>
 #include <QDateTimeEdit>
+#include <QScreen>
+#include <QWindow>
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -3883,6 +3886,31 @@ int Configuration::impl::exec ()
   rig_changed_ = false;
 
   initialize_models ();
+
+  // Keep settings dialog fully reachable on small/HiDPI Linux desktops.
+  adjustSize ();
+  QScreen * screen = this->windowHandle () ? this->windowHandle ()->screen () : nullptr;
+  if (!screen) {
+    screen = QGuiApplication::screenAt (QCursor::pos ());
+  }
+  if (!screen) {
+    screen = QGuiApplication::primaryScreen ();
+  }
+  if (screen) {
+    QRect const available = screen->availableGeometry ();
+    int const maxWidth = qMax (600, available.width () - 40);
+    int const maxHeight = qMax (420, available.height () - 40);
+    QSize const clamped = size ().boundedTo (QSize {maxWidth, maxHeight});
+    resize (clamped);
+
+    int x = geometry ().x ();
+    int y = geometry ().y ();
+    if (x < available.left ()) x = available.left ();
+    if (y < available.top ()) y = available.top ();
+    if (x + width () > available.right ()) x = available.right () - width () + 1;
+    if (y + height () > available.bottom ()) y = available.bottom () - height () + 1;
+    move (x, y);
+  }
 
   return QDialog::exec();
 }

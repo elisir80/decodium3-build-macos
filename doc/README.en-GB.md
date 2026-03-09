@@ -6,7 +6,7 @@ Repository-specific notes for the macOS fork.
 
 ## Current Release Context
 
-- Latest stable release: `v1.4.1`
+- Latest stable release: `v1.4.2`
 - Targets: macOS Tahoe ARM64, Sequoia ARM64, Sequoia Intel, Monterey Intel (experimental), Linux x86_64 AppImage
 
 ## Build and Runtime Notes
@@ -21,14 +21,18 @@ Repository-specific notes for the macOS fork.
 - This fork uses `SharedMemorySegment` with file-backed `mmap` on Darwin.
 - The release flow no longer depends on System V shared-memory `sysctl` tuning (`kern.sysv.shmmax/shmall`).
 
-### v1.4.1 consolidated highlights
+### v1.4.2 consolidated highlights
 
-- FT2 decode-flow stabilization with packed-row split + near-duplicate suppression (5-second window).
-- Async L2 control shown only in FT2 mode and auto-disabled outside FT2.
-- Startup auto mode-from-rig now one-shot; initial mode-switch responsiveness restored.
-- Mode switch no longer forces waterfall to foreground.
-- Remote web dashboard maturity improvements (LAN config, username/password auth, mobile/PWA behavior).
-- Existing CAT/UDP/TCI hardening and map options (greyline + distance badge) retained.
+- LotW requests moved from credentialed GET URL to HTTPS POST body.
+- Strict redirect policy for credentialed LotW requests (HTTPS + expected host).
+- Remote web LAN/WAN bind now requires token length >= 12.
+- Linux settings dialog is clamped to visible screen geometry.
+- Async decode thread-pool stack/overlap hardening (Linux-focused stability pass).
+- FT2 control behavior finalized:
+  - Async L2 defaults ON in FT2, auto-OFF outside FT2,
+  - `Lock Tx Freq` and `Tx even/1st` hidden in FT2.
+- `View -> Ionospheric Forecast` and `View -> DX Cluster` actions restored.
+- Remote dashboard TX events preserved correctly across refresh cycles.
 
 ### Release artifacts
 
@@ -63,8 +67,8 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 ## References
 
 - `CHANGELOG.md`
-- `RELEASE_NOTES_v1.4.1.md`
-- `doc/GITHUB_RELEASE_BODY_v1.4.1.md`
+- `RELEASE_NOTES_v1.4.2.md`
+- `doc/GITHUB_RELEASE_BODY_v1.4.2.md`
 - `doc/WEBAPP_SETUP_GUIDE.en-GB.md`
 - `doc/WEBAPP_SETUP_GUIDE.it.md`
 - `doc/WEBAPP_SETUP_GUIDE.es.md`

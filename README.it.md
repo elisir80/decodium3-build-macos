@@ -1,32 +1,28 @@
-# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.4.1 (Italiano)
+# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.4.2 (Italiano)
 
 Per la versione bilingue completa (English + Italiano), vedere [README.md](README.md).
 
-## Sintesi italiana (v1.4.1)
+## Sintesi italiana (v1.4.2)
 
-Questa release consolida tutti i fix e le nuove feature del ciclo `v1.4.0 -> v1.4.1`:
+Questa release copre il ciclo `v1.4.1 -> v1.4.2`:
 
-- Stabilizzazione flusso decode FT2:
-  - gestione split righe packed (niente righe fuse/disallineate),
-  - soppressione near-duplicate con finestra 5 secondi,
-  - mantenimento preferenziale della riga con SNR migliore,
-  - filtro uniforme su decode normale e async.
-- Correzione comportamento Async L2:
-  - visibile solo in FT2,
-  - disattivazione automatica quando si esce da FT2.
-- Corrette regressioni startup/cambio modalita':
-  - auto-selezione startup da frequenza radio ora one-shot (niente riforzatura continua modalita'),
-  - risposta iniziale al cambio modalita' ripristinata,
-  - niente apertura forzata del waterfall durante il cambio modalita'.
-- Maturazione dashboard web remota:
-  - impostazioni LAN direttamente dal menu app (bind/porta/user/token),
-  - login username/password,
-  - UX mobile/PWA migliorata,
-  - controlli principali piu' chiari (mode/band/rx/tx/auto-cq).
-- Hardening CAT/UDP/TCI delle release precedenti mantenuto.
-- Feature mappa/runtime mantenute:
-  - toggle greyline opzionale,
-  - distanza sul path mappa attivo in km/mi.
+- Hardening sicurezza LotW:
+  - richieste LotW con credenziali spostate da GET URL a POST HTTPS,
+  - rimozione logging URL con credenziali,
+  - redirect policy stretta per richieste con credenziali (HTTPS + host atteso).
+- Hardening web remota:
+  - bind LAN/WAN rifiutato con token sotto 12 caratteri,
+  - avviso esplicito su traffico HTTP/WS in chiaro quando il bind e' esposto.
+- Fix stabilita' Linux:
+  - dialog impostazioni clampato alla geometria schermo (pulsanti sempre raggiungibili),
+  - decode async su thread pool dedicato con stack controllato + guardie anti-overlap.
+- Coerenza controlli FT2:
+  - Async L2 ON di default entrando in FT2 e OFF automatico fuori FT2,
+  - `Blocca la Freq Tx` e `Tx pari/1°` nascosti (e forzati OFF) in FT2.
+- Ripristino finestre strumenti:
+  - azioni `View -> Ionospheric Forecast` e `View -> DX Cluster` ripristinate.
+- Dashboard web RX/TX:
+  - eventi TX preservati nei refresh e prima transizione TX ora mostrata correttamente.
 - `.pkg` non necessario: release solo DMG/ZIP/SHA256 (macOS) e AppImage/SHA256 (Linux).
 
 ## Target release
@@ -74,9 +70,9 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ## Documentazione
 
-- [RELEASE_NOTES_v1.4.1.md](RELEASE_NOTES_v1.4.1.md)
+- [RELEASE_NOTES_v1.4.2.md](RELEASE_NOTES_v1.4.2.md)
 - [CHANGELOG.md](CHANGELOG.md)
-- [doc/GITHUB_RELEASE_BODY_v1.4.1.md](doc/GITHUB_RELEASE_BODY_v1.4.1.md)
+- [doc/GITHUB_RELEASE_BODY_v1.4.2.md](doc/GITHUB_RELEASE_BODY_v1.4.2.md)
 - [doc/README.it.md](doc/README.it.md)
 - [doc/WEBAPP_SETUP_GUIDE.it.md](doc/WEBAPP_SETUP_GUIDE.it.md)
 - [doc/WEBAPP_SETUP_GUIDE.en-GB.md](doc/WEBAPP_SETUP_GUIDE.en-GB.md)

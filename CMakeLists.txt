@@ -77,7 +77,7 @@ include (set_build_type)
 # RC 0 or omitted is a development build, GA is a General Availability release build
 set_build_type (RC 1)
 set (wsjtx_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}${BUILD_TYPE_REVISION}")
-set (FORK_RELEASE_VERSION "v1.4.1" CACHE STRING "Fork release version shown in UI title" FORCE)
+set (FORK_RELEASE_VERSION "v1.4.2" CACHE STRING "Fork release version shown in UI title" FORCE)
 add_definitions (-DFORK_RELEASE_VERSION=\"${FORK_RELEASE_VERSION}\")
 
 #
@@ -335,17 +335,7 @@ set_source_files_properties (
   lib/crc14.cpp
   PROPERTIES COMPILE_FLAGS -fpermissive)
 
-if (WIN32)
-  set (wsjt_CXXSRCS
-    ${wsjt_CXXSRCS}
-    killbyname.cpp
-    )
-
-  set (wsjt_qt_CXXSRCS
-    ${wsjt_qt_CXXSRCS}
-    Transceiver/OmniRigTransceiver.cpp
-    )
-endif (WIN32)
+# Windows-specific helper sources intentionally excluded in this fork.
 
 set (wsjt_FSRCS
   # put module sources first in the hope that they get rebuilt before use

@@ -1,13 +1,13 @@
-# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.4.1
+# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.4.2
 
 English, Italian, and Spanish documentation for this fork is included in this repository.
 
 ## English
 
-Fork release `v1.4.1` is based on upstream `iu8lmc/Decodium-3.0-Codename-Raptor` and adds macOS-focused operational hardening.
+Fork release `v1.4.2` is based on upstream `iu8lmc/Decodium-3.0-Codename-Raptor` and adds macOS-focused operational hardening.
 
 - Upstream base: Decodium v3.0 SE "Raptor"
-- Fork release: `v1.4.1`
+- Fork release: `v1.4.2`
 - App bundle/executable on macOS: `ft2.app` / `ft2`
 - License: GPLv3
 
@@ -60,24 +60,20 @@ Fork release `v1.4.1` is based on upstream `iu8lmc/Decodium-3.0-Codename-Raptor`
   - Fixed cross-thread Qt signal delivery for `ModulatorState` with explicit metatype registration.
   - Set default Qt style to `Fusion` for more consistent rendering across macOS variants.
   - Removed hardcoded legacy revision suffix source so PSKReporter `Using:` no longer appends `mod by IU8LMC...`.
-- Fork `v1.4.1` CAT/network/map/runtime updates (from `v1.3.8`):
-  - CAT/remote Configure hardening: generic Configure packets no longer force FT2 mode.
-  - UDP control hardening: control commands now require direct target id matching.
-  - TCI runtime hardening: safer websocket endpoint normalization, safer command parsing, timer/null guards.
-  - LotW/download hardening: query-builder URLs, password redaction in logs, safer redirect policy.
-  - Auto-CQ/DX-ped workflow stability improvements (queue timeout handling + 2-slot flow refinements).
-  - Added optional greyline toggle in `Settings -> General` for world map day/night overlay.
-  - Added distance badge on active world-map path (km/mi based on current unit setting).
-  - Refined compact top-controls layout with DX-ped button alignment improvements.
-  - Multi-monitor geometry safety improvements to keep tool windows visible after display topology changes.
-  - Legacy `map65`/`qmap` safety hardening (bounded strings, device index clamps, safer file path handling).
-  - Linux CI fixes for Hamlib latest-tag parsing + Hamlib 4.x fallback compatibility.
-  - Decode-flow stability pass: packed-row split handling and near-duplicate suppression (5s window, best-SNR preference).
-  - Async L2 now appears only in FT2 mode and is auto-disabled when leaving FT2.
-  - Remote web dashboard maturity updates: LAN settings workflow, username/password auth path, improved mobile/PWA usability.
-  - Startup auto-mode now applies as one-shot (no repeated CAT-driven mode re-forcing loop).
-  - Initial mode-switch responsiveness restored at startup.
-  - Waterfall is no longer forced to foreground when switching mode.
+- Fork `v1.4.2` security/runtime updates (from `v1.4.1`):
+  - LotW security hardening: moved credentialed requests from URL GET to HTTPS POST body.
+  - LotW redirect hardening: credentialed redirects now require HTTPS + expected host.
+  - Remote web hardening: LAN/WAN bind denied when token is shorter than 12 chars.
+  - Remote web diagnostics: explicit plaintext HTTP/WS warning when exposed off loopback.
+  - Linux settings dialog now auto-fits visible screen geometry (bottom buttons remain reachable).
+  - Async decode stability pass: dedicated thread pool stack sizing + overlap guards + bounded parameters.
+  - FT2 control consistency: Async L2 defaults ON in FT2, and turns OFF automatically outside FT2.
+  - FT2 UI coherence: `Lock Tx Freq` + `Tx even/1st` are hidden/forced-off in FT2.
+  - Band-button tuning flow unified to prevent re-click deselection/re-tune anomalies.
+  - Restored `View -> Ionospheric Forecast` and `View -> DX Cluster` windows with proper action-state sync.
+  - Remote dashboard feed keeps TX activity events across refresh cycles.
+  - C/C++ safety hardening in WSPR helpers (`snprintf`/bounded operations).
+  - Windows-specific helper paths excluded from this fork build configuration.
 
 ### Build (macOS)
 
@@ -107,12 +103,12 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ### Documentation
 
-- Release notes (EN/IT/ES): [RELEASE_NOTES_v1.4.1.md](RELEASE_NOTES_v1.4.1.md)
+- Release notes (EN/IT/ES): [RELEASE_NOTES_v1.4.2.md](RELEASE_NOTES_v1.4.2.md)
 - Changelog (EN/IT/ES for latest release): [CHANGELOG.md](CHANGELOG.md)
 - Security and bug analysis report: [doc/SECURITY_BUG_ANALYSIS_REPORT.md](doc/SECURITY_BUG_ANALYSIS_REPORT.md)
 - macOS porting details (EN/IT): [doc/MACOS_PORTING_v1.2.0.md](doc/MACOS_PORTING_v1.2.0.md)
 - DT/NTP architecture (EN/IT): [doc/DT_NTP_ROBUST_SYNC_v1.2.0.md](doc/DT_NTP_ROBUST_SYNC_v1.2.0.md)
-- GitHub release body template (EN/IT/ES): [doc/GITHUB_RELEASE_BODY_v1.4.1.md](doc/GITHUB_RELEASE_BODY_v1.4.1.md)
+- GitHub release body template (EN/IT/ES): [doc/GITHUB_RELEASE_BODY_v1.4.2.md](doc/GITHUB_RELEASE_BODY_v1.4.2.md)
 - Web app setup guide (EN): [doc/WEBAPP_SETUP_GUIDE.en-GB.md](doc/WEBAPP_SETUP_GUIDE.en-GB.md)
 - Web app setup guide (IT): [doc/WEBAPP_SETUP_GUIDE.it.md](doc/WEBAPP_SETUP_GUIDE.it.md)
 - Web app setup guide (ES): [doc/WEBAPP_SETUP_GUIDE.es.md](doc/WEBAPP_SETUP_GUIDE.es.md)
@@ -163,10 +159,10 @@ cd squashfs-root
 
 ## Italiano
 
-La release fork `v1.4.1` e' basata su `iu8lmc/Decodium-3.0-Codename-Raptor` e aggiunge hardening operativo specifico per macOS.
+La release fork `v1.4.2` e' basata su `iu8lmc/Decodium-3.0-Codename-Raptor` e aggiunge hardening operativo specifico per macOS.
 
 - Base upstream: Decodium v3.0 SE "Raptor"
-- Versione fork: `v1.4.1`
+- Versione fork: `v1.4.2`
 - Bundle/eseguibile su macOS: `ft2.app` / `ft2`
 - Licenza: GPLv3
 
@@ -219,21 +215,20 @@ La release fork `v1.4.1` e' basata su `iu8lmc/Decodium-3.0-Codename-Raptor` e ag
   - Corretto delivery segnali cross-thread `ModulatorState` con registrazione metatype esplicita.
   - Impostato stile Qt predefinito `Fusion` per rendering piu' coerente tra varianti macOS.
   - Rimossa sorgente hardcoded del suffisso revision legacy: PSKReporter `Using:` non appende piu' `mod by IU8LMC...`.
-- Aggiornamenti CAT/rete/mappa fork `v1.4.1` (da `v1.3.7`):
-  - Hardening CAT/Configure remoto: pacchetti Configure generici non forzano piu' FT2.
-  - Hardening UDP controllo: i comandi di controllo richiedono target id diretto.
-  - Hardening runtime TCI: normalizzazione endpoint websocket, parsing comandi piu' sicuro, guardie timer/null.
-  - Hardening LotW/download: URL su query builder, password redatte nei log, redirect policy piu' sicura.
-  - Migliorata stabilita' workflow Auto-CQ/DX-ped (timeout coda + affinamenti flusso 2-slot).
-  - Aggiunto toggle opzionale greyline in `Settings -> General`.
-  - Aggiunto badge distanza sul path mappa attivo (km/mi in base all'unita' configurata).
-  - Rifinito il layout controlli top compatti con allineamento pulsante DX-ped.
-  - Migliorata resilienza geometria multi-monitor per mantenere le finestre visibili dopo cambi display.
-  - Hardening safety `map65`/`qmap` (stringhe bounded, clamp indici device, gestione path file piu' sicura).
-  - Fix CI Linux su parsing latest-tag Hamlib + compatibilita' fallback Hamlib 4.x.
-  - Auto-mode startup resa one-shot (niente loop di riforzatura modalita' via CAT).
-  - Ripristinata responsiveness iniziale nel cambio modalita'.
-  - Rimosso foreground forzato waterfall durante cambio modalita'.
+- Aggiornamenti sicurezza/runtime fork `v1.4.2` (da `v1.4.1`):
+  - Hardening LotW: richieste con credenziali migrate da GET URL a POST HTTPS.
+  - Hardening redirect LotW: richieste con credenziali limitate a HTTPS + host atteso.
+  - Hardening web remota: bind LAN/WAN negato con token sotto 12 caratteri.
+  - Diagnostica web remota: avviso esplicito su traffico HTTP/WS in chiaro fuori loopback.
+  - Dialog impostazioni Linux ora adattato automaticamente alla geometria visibile (pulsanti sempre raggiungibili).
+  - Stabilita' decode async: thread pool dedicato con stack controllato + guardie anti-overlap + parametri bounded.
+  - Coerenza controlli FT2: Async L2 ON di default in FT2 e OFF automatico fuori FT2.
+  - Coerenza UI FT2: `Blocca la Freq Tx` + `Tx pari/1°` nascosti/forzati OFF in FT2.
+  - Flusso tuning pulsanti banda unificato per evitare anomalie di deselezione/re-tune al re-click.
+  - Ripristinate finestre `View -> Ionospheric Forecast` e `View -> DX Cluster` con sync corretto stato azione.
+  - Feed dashboard remota preserva gli eventi TX durante i refresh.
+  - Hardening sicurezza C/C++ nei helper WSPR (`snprintf`/operazioni bounded).
+  - Esclusi path helper specifici Windows dalla build di questo fork.
 
 ### Compilazione (macOS)
 
@@ -263,12 +258,12 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ### Documentazione
 
-- Note di rilascio (EN/IT/ES): [RELEASE_NOTES_v1.4.1.md](RELEASE_NOTES_v1.4.1.md)
+- Note di rilascio (EN/IT/ES): [RELEASE_NOTES_v1.4.2.md](RELEASE_NOTES_v1.4.2.md)
 - Changelog (EN/IT/ES per release attuale): [CHANGELOG.md](CHANGELOG.md)
 - Report analisi sicurezza e bug: [doc/SECURITY_BUG_ANALYSIS_REPORT.md](doc/SECURITY_BUG_ANALYSIS_REPORT.md)
 - Porting macOS (EN/IT): [doc/MACOS_PORTING_v1.2.0.md](doc/MACOS_PORTING_v1.2.0.md)
 - Architettura DT/NTP (EN/IT): [doc/DT_NTP_ROBUST_SYNC_v1.2.0.md](doc/DT_NTP_ROBUST_SYNC_v1.2.0.md)
-- Template release GitHub (EN/IT/ES): [doc/GITHUB_RELEASE_BODY_v1.4.1.md](doc/GITHUB_RELEASE_BODY_v1.4.1.md)
+- Template release GitHub (EN/IT/ES): [doc/GITHUB_RELEASE_BODY_v1.4.2.md](doc/GITHUB_RELEASE_BODY_v1.4.2.md)
 - Guida Web App (IT): [doc/WEBAPP_SETUP_GUIDE.it.md](doc/WEBAPP_SETUP_GUIDE.it.md)
 - Guida Web App (EN): [doc/WEBAPP_SETUP_GUIDE.en-GB.md](doc/WEBAPP_SETUP_GUIDE.en-GB.md)
 - Guida Web App (ES): [doc/WEBAPP_SETUP_GUIDE.es.md](doc/WEBAPP_SETUP_GUIDE.es.md)

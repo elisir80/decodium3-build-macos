@@ -969,8 +969,21 @@ R"FT2JS((() => {
     const s = await r.json();
     renderState(s);
     if (replaceActivity) {
+      const preservedTxEvents = activityRows.filter((row) => row && row.txEvent);
       activityRows.length = 0;
-      (s.recent_band_activity || []).forEach(pushActivity);
+      (s.recent_band_activity || []).forEach((line) => {
+        const parsed = parseActivityLine(line);
+        if (!parsed) return;
+        if (parsed.isTxRow && parsed.call) {
+          txPeerFromRows = parsed.call;
+        }
+        activityRows.push(parsed);
+      });
+      if (preservedTxEvents.length) {
+        preservedTxEvents.forEach((row) => activityRows.push(row));
+      }
+      trimActivityRows();
+      renderActivity();
     }
   }
 
@@ -996,8 +1009,13 @@ R"FT2JS((() => {
     updateTxPeer(s.transmitting, (s.dx_call || '').toString().trim().toUpperCase());
     if (typeof s.transmitting === 'boolean') {
       const isTx = !!s.transmitting;
-      if (lastTransmitting !== null && lastTransmitting !== isTx) {
-        appendTxEvent(isTx, (s.dx_call || txPeerFromRows || '').toString().trim().toUpperCase());
+      const peer = (s.dx_call || txPeerFromRows || '').toString().trim().toUpperCase();
+      if (lastTransmitting === null) {
+        if (isTx) {
+          appendTxEvent(true, peer);
+        }
+      } else if (lastTransmitting !== isTx) {
+        appendTxEvent(isTx, peer);
       }
       lastTransmitting = isTx;
     }
@@ -1431,6 +1449,15 @@ bool RemoteCommandServer::start(quint16 wsPort, QHostAddress const& address, qui
   wsPort_ = wsPort;
   bindAddress_ = address;
   httpPort_ = 0;
+
+  bool const remoteExposed = !(address.isLoopback()
+                               || address == QHostAddress::LocalHost
+                               || address == QHostAddress::LocalHostIPv6);
+  if (remoteExposed && authToken_.trimmed().size() < 12)
+    {
+      Q_EMIT logMessage(QStringLiteral("Remote WS refused: token must be at least 12 characters for LAN/WAN bind."));
+      return false;
+    }
 
   server_ = new QWebSocketServer(QStringLiteral("Decodium Remote WS"), QWebSocketServer::NonSecureMode, this);
   if (!server_->listen(address, wsPort))

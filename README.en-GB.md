@@ -16,39 +16,36 @@ security fixes, and release automation for:
 ## Current Baseline
 
 - Source branch: `master`
-- Latest stable release: `v1.4.1`
+- Latest stable release: `v1.4.2`
 - App bundle/executable: `ft2.app` / `ft2`
 
-## Key Notes for v1.4.1
+## Key Notes for v1.4.2
 
-This release consolidates the update cycle from `v1.4.0` to `v1.4.1`:
+This release covers the `v1.4.1 -> v1.4.2` cycle:
 
-- FT2 decode flow stabilization:
-  - packed-row split handling to avoid merged/overlapped lines,
-  - near-duplicate suppression (5-second window) with best-SNR preference,
-  - consistent filtering across normal decode and async decode paths.
-- Async L2 behavior correction:
-  - visible only when mode is FT2,
-  - automatically disabled when leaving FT2.
-- Startup mode-switch/runtime regressions fixed:
-  - startup auto mode-from-rig is now one-shot (no repeated mode re-forcing loop),
-  - initial mode-switch responsiveness restored,
-  - no forced waterfall foreground on mode changes.
-- Remote web dashboard maturity improvements:
-  - LAN settings from app configuration (bind/port/user/token),
-  - username/password login flow,
-  - mobile/PWA usability improvements,
-  - clearer operator-oriented controls (mode/band/rx/tx/auto-cq).
-- Existing CAT/UDP/TCI hardening retained.
-- Existing map/runtime features retained:
-  - optional greyline toggle,
-  - distance badge on active world-map path (km/mi).
+- LotW security hardening:
+  - moved credentialed LotW download requests from URL GET to HTTPS POST body,
+  - removed credential-bearing URL-style logging,
+  - enforced strict redirect policy for credentialed requests (HTTPS + expected host).
+- Remote web hardening:
+  - LAN/WAN bind is refused when token length is below 12 characters,
+  - explicit warning is shown for plaintext HTTP/WS usage on exposed binds.
+- Linux stability fixes:
+  - settings dialog is clamped to visible screen geometry (action buttons reachable),
+  - async decode now runs with dedicated thread pool stack sizing + overlap guards.
+- FT2 control consistency:
+  - Async L2 defaults ON when entering FT2 and auto-disables outside FT2,
+  - `Lock Tx Freq` and `Tx even/1st` are hidden (and forced OFF) in FT2.
+- UI/tooling restoration:
+  - `View -> Ionospheric Forecast` and `View -> DX Cluster` window actions restored.
+- Web dashboard RX/TX activity:
+  - TX events are preserved across refresh and initial TX transitions are now reported correctly.
 - No `.pkg` installer flow (DMG/ZIP/SHA256 for macOS, AppImage/SHA256 for Linux).
 
 ## Quick Start (macOS)
 
 ```bash
-cmake -S . -B build -DFORK_RELEASE_VERSION=v1.4.1
+cmake -S . -B build -DFORK_RELEASE_VERSION=v1.4.2
 cmake --build build -j8
 ./build/ft2.app/Contents/MacOS/ft2
 ```
@@ -58,13 +55,13 @@ cmake --build build -j8
 Local release script:
 
 ```bash
-scripts/release-macos.sh v1.4.1 --publish --repo elisir80/decodium3-build-macos
+scripts/release-macos.sh v1.4.2 --publish --repo elisir80/decodium3-build-macos
 ```
 
 Per-platform suffix example:
 
 ```bash
-scripts/release-macos.sh v1.4.1 --compat-macos 15.0 --asset-suffix macos-sequoia-arm64
+scripts/release-macos.sh v1.4.2 --compat-macos 15.0 --asset-suffix macos-sequoia-arm64
 ```
 
 ## Hamlib in Release Builds
@@ -109,9 +106,9 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 - `README.md`
 - `README.it.md`
 - `README.es.md`
-- `RELEASE_NOTES_v1.4.1.md`
+- `RELEASE_NOTES_v1.4.2.md`
 - `CHANGELOG.md`
-- `doc/GITHUB_RELEASE_BODY_v1.4.1.md`
+- `doc/GITHUB_RELEASE_BODY_v1.4.2.md`
 - `doc/WEBAPP_SETUP_GUIDE.en-GB.md`
 - `doc/WEBAPP_SETUP_GUIDE.it.md`
 - `doc/WEBAPP_SETUP_GUIDE.es.md`

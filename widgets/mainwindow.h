@@ -30,6 +30,7 @@
 #include <QQueue>
 #include <QFuture>
 #include <QFutureWatcher>
+#include <QThreadPool>
 #include <QDateTime>
 #include <QSaveFile>
 #include <QUrl>
@@ -182,6 +183,7 @@ private:
   DisplayText * secondaryDecodeView () const;
   void applySingleDecodeColumnFlowLayout ();
   void updateAsyncL2ControlsVisibility ();
+  void selectBandFrequency (Frequency preferredFrequency, Frequency fallbackFrequency);
   bool shouldSuppressNearDuplicateDecode (DecodedText const& decodedtext);
   void pruneNearDuplicateDecodeCache (qint64 nowMs);
 
@@ -253,6 +255,8 @@ private slots:
   void on_monitorButton_clicked (bool);
   void onApplicationStateChanged (Qt::ApplicationState state);
   void on_actionWorld_Map_toggled (bool checked);
+  void on_actionIonospheric_Forecast_triggered (bool checked);
+  void on_actionDX_Cluster_triggered (bool checked);
   void on_actionAbout_triggered();
   void on_actionCheck_for_Updates_triggered();
   void on_autoButton_clicked (bool);
@@ -615,6 +619,8 @@ private:
   QScopedPointer<MessageAveraging> m_msgAvgWidget;
   QScopedPointer<ActiveStations> m_ActiveStationsWidget;
   QPointer<WorldMapWidget> m_worldMapWidget;
+  QScopedPointer<IonosphericForecastWindow> m_ionosphericForecastWindow;
+  QScopedPointer<DXClusterWindow> m_dxClusterWindow;
   QHash<QString, QString> m_worldMapGridByCall;
   bool m_worldMapCall3Loaded {false};
   QScopedPointer<FoxLogWindow> m_foxLogWindow;
@@ -895,6 +901,10 @@ private:
   bool url_valid;         //avt 10/2/25
   QUrl current_url;       //avt 10/2/25 may be a redirect
   int redirect_count;     //avt 10/2/25
+  QByteArray download_post_data_;
+  QByteArray download_content_type_;
+  bool download_strict_https_same_host_ {false};
+  QString download_expected_host_;
   
   enum
     {
@@ -940,7 +950,9 @@ private:
   QFutureWatcher<void> m_wav_future_watcher;
   QFutureWatcher<void> watcher3;
   QFutureWatcher<void> m_asyncDecodeWatcher;
+  QThreadPool m_asyncDecodeThreadPool;
   QTimer m_asyncDecodeTimer;
+  bool m_asyncL2DefaultAppliedForCurrentFt2 {false};
   short int m_asyncAudio[90000];     // ring buffer ~7.5s at 12kHz
   int m_asyncAudioPos {0};           // write position in ring buffer
   bool m_bAsyncDecoding {false};     // async decode in progress
@@ -1294,7 +1306,6 @@ private:
   void setIncrLogCount();    //avt 9/25/25
 };
 
-extern int killbyname(const char* progName);
 extern void getDev(int* numDevices,char hostAPI_DeviceName[][50],
                    int minChan[], int maxChan[],
                    int minSpeed[], int maxSpeed[]);

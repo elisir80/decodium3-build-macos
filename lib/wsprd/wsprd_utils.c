@@ -32,6 +32,35 @@
 #define int32_t int
 #endif
 
+enum
+{
+    WSPR_CALLSIGN_CAP = 13,   // 12 chars + NUL
+    WSPR_GRID_CAP = 5,        // 4 chars + NUL
+    WSPR_CALL_LOC_POW_CAP = 23
+};
+
+static void bounded_copy(char *dst, size_t cap, const char *src)
+{
+    if (!dst || cap == 0)
+        return;
+    if (!src)
+    {
+        dst[0] = '\0';
+        return;
+    }
+    snprintf(dst, cap, "%s", src);
+}
+
+static void bounded_append(char *dst, size_t cap, const char *src)
+{
+    if (!dst || cap == 0 || !src)
+        return;
+    size_t cur = strlen(dst);
+    if (cur >= cap - 1)
+        return;
+    strncat(dst, src, cap - cur - 1);
+}
+
 void unpack50( signed char *dat, int32_t *n1, int32_t *n2 )
 {
     int32_t i,i4;
@@ -76,7 +105,7 @@ int unpackcall( int32_t ncall, char *call )
     char tmp[7];
 
     n=ncall;
-    strcpy(call,"......");
+    bounded_copy(call, WSPR_CALLSIGN_CAP, "......");
     if (n < 262177560 ) {
         i=n%27+10;
         tmp[5]=c[i];
@@ -101,7 +130,7 @@ int unpackcall( int32_t ncall, char *call )
             if( tmp[i] != c[36] )
                 break;
         }
-        sprintf(call,"%-6s",&tmp[i]);
+        snprintf(call, WSPR_CALLSIGN_CAP, "%-6s",&tmp[i]);
         // remove trailing whitespace
         for(i=0; i<6; i++) {
             if( call[i] == c[36] ) {
@@ -141,7 +170,7 @@ int unpackgrid( int32_t ngrid, char *grid)
         grid[1]=c[10+n1];
         grid[3]=c[n2];
     } else {
-        strcpy(grid,"XXXX");
+        bounded_copy(grid, WSPR_GRID_CAP, "XXXX");
         return 0;
     }
     return 1;
@@ -149,11 +178,11 @@ int unpackgrid( int32_t ngrid, char *grid)
 
 int unpackpfx( int32_t nprefix, char *call)
 {
-    char nc, pfx[4]={'\0'}, tmpcall[7];
+    char nc, pfx[4]={'\0'}, tmpcall[WSPR_CALLSIGN_CAP];
     int i;
     int32_t n;
     
-    strcpy(tmpcall,call);
+    bounded_copy(tmpcall, sizeof(tmpcall), call);
     if( nprefix < 60000 ) {
         // add a prefix of 1 to 3 characters
         n=nprefix;
@@ -172,31 +201,31 @@ int unpackpfx( int32_t nprefix, char *call)
         }
 
         char * p = strrchr(pfx,' ');
-        strcpy(call, p ? p + 1 : pfx);
-        strncat(call,"/",1);
-        strncat(call,tmpcall,strlen(tmpcall));
+        bounded_copy(call, WSPR_CALLSIGN_CAP, p ? p + 1 : pfx);
+        bounded_append(call, WSPR_CALLSIGN_CAP, "/");
+        bounded_append(call, WSPR_CALLSIGN_CAP, tmpcall);
         
     } else {
         // add a suffix of 1 or 2 characters
         nc=nprefix-60000;
         if( (nc >= 0) & (nc <= 9) ) {
             pfx[0]=nc+48;
-            strcpy(call,tmpcall);
-            strncat(call,"/",1);
-            strncat(call,pfx,1);
+            bounded_copy(call, WSPR_CALLSIGN_CAP, tmpcall);
+            bounded_append(call, WSPR_CALLSIGN_CAP, "/");
+            bounded_append(call, WSPR_CALLSIGN_CAP, pfx);
         }
         else if( (nc >= 10) & (nc <= 35) ) {
             pfx[0]=nc+55;
-            strcpy(call,tmpcall);
-            strncat(call,"/",1);
-            strncat(call,pfx,1);
+            bounded_copy(call, WSPR_CALLSIGN_CAP, tmpcall);
+            bounded_append(call, WSPR_CALLSIGN_CAP, "/");
+            bounded_append(call, WSPR_CALLSIGN_CAP, pfx);
         }
         else if( (nc >= 36) & (nc <= 125) ) {
             pfx[0]=(nc-26)/10+48;
             pfx[1]=(nc-26)%10+48;
-            strcpy(call,tmpcall);
-            strncat(call,"/",1);
-            strncat(call,pfx,2);
+            bounded_copy(call, WSPR_CALLSIGN_CAP, tmpcall);
+            bounded_append(call, WSPR_CALLSIGN_CAP, "/");
+            bounded_append(call, WSPR_CALLSIGN_CAP, pfx);
         }
         else {
             return 0;
@@ -269,17 +298,11 @@ int unpk_(signed char *message, char *hashtab, char *loctab, char *call_loc_pow,
         int nu=ntype%10;
         if( nu == 0 || nu == 3 || nu == 7 ) {
             ndbm=ntype;
-            memset(call_loc_pow,0,sizeof(char)*23);
-            sprintf(cdbm,"%2d",ndbm);
-            strncat(call_loc_pow,callsign,strlen(callsign));
-            strncat(call_loc_pow," ",1);
-            strncat(call_loc_pow,grid,4);
-            strncat(call_loc_pow," ",1);
-            strncat(call_loc_pow,cdbm,2);
-            strncat(call_loc_pow,"\0",1);
+            snprintf(cdbm, sizeof(cdbm), "%2d", ndbm);
+            snprintf(call_loc_pow, WSPR_CALL_LOC_POW_CAP, "%s %.4s %s", callsign, grid, cdbm);
             ihash=nhash(callsign,strlen(callsign),(uint32_t)146);
-            strcpy(hashtab+ihash*13,callsign);
-            strcpy(loctab+ihash*5,grid);
+            snprintf(hashtab+ihash*13, WSPR_CALLSIGN_CAP, "%s", callsign);
+            snprintf(loctab+ihash*5, WSPR_GRID_CAP, "%s", grid);
         } else {
             nadd=nu;
             if( nu > 3 ) nadd=nu-3;
@@ -287,25 +310,21 @@ int unpk_(signed char *message, char *hashtab, char *loctab, char *call_loc_pow,
             n3=n2/128+32768*(nadd-1);
             if( !unpackpfx(n3,callsign) ) return 1;
             ndbm=ntype-nadd;
-            memset(call_loc_pow,0,sizeof(char)*23);
-            sprintf(cdbm,"%2d",ndbm);
-            strncat(call_loc_pow,callsign,strlen(callsign));
-            strncat(call_loc_pow," ",1);
-            strncat(call_loc_pow,cdbm,2);
-            strncat(call_loc_pow,"\0",1);
+            snprintf(cdbm, sizeof(cdbm), "%2d", ndbm);
+            snprintf(call_loc_pow, WSPR_CALL_LOC_POW_CAP, "%s %s", callsign, cdbm);
             int nu=ndbm%10;
             if( nu == 0 || nu == 3 || nu == 7 || nu == 10 ) { //make sure power is OK
                 ihash=nhash(callsign,strlen(callsign),(uint32_t)146);
-                strcpy(hashtab+ihash*13,callsign);
+                snprintf(hashtab+ihash*13, WSPR_CALLSIGN_CAP, "%s", callsign);
             } else noprint=1;
         }
     } else if ( ntype < 0 ) {
         ndbm=-(ntype+1);
         memset(grid6,0,sizeof(char)*7);
-//        size_t len=strlen(callsign);
         size_t len=6;
-        strncat(grid6,callsign+len-1,1);
-        strncat(grid6,callsign,len-1);
+        grid6[0] = callsign[len - 1];
+        memcpy(grid6 + 1, callsign, len - 1);
+        grid6[len] = '\0';
         int nu=ndbm%10;
         if ((nu != 0 && nu != 3 && nu != 7 && nu != 10) ||
             !isalpha(grid6[0]) || !isalpha(grid6[1]) ||
@@ -318,19 +337,13 @@ int unpk_(signed char *message, char *hashtab, char *loctab, char *call_loc_pow,
         
         ihash=(n2-ntype-64)/128;
         if( strncmp(hashtab+ihash*13,"\0",1) != 0 ) {
-            sprintf(callsign,"<%s>",hashtab+ihash*13);
+            snprintf(callsign, WSPR_CALLSIGN_CAP, "<%.10s>", hashtab+ihash*13);
         } else {
-            sprintf(callsign,"%5s","<...>");
+            snprintf(callsign, WSPR_CALLSIGN_CAP, "%5s", "<...>");
         }
         
-        memset(call_loc_pow,0,sizeof(char)*23);
-        sprintf(cdbm,"%2d",ndbm);
-        strncat(call_loc_pow,callsign,strlen(callsign));
-        strncat(call_loc_pow," ",1);
-        strncat(call_loc_pow,grid6,strlen(grid6));
-        strncat(call_loc_pow," ",1);
-        strncat(call_loc_pow,cdbm,2);
-        strncat(call_loc_pow,"\0",1);
+        snprintf(cdbm, sizeof(cdbm), "%2d", ndbm);
+        snprintf(call_loc_pow, WSPR_CALL_LOC_POW_CAP, "%s %s %s", callsign, grid6, cdbm);
         
         
         // I don't know what to do with these... They show up as "A000AA" grids.

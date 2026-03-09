@@ -1,5 +1,94 @@
 # Changelog / Registro Modifiche
 
+## [1.4.2] - 2026-03-10
+
+### English
+
+Release focused on security hardening (LotW + remote web), Linux stability, and FT2 runtime/control consistency.
+
+#### Changed
+
+- LotW download pipeline migrated from credentialed URL GET to HTTPS POST body (`application/x-www-form-urlencoded`).
+- Added strict redirect checks for credentialed LotW requests (HTTPS + expected host only).
+- Remote web startup now rejects LAN/WAN bind with token length below 12 characters.
+- Remote web startup now reports explicit plaintext HTTP/WS warning when exposed beyond loopback.
+- Async L2 now defaults ON when entering FT2 (user can still disable), and remains FT2-scoped.
+- Added FT2-mode visibility guard for `Lock Tx Freq` and `Tx even/1st` controls (auto-off + hidden in FT2).
+- Consolidated band button frequency selection into shared helper for deterministic re-click behavior.
+- Added screen-geometry clamp for configuration dialog sizing/positioning.
+- Added dedicated thread-pool config for async decode with controlled stack sizing (Linux: 16 MB).
+- Restored `View -> Ionospheric Forecast` and `View -> DX Cluster` window actions with checked-state synchronization.
+- Updated release/docs/workflow defaults to `v1.4.2` (IT/EN/ES), including artifact templates and guidance links.
+
+#### Fixed
+
+- Fixed LotW credential exposure in query URLs and URL-style debug output.
+- Fixed insecure redirect-follow path on credential-bearing LotW requests.
+- Fixed Linux settings dialog overflow cases where `OK`/bottom controls were unreachable on small displays.
+- Fixed async decode overlap edge cases by guarding against main decoder busy state.
+- Fixed async decode shutdown race by waiting for watcher/thread-pool completion in destructor.
+- Fixed remote dashboard TX/RX activity feed to preserve TX events across refresh and report initial TX state correctly.
+- Fixed regressions in `View` menu tool windows where actions were toggling without showing the actual window.
+- Reduced C string overflow risk in WSPR helper paths by replacing unsafe operations with bounded variants.
+
+### Italiano
+
+Release focalizzata su hardening sicurezza (LotW + web remota), stabilita' Linux e coerenza runtime/controlli FT2.
+
+#### Modificato
+
+- Pipeline download LotW migrata da GET URL con credenziali a POST HTTPS (`application/x-www-form-urlencoded`).
+- Aggiunti controlli redirect stretti su richieste LotW con credenziali (solo HTTPS + host atteso).
+- Avvio web remota ora rifiuta bind LAN/WAN con token inferiore a 12 caratteri.
+- Avvio web remota ora mostra avviso esplicito su traffico HTTP/WS in chiaro se esposta oltre loopback.
+- Async L2 ora ON di default entrando in FT2 (disattivabile utente), mantenendo scope FT2.
+- Aggiunta guardia visibilita' FT2 per `Blocca la Freq Tx` e `Tx pari/1°` (auto-off + nascosti in FT2).
+- Consolidata selezione frequenze pulsanti banda in helper comune per comportamento re-click deterministico.
+- Aggiunto clamp geometria schermo per dimensione/posizione dialog configurazione.
+- Aggiunta configurazione thread-pool dedicato per decode async con stack controllato (Linux: 16 MB).
+- Ripristinate azioni finestre `View -> Ionospheric Forecast` e `View -> DX Cluster` con sincronizzazione stato check.
+- Aggiornati default release/documentazione/workflow a `v1.4.2` (IT/EN/ES), inclusi template artifact e link guida.
+
+#### Corretto
+
+- Corretta esposizione credenziali LotW in URL query e output debug stile URL.
+- Corretto percorso redirect insicuro su richieste LotW con credenziali.
+- Corretti casi Linux con dialog impostazioni fuori schermo (`OK`/controlli bassi non raggiungibili).
+- Corrette sovrapposizioni decode async tramite guardia su stato busy del decoder principale.
+- Corretta race di shutdown decode async attendendo completamento watcher/thread-pool nel distruttore.
+- Corretto feed attivita' TX/RX dashboard remota preservando eventi TX nei refresh e stato TX iniziale.
+- Corrette regressioni finestre strumenti nel menu `View` (azione toggle senza apertura finestra).
+- Ridotto rischio overflow stringhe C nei percorsi helper WSPR sostituendo operazioni non sicure con varianti bounded.
+
+### Espanol
+
+Release centrada en hardening de seguridad (LotW + web remota), estabilidad Linux y consistencia runtime/controles FT2.
+
+#### Cambios
+
+- Pipeline de descarga LotW migrada de GET URL con credenciales a POST HTTPS (`application/x-www-form-urlencoded`).
+- Anadidos controles strict de redirect para peticiones LotW con credenciales (solo HTTPS + host esperado).
+- Inicio web remoto ahora rechaza bind LAN/WAN con token menor de 12 caracteres.
+- Inicio web remoto ahora muestra aviso explicito de trafico HTTP/WS en claro si se expone fuera de loopback.
+- Async L2 ahora ON por defecto al entrar en FT2 (usuario puede desactivar), manteniendo alcance FT2.
+- Anadida guarda de visibilidad FT2 para `Bloquear Freq Tx` y `Tx par/1°` (auto-off + ocultos en FT2).
+- Consolidada seleccion de frecuencia de botones de banda en helper comun para reclick determinista.
+- Anadido clamp de geometria de pantalla para tamano/posicion del dialogo de configuracion.
+- Anadida configuracion de thread-pool dedicado para decode async con stack controlado (Linux: 16 MB).
+- Restauradas acciones de ventana `View -> Ionospheric Forecast` y `View -> DX Cluster` con sincronizacion de estado check.
+- Actualizados defaults de release/docs/workflows a `v1.4.2` (IT/EN/ES), incluyendo plantillas de artefactos y enlaces de guia.
+
+#### Corregido
+
+- Corregida exposicion de credenciales LotW en query URL y salida debug estilo URL.
+- Corregido flujo de redirect inseguro para peticiones LotW con credenciales.
+- Corregidos casos Linux con dialogo de ajustes fuera de pantalla (`OK`/controles inferiores inaccesibles).
+- Corregidos solapamientos de decode async con guarda sobre estado busy del decoder principal.
+- Corregida race de cierre decode async esperando finalizacion de watcher/thread-pool en destructor.
+- Corregido feed de actividad TX/RX en dashboard remoto preservando eventos TX durante refresh y estado TX inicial.
+- Corregidas regresiones de ventanas de herramientas en menu `View` (toggle sin apertura real).
+- Reducido riesgo de overflow de strings C en helpers WSPR reemplazando operaciones inseguras por variantes acotadas.
+
 ## [1.4.1] - 2026-03-09
 
 ### English
@@ -12,7 +101,7 @@ Release focused on startup/mode-switch correctness, CAT runtime resilience, and 
 - Startup auto mode-from-rig selection is now one-shot after first valid match.
 - Remote runtime state/control surface expanded for `Async L2`, `Dual Carrier`, and `Alt 1/2`.
 - World-map visibility persistence in splitter layout retained/cleaned.
-- Release/docs templates aligned to `v1.4.1` (IT/EN/ES), including macOS quarantine and Linux AppImage extract-run guidance.
+- Release/docs templates aligned to `v1.4.2` (IT/EN/ES), including macOS quarantine and Linux AppImage extract-run guidance.
 
 #### Fixed
 
@@ -31,7 +120,7 @@ Release focalizzata su correttezza startup/cambio modalita', resilienza runtime 
 - Auto-selezione modalita' startup da frequenza radio resa one-shot dopo il primo match valido.
 - Superficie stato/controllo runtime remoto estesa per `Async L2`, `Dual Carrier` e `Alt 1/2`.
 - Persistenza visibilita' world-map nel layout splitter mantenuta/rifinita.
-- Template release/documentazione allineati a `v1.4.1` (IT/EN/ES), inclusi comandi quarantena macOS e avvio AppImage estratto su Linux.
+- Template release/documentazione allineati a `v1.4.2` (IT/EN/ES), inclusi comandi quarantena macOS e avvio AppImage estratto su Linux.
 
 #### Corretto
 
@@ -50,7 +139,7 @@ Release centrada en correccion de startup/cambio de modo, resiliencia CAT en run
 - Auto-seleccion de modo startup por frecuencia del rig ahora one-shot tras el primer match valido.
 - Superficie de estado/control remoto ampliada para `Async L2`, `Dual Carrier` y `Alt 1/2`.
 - Persistencia de visibilidad world-map en layout splitter mantenida/ajustada.
-- Plantillas de release/docs alineadas a `v1.4.1` (IT/EN/ES), incluyendo comando de cuarentena macOS y arranque AppImage extraido en Linux.
+- Plantillas de release/docs alineadas a `v1.4.2` (IT/EN/ES), incluyendo comando de cuarentena macOS y arranque AppImage extraido en Linux.
 
 #### Corregido
 

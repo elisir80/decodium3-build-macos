@@ -35,6 +35,7 @@
 #include <QNetworkRequest> // TCI
 #include <QNetworkReply> // TCI
 #include <QUrl>
+#include <QUrlQuery>
 #include <QStandardPaths>
 #include <QDir>
 #include <QDebug>
@@ -120,6 +121,8 @@
 #include "widgets/QSYMessage.h"
 #include "widgets/QSYMessageCreator.h"
 #include "widgets/qsymonitor.h"
+#include "widgets/IonosphericForecastWindow.h"
+#include "widgets/DXClusterWindow.h"
 
 #define FCL fortran_charlen_t
 //avt 10/1/25
@@ -423,9 +426,17 @@ void MainWindow::updateAsyncL2ControlsVisibility ()
   bool const isFt2 = (m_mode == "FT2");
 
   if (ui->cbAsyncDecode) {
+    if (isFt2 && !m_asyncL2DefaultAppliedForCurrentFt2) {
+      // FT2 default: Async L2 ON. User can still disable it manually.
+      ui->cbAsyncDecode->setChecked (true);
+      m_asyncL2DefaultAppliedForCurrentFt2 = true;
+    }
     if (!isFt2 && ui->cbAsyncDecode->isChecked ()) {
       // Force async L2 OFF when leaving FT2 to avoid hidden active state.
       ui->cbAsyncDecode->setChecked (false);
+    }
+    if (!isFt2) {
+      m_asyncL2DefaultAppliedForCurrentFt2 = false;
     }
     ui->cbAsyncDecode->setVisible (isFt2);
   }
@@ -453,6 +464,20 @@ void MainWindow::updateAsyncL2ControlsVisibility ()
       ui->cbAutoTogglePeriod->setChecked (false);
     }
     ui->cbAutoTogglePeriod->setVisible (!isFt2);
+  }
+
+  if (ui->cbHoldTxFreq) {
+    if (isFt2 && ui->cbHoldTxFreq->isChecked ()) {
+      ui->cbHoldTxFreq->setChecked (false);
+    }
+    ui->cbHoldTxFreq->setVisible (!isFt2);
+  }
+
+  if (ui->txFirstCheckBox) {
+    if (isFt2 && ui->txFirstCheckBox->isChecked ()) {
+      ui->txFirstCheckBox->setChecked (false);
+    }
+    ui->txFirstCheckBox->setVisible (!isFt2);
   }
 
   dt_correction_label.setVisible (!isFt2);
@@ -1476,98 +1501,109 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
             bindAddress = QHostAddress::AnyIPv4;
           }
 
-        m_remoteCommandServer = new RemoteCommandServer {this};
-        m_remoteCommandServer->setRuntimeStateProvider([this] {
-            RemoteCommandServer::RuntimeState state;
-            state.mode = m_mode;
-            state.band = ui && ui->bandComboBox ? ui->bandComboBox->currentText().trimmed() : QString {};
-            state.dialFrequencyHz = static_cast<qint64>(m_freqNominal);
-            state.rxFrequencyHz = ui && ui->RxFreqSpinBox ? ui->RxFreqSpinBox->value() : 0;
-            state.txFrequencyHz = ui && ui->TxFreqSpinBox ? ui->TxFreqSpinBox->value() : 0;
-            state.periodMs = qMax<qint64>(1, qRound64(m_TRperiod * 1000.0));
-            state.txEnabled = m_auto;
-            state.autoCqEnabled = m_autoCQ;
-            state.asyncL2Enabled = ui && ui->cbAsyncDecode && ui->cbAsyncDecode->isChecked();
-            state.dualCarrierEnabled = ui && ui->cbDualCarrier && ui->cbDualCarrier->isChecked();
-            state.alt12Enabled = ui && ui->cbAutoTogglePeriod && ui->cbAutoTogglePeriod->isChecked();
-            state.monitoring = m_monitoring;
-            state.transmitting = m_transmitting;
-            state.myCall = m_config.my_callsign();
-            state.dxCall = ui && ui->dxCallEntry ? ui->dxCallEntry->text().trimmed().toUpper() : QString {};
-            state.nowUtcMs = ntpCorrectedCurrentMSecsSinceEpoch();
-            return state;
-          });
-
-        bool guardOk {false};
-        auto const guardMs = m_env.value("FT2_REMOTE_GUARD_PRE_MS", "300").toInt(&guardOk);
-        if (guardOk)
+        authToken = authToken.trimmed();
+        bool const remoteExposed = !(bindAddress.isLoopback()
+                                     || bindAddress == QHostAddress::LocalHost
+                                     || bindAddress == QHostAddress::LocalHostIPv6);
+        if (remoteExposed && authToken.size() < 12)
           {
-            m_remoteCommandServer->setGuardPreMs(guardMs);
+            showStatusMessage(tr("Remote Web disabled: token must be at least 12 characters when binding on LAN/WAN."));
           }
+        else
+          {
+            m_remoteCommandServer = new RemoteCommandServer {this};
+            m_remoteCommandServer->setRuntimeStateProvider([this] {
+                RemoteCommandServer::RuntimeState state;
+                state.mode = m_mode;
+                state.band = ui && ui->bandComboBox ? ui->bandComboBox->currentText().trimmed() : QString {};
+                state.dialFrequencyHz = static_cast<qint64>(m_freqNominal);
+                state.rxFrequencyHz = ui && ui->RxFreqSpinBox ? ui->RxFreqSpinBox->value() : 0;
+                state.txFrequencyHz = ui && ui->TxFreqSpinBox ? ui->TxFreqSpinBox->value() : 0;
+                state.periodMs = qMax<qint64>(1, qRound64(m_TRperiod * 1000.0));
+                state.txEnabled = m_auto;
+                state.autoCqEnabled = m_autoCQ;
+                state.asyncL2Enabled = ui && ui->cbAsyncDecode && ui->cbAsyncDecode->isChecked();
+                state.dualCarrierEnabled = ui && ui->cbDualCarrier && ui->cbDualCarrier->isChecked();
+                state.alt12Enabled = ui && ui->cbAutoTogglePeriod && ui->cbAutoTogglePeriod->isChecked();
+                state.monitoring = m_monitoring;
+                state.transmitting = m_transmitting;
+                state.myCall = m_config.my_callsign();
+                state.dxCall = ui && ui->dxCallEntry ? ui->dxCallEntry->text().trimmed().toUpper() : QString {};
+                state.nowUtcMs = ntpCorrectedCurrentMSecsSinceEpoch();
+                return state;
+              });
 
-        bool ageOk {false};
-        auto const maxAgeMs = m_env.value("FT2_REMOTE_MAX_AGE_MS", "7500").toInt(&ageOk);
-        if (ageOk)
-          {
-            m_remoteCommandServer->setMaxCommandAgeMs(maxAgeMs);
-          }
-
-        m_remoteCommandServer->setAuthUser(authUser);
-        if (!authToken.isEmpty())
-          {
-            m_remoteCommandServer->setAuthToken(authToken);
-          }
-        else if (bindAddress == QHostAddress::AnyIPv4 || bindAddress == QHostAddress::AnyIPv6)
-          {
-            showStatusMessage(tr("Remote Web warning: no token configured while listening on LAN."));
-          }
-
-        quint16 httpPort {0};
-        if (!httpPortText.isEmpty())
-          {
-            bool httpPortOk {false};
-            auto const httpPortRaw = httpPortText.toUInt(&httpPortOk);
-            if (httpPortOk && httpPortRaw <= 65535u)
+            bool guardOk {false};
+            auto const guardMs = m_env.value("FT2_REMOTE_GUARD_PRE_MS", "300").toInt(&guardOk);
+            if (guardOk)
               {
-                httpPort = static_cast<quint16>(httpPortRaw);
+                m_remoteCommandServer->setGuardPreMs(guardMs);
               }
-            else
+
+            bool ageOk {false};
+            auto const maxAgeMs = m_env.value("FT2_REMOTE_MAX_AGE_MS", "7500").toInt(&ageOk);
+            if (ageOk)
               {
-                showStatusMessage(tr("Remote HTTP: invalid FT2_REMOTE_HTTP_PORT=\"%1\" (using default ws+1)")
-                                  .arg(httpPortText));
+                m_remoteCommandServer->setMaxCommandAgeMs(maxAgeMs);
               }
-          }
 
-        connect(m_remoteCommandServer, &RemoteCommandServer::selectCallerDue,
-                this, &MainWindow::onRemoteSelectCallerDue);
-        connect(m_remoteCommandServer, &RemoteCommandServer::setModeRequested,
-                this, &MainWindow::onRemoteSetModeRequested);
-        connect(m_remoteCommandServer, &RemoteCommandServer::setBandRequested,
-                this, &MainWindow::onRemoteSetBandRequested);
-        connect(m_remoteCommandServer, &RemoteCommandServer::setRxFrequencyRequested,
-                this, &MainWindow::onRemoteSetRxFrequencyRequested);
-        connect(m_remoteCommandServer, &RemoteCommandServer::setTxEnabledRequested,
-                this, &MainWindow::onRemoteSetTxEnabledRequested);
-        connect(m_remoteCommandServer, &RemoteCommandServer::setAutoCqRequested,
-                this, &MainWindow::onRemoteSetAutoCqRequested);
-        connect(m_remoteCommandServer, &RemoteCommandServer::setAsyncL2Requested,
-                this, &MainWindow::onRemoteSetAsyncL2Requested);
-        connect(m_remoteCommandServer, &RemoteCommandServer::setDualCarrierRequested,
-                this, &MainWindow::onRemoteSetDualCarrierRequested);
-        connect(m_remoteCommandServer, &RemoteCommandServer::setAlt12Requested,
-                this, &MainWindow::onRemoteSetAlt12Requested);
-        connect(m_remoteCommandServer, &RemoteCommandServer::waterfallStreamingChanged,
-                this, &MainWindow::onRemoteWaterfallStreamingChanged);
-        connect(m_remoteCommandServer, &RemoteCommandServer::logMessage, this,
-                [this] (QString const& message) { showStatusMessage(message); });
+            m_remoteCommandServer->setAuthUser(authUser);
+            if (!authToken.isEmpty())
+              {
+                m_remoteCommandServer->setAuthToken(authToken);
+              }
 
-        m_remoteWaterfallStreamingEnabled = m_remoteCommandServer->waterfallEnabled();
+            quint16 httpPort {0};
+            if (!httpPortText.isEmpty())
+              {
+                bool httpPortOk {false};
+                auto const httpPortRaw = httpPortText.toUInt(&httpPortOk);
+                if (httpPortOk && httpPortRaw <= 65535u)
+                  {
+                    httpPort = static_cast<quint16>(httpPortRaw);
+                  }
+                else
+                  {
+                    showStatusMessage(tr("Remote HTTP: invalid FT2_REMOTE_HTTP_PORT=\"%1\" (using default ws+1)")
+                                      .arg(httpPortText));
+                  }
+              }
 
-        if (!m_remoteCommandServer->start(wsPort, bindAddress, httpPort))
-          {
-            showStatusMessage(tr("Remote WS disabled: failed to bind %1:%2")
-                                .arg(bindAddress.toString())
-                                .arg(wsPort));
+            connect(m_remoteCommandServer, &RemoteCommandServer::selectCallerDue,
+                    this, &MainWindow::onRemoteSelectCallerDue);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setModeRequested,
+                    this, &MainWindow::onRemoteSetModeRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setBandRequested,
+                    this, &MainWindow::onRemoteSetBandRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setRxFrequencyRequested,
+                    this, &MainWindow::onRemoteSetRxFrequencyRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setTxEnabledRequested,
+                    this, &MainWindow::onRemoteSetTxEnabledRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setAutoCqRequested,
+                    this, &MainWindow::onRemoteSetAutoCqRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setAsyncL2Requested,
+                    this, &MainWindow::onRemoteSetAsyncL2Requested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setDualCarrierRequested,
+                    this, &MainWindow::onRemoteSetDualCarrierRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setAlt12Requested,
+                    this, &MainWindow::onRemoteSetAlt12Requested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::waterfallStreamingChanged,
+                    this, &MainWindow::onRemoteWaterfallStreamingChanged);
+            connect(m_remoteCommandServer, &RemoteCommandServer::logMessage, this,
+                    [this] (QString const& message) { showStatusMessage(message); });
+
+            m_remoteWaterfallStreamingEnabled = m_remoteCommandServer->waterfallEnabled();
+
+            if (!m_remoteCommandServer->start(wsPort, bindAddress, httpPort))
+              {
+                showStatusMessage(tr("Remote WS disabled: failed to bind %1:%2")
+                                    .arg(bindAddress.toString())
+                                    .arg(wsPort));
+              }
+            else if (remoteExposed)
+              {
+                showStatusMessage(tr("Remote Web notice: traffic is plain HTTP/WS. Use only trusted LAN/VPN or a TLS reverse proxy."));
+              }
           }
       }
     else if (!wsPortText.isEmpty())
@@ -1980,21 +2016,6 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   }
   m_audioThread.start (m_audioThreadPriority);
 
-#ifdef WIN32
-  if (!m_multiple)
-    {
-      while(true)
-        {
-          int iret=killbyname("jt9.exe");
-          if(iret == 603) break;
-          if(iret != 0)
-            MessageBox::warning_message (this, tr ("Error Killing jt9.exe Process")
-                                         , tr ("KillByName return code: %1")
-                                         .arg (iret));
-        }
-    }
-#endif
-
   {
     //delete any .quit file that might have been left lying around
     //since its presence will cause jt9 to exit a soon as we start it
@@ -2048,9 +2069,17 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
 
   connect(&watcher3, SIGNAL(finished()),this,SLOT(fast_decode_done()));
   connect(&m_asyncDecodeWatcher, &QFutureWatcher<void>::finished, this, &MainWindow::asyncDecodeDone);
+  m_asyncDecodeThreadPool.setMaxThreadCount (1);
+#if defined(Q_OS_LINUX)
+  // Fortran/OpenMP path in async L2 is stack hungry on some Linux distros.
+  m_asyncDecodeThreadPool.setStackSize (16 * 1024 * 1024);
+#else
+  m_asyncDecodeThreadPool.setStackSize (8 * 1024 * 1024);
+#endif
   connect(&m_asyncDecodeTimer, &QTimer::timeout, this, [this]() {
-    if (m_mode != "FT2" || !ui->cbAsyncDecode->isChecked()) return;
+    if (m_mode != "FT2" || !ui->cbAsyncDecode || !ui->cbAsyncDecode->isChecked()) return;
     if (m_bAsyncDecoding) return;  // previous decode still running
+    if (m_decoderBusy) return;     // avoid overlap with main decoder path
     if (m_asyncAudioPos < 45000) return;  // not enough audio yet
 
     // Extract last 45000 samples from ring buffer
@@ -2069,16 +2098,19 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
     }
 
     // Set up decode parameters
-    int nqsoprogress = m_QSOProgress;
-    int nfqso = m_wideGraph->rxFreq();
-    int nfa = m_wideGraph->nStartFreq();
-    int nfb = m_wideGraph->Fmax();
-    int ndepth = m_ndepth;
-    int ncontest = int(m_specOp);
+    int nqsoprogress = qBound (0, int(m_QSOProgress), 6);
+    int nfqso = qBound (0, m_wideGraph->rxFreq(), 5000);
+    int nfa = qBound (0, m_wideGraph->nStartFreq(), 5000);
+    int nfb = qBound (0, m_wideGraph->Fmax(), 5000);
+    if (nfb <= nfa) {
+      nfb = nfa + 50;
+    }
+    int ndepth = qBound (1, m_ndepth, 4);
+    int ncontest = qBound (0, int(m_specOp), 16);
     m_asyncMsg[0][0] = 0;
     m_bAsyncDecoding = true;
 
-    m_asyncDecodeWatcher.setFuture(QtConcurrent::run([=]() mutable {
+    m_asyncDecodeWatcher.setFuture(QtConcurrent::run(&m_asyncDecodeThreadPool, [=]() mutable {
       int nout = 0;
       ft2_triggered_decode_(asyncBuf, &nqsoprogress, &nfqso, &nfa, &nfb,
                             &ndepth, &ncontest,
@@ -2390,6 +2422,12 @@ void MainWindow::on_the_minute ()
 //--------------------------------------------------- MainWindow destructor
 MainWindow::~MainWindow()
 {
+  m_asyncDecodeTimer.stop ();
+  if (m_asyncDecodeWatcher.isRunning ()) {
+    m_asyncDecodeWatcher.waitForFinished ();
+  }
+  m_asyncDecodeThreadPool.waitForDone (1000);
+
   if(m_astroWidget) m_astroWidget.reset ();
   if(m_QSYMessageCreatorWidget) m_QSYMessageCreatorWidget.reset ();
   if(m_QSYMessageWidget) m_QSYMessageWidget.reset ();
@@ -4586,6 +4624,63 @@ void MainWindow::on_actionWorld_Map_toggled (bool checked)
 {
   Q_UNUSED (checked);
   applySingleDecodeColumnFlowLayout ();
+}
+
+void MainWindow::on_actionIonospheric_Forecast_triggered (bool checked)
+{
+  if (!checked)
+    {
+      if (m_ionosphericForecastWindow)
+        {
+          m_ionosphericForecastWindow->hide ();
+        }
+      return;
+    }
+
+  if (!m_ionosphericForecastWindow)
+    {
+      m_ionosphericForecastWindow.reset (new IonosphericForecastWindow {m_settings, this});
+      connect (this, &MainWindow::finished, m_ionosphericForecastWindow.data (), &QDialog::close);
+      connect (m_ionosphericForecastWindow.data (), &IonosphericForecastWindow::windowVisibleChanged,
+               this, [this] (bool visible) {
+                 if (!ui || !ui->actionIonospheric_Forecast) return;
+                 QSignalBlocker blocker {ui->actionIonospheric_Forecast};
+                 ui->actionIonospheric_Forecast->setChecked (visible);
+               });
+    }
+
+  m_ionosphericForecastWindow->show ();
+  m_ionosphericForecastWindow->raise ();
+  m_ionosphericForecastWindow->activateWindow ();
+}
+
+void MainWindow::on_actionDX_Cluster_triggered (bool checked)
+{
+  if (!checked)
+    {
+      if (m_dxClusterWindow)
+        {
+          m_dxClusterWindow->hide ();
+        }
+      return;
+    }
+
+  if (!m_dxClusterWindow)
+    {
+      m_dxClusterWindow.reset (new DXClusterWindow {m_settings, this});
+      connect (this, &MainWindow::finished, m_dxClusterWindow.data (), &QDialog::close);
+      connect (m_dxClusterWindow.data (), &DXClusterWindow::windowVisibleChanged,
+               this, [this] (bool visible) {
+                 if (!ui || !ui->actionDX_Cluster) return;
+                 QSignalBlocker blocker {ui->actionDX_Cluster};
+                 ui->actionDX_Cluster->setChecked (visible);
+               });
+    }
+
+  m_dxClusterWindow->setBand (m_currentBand, true);
+  m_dxClusterWindow->show ();
+  m_dxClusterWindow->raise ();
+  m_dxClusterWindow->activateWindow ();
 }
 
 void MainWindow::showQSYMessage(QString message)
@@ -20233,373 +20328,153 @@ void MainWindow::check_button_color()
 
 void MainWindow::on_pb160_clicked()
 {
-    quint64 freq = (m_mode=="FT2") ? 1843000 : 1840000;
-    auto const& row = m_config.frequencies ()->best_working_frequency (freq);
-    ui->bandComboBox->setCurrentIndex (row);
-    if (row >= 0) {
-      on_bandComboBox_activated (row);
-    } else {
-      keep_frequency = true;
-      setRig((m_mode=="FT2") ? 1843000 : 1837000);
-      QTimer::singleShot (250, [=] {keep_frequency = false;});
-    }
-    setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency ((m_mode=="FT2") ? 1843000 : 1840000,
+                       (m_mode=="FT2") ? 1843000 : 1837000);
 }
 
 void MainWindow::on_pb80_clicked()
 {
-    quint64 freq = (m_mode=="FT2") ? 3578000 : 3573000;
-    auto const& row = m_config.frequencies ()->best_working_frequency (freq);
-    ui->bandComboBox->setCurrentIndex (row);
-    if (row >= 0) {
-      on_bandComboBox_activated (row);
-    } else {
-      keep_frequency = true;
-      setRig((m_mode=="FT2") ? 3578000 : 3576000);
-      QTimer::singleShot (250, [=] {keep_frequency = false;});
-    }
-    setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency ((m_mode=="FT2") ? 3578000 : 3573000,
+                       (m_mode=="FT2") ? 3578000 : 3576000);
 }
 
 void MainWindow::on_pb60_clicked()
 {
-    quint64 freq = (m_mode=="FT2") ? 5360000 : 5357000;
-    auto const& row = m_config.frequencies ()->best_working_frequency (freq);
-    ui->bandComboBox->setCurrentIndex (row);
-    if (row >= 0) {
-      on_bandComboBox_activated (row);
-    } else {
-      keep_frequency = true;
-      setRig((m_mode=="FT2") ? 5360000 : 5357000);
-      QTimer::singleShot (250, [=] {keep_frequency = false;});
-    }
-    setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency ((m_mode=="FT2") ? 5360000 : 5357000,
+                       (m_mode=="FT2") ? 5360000 : 5357000);
 }
 
 void MainWindow::on_pb40_clicked()
 {
-    quint64 freq = (m_mode=="FT2") ? 7052000 : 7074000;
-    auto const& row = m_config.frequencies ()->best_working_frequency (freq);
-    ui->bandComboBox->setCurrentIndex (row);
-    if (row >= 0) {
-      on_bandComboBox_activated (row);
-    } else {
-      keep_frequency = true;
-      setRig((m_mode=="FT2") ? 7052000 : 7077000);
-      QTimer::singleShot (250, [=] {keep_frequency = false;});
-    }
-    setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency ((m_mode=="FT2") ? 7052000 : 7074000,
+                       (m_mode=="FT2") ? 7052000 : 7077000);
 }
 
 void MainWindow::on_pb30_clicked()
 {
-    quint64 freq = (m_mode=="FT2") ? 10144000 : 10136000;
-    auto const& row = m_config.frequencies ()->best_working_frequency (freq);
-    ui->bandComboBox->setCurrentIndex (row);
-    if (row >= 0) {
-      on_bandComboBox_activated (row);
-    } else {
-      keep_frequency = true;
-      setRig((m_mode=="FT2") ? 10144000 : 10139000);
-      QTimer::singleShot (250, [=] {keep_frequency = false;});
-    }
-    setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency ((m_mode=="FT2") ? 10144000 : 10136000,
+                       (m_mode=="FT2") ? 10144000 : 10139000);
 }
 
 void MainWindow::on_pb20_clicked()
 {
-    quint64 freq = (m_mode=="FT2") ? 14084000 : 14074000;
-    auto const& row = m_config.frequencies ()->best_working_frequency (freq);
-    ui->bandComboBox->setCurrentIndex (row);
-    if (row >= 0) {
-      on_bandComboBox_activated (row);
-    } else {
-      keep_frequency = true;
-      setRig((m_mode=="FT2") ? 14084000 : 14077000);
-      QTimer::singleShot (250, [=] {keep_frequency = false;});
-    }
-    setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency ((m_mode=="FT2") ? 14084000 : 14074000,
+                       (m_mode=="FT2") ? 14084000 : 14077000);
 }
 
 void MainWindow::on_pb17_clicked()
 {
-    quint64 freq = (m_mode=="FT2") ? 18108000 : 18100000;
-    auto const& row = m_config.frequencies ()->best_working_frequency (freq);
-    ui->bandComboBox->setCurrentIndex (row);
-    if (row >= 0) {
-      on_bandComboBox_activated (row);
-    } else {
-      keep_frequency = true;
-      setRig((m_mode=="FT2") ? 18108000 : 18103000);
-      QTimer::singleShot (250, [=] {keep_frequency = false;});
-    }
-    setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency ((m_mode=="FT2") ? 18108000 : 18100000,
+                       (m_mode=="FT2") ? 18108000 : 18103000);
 }
 
 void MainWindow::on_pb15_clicked()
 {
-    quint64 freq = (m_mode=="FT2") ? 21144000 : 21074000;
-    auto const& row = m_config.frequencies ()->best_working_frequency (freq);
-    ui->bandComboBox->setCurrentIndex (row);
-    if (row >= 0) {
-      on_bandComboBox_activated (row);
-    } else {
-      keep_frequency = true;
-      setRig((m_mode=="FT2") ? 21144000 : 21077000);
-      QTimer::singleShot (250, [=] {keep_frequency = false;});
-    }
-    setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency ((m_mode=="FT2") ? 21144000 : 21074000,
+                       (m_mode=="FT2") ? 21144000 : 21077000);
 }
 
 void MainWindow::on_pb12_clicked()
 {
-    quint64 freq = (m_mode=="FT2") ? 24923000 : 24915000;
-    auto const& row = m_config.frequencies ()->best_working_frequency (freq);
-    ui->bandComboBox->setCurrentIndex (row);
-    if (row >= 0) {
-      on_bandComboBox_activated (row);
-    } else {
-      keep_frequency = true;
-      setRig((m_mode=="FT2") ? 24923000 : 24918000);
-      QTimer::singleShot (250, [=] {keep_frequency = false;});
-    }
-    setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency ((m_mode=="FT2") ? 24923000 : 24915000,
+                       (m_mode=="FT2") ? 24923000 : 24918000);
 }
 
 void MainWindow::on_pb10_clicked()
 {
-    quint64 freq = (m_mode=="FT2") ? 28184000 : 28074000;
-    auto const& row = m_config.frequencies ()->best_working_frequency (freq);
-    ui->bandComboBox->setCurrentIndex (row);
-    if (row >= 0) {
-      on_bandComboBox_activated (row);
-    } else {
-      keep_frequency = true;
-      setRig((m_mode=="FT2") ? 28184000 : 28077000);
-      QTimer::singleShot (250, [=] {keep_frequency = false;});
-    }
-    setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency ((m_mode=="FT2") ? 28184000 : 28074000,
+                       (m_mode=="FT2") ? 28184000 : 28077000);
 }
 
 void MainWindow::on_pb6_clicked()
 {
-    auto const& row = m_config.frequencies ()->best_working_frequency (50313000);
-    ui->bandComboBox->setCurrentIndex (row);
-    if (row >= 0) {
-      on_bandComboBox_activated (row);
-    } else {
-      keep_frequency = true;
-      setRig(50316000);
-      QTimer::singleShot (250, [=] {keep_frequency = false;});
-    }
-    setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency (50313000, 50316000);
 }
 
 void MainWindow::on_pb2_clicked()
 {
-    auto const& row = m_config.frequencies ()->best_working_frequency (144074000);
-    ui->bandComboBox->setCurrentIndex (row);
-    if (row >= 0) {
-      on_bandComboBox_activated (row);
-    } else {
-      keep_frequency = true;
-      setRig(144077000);
-      QTimer::singleShot (250, [=] {keep_frequency = false;});
-    }
-    setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency (144074000, 144077000);
 }
 
 void MainWindow::on_pb70_clicked()
 {
-    auto const& row = m_config.frequencies ()->best_working_frequency (432074000);
-    ui->bandComboBox->setCurrentIndex (row);
-    if (row >= 0) {
-      on_bandComboBox_activated (row);
-    } else {
-      keep_frequency = true;
-      setRig(432077000);
-      QTimer::singleShot (250, [=] {keep_frequency = false;});
-    }
-    setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency (432074000, 432077000);
 }
 
 void MainWindow::on_pb8_clicked()
 {
-  auto const& row = m_config.frequencies ()->best_working_frequency (40680000);
-  ui->bandComboBox->setCurrentIndex (row);
-  if (row >= 0) {
-    on_bandComboBox_activated (row);
-  } else {
-    keep_frequency = true;
-    setRig(40680000);
-    QTimer::singleShot (250, [=] {keep_frequency = false;});
-  }
-  setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency (40680000, 40680000);
 }
 
 void MainWindow::on_pb50_clicked()
 {
-  auto const& row = m_config.frequencies ()->best_working_frequency (50313000);
-  ui->bandComboBox->setCurrentIndex (row);
-  if (row >= 0) {
-    on_bandComboBox_activated (row);
-  } else {
-    keep_frequency = true;
-    setRig(50316000);
-    QTimer::singleShot (250, [=] {keep_frequency = false;});
-  }
-  setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency (50313000, 50316000);
 }
 
 void MainWindow::on_pb4_clicked()
 {
-  auto const& row = m_config.frequencies ()->best_working_frequency (70154000);
-  ui->bandComboBox->setCurrentIndex (row);
-  if (row >= 0) {
-    on_bandComboBox_activated (row);
-  } else {
-    keep_frequency = true;
-    setRig(70154000);
-    QTimer::singleShot (250, [=] {keep_frequency = false;});
-  }
-  setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency (70154000, 70154000);
 }
 
 void MainWindow::on_pb144_clicked()
 {
-  auto const& row = m_config.frequencies ()->best_working_frequency (144074000);
-  ui->bandComboBox->setCurrentIndex (row);
-  if (row >= 0) {
-    on_bandComboBox_activated (row);
-  } else {
-    keep_frequency = true;
-    setRig(144077000);
-    QTimer::singleShot (250, [=] {keep_frequency = false;});
-  }
-  setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency (144074000, 144077000);
 }
 
 void MainWindow::on_pb220_clicked()
 {
-  auto const& row = m_config.frequencies ()->best_working_frequency (222174000);
-  ui->bandComboBox->setCurrentIndex (row);
-  if (row >= 0) {
-    on_bandComboBox_activated (row);
-  } else {
-    keep_frequency = true;
-    setRig(222177000);
-    QTimer::singleShot (250, [=] {keep_frequency = false;});
-  }
-  setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency (222174000, 222177000);
 }
 
 void MainWindow::on_pb432_clicked()
 {
-  auto const& row = m_config.frequencies ()->best_working_frequency (432174000);
-  ui->bandComboBox->setCurrentIndex (row);
-  if (row >= 0) {
-    on_bandComboBox_activated (row);
-  } else {
-    keep_frequency = true;
-    setRig(432177000);
-    QTimer::singleShot (250, [=] {keep_frequency = false;});
-  }
-  setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency (432174000, 432177000);
 }
 
 void MainWindow::on_pb902_clicked()
 {
-  auto const& row = m_config.frequencies ()->best_working_frequency (902174000);
-  ui->bandComboBox->setCurrentIndex (row);
-  if (row >= 0) {
-    on_bandComboBox_activated (row);
-  } else {
-    keep_frequency = true;
-    setRig(902177000);
-    QTimer::singleShot (250, [=] {keep_frequency = false;});
-  }
-  setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency (902174000, 902177000);
 }
 
 void MainWindow::on_pb23_clicked()
 {
-  auto const& row = m_config.frequencies ()->best_working_frequency (1296065000);
-  ui->bandComboBox->setCurrentIndex (row);
-  if (row >= 0) {
-    on_bandComboBox_activated (row);
-  } else {
-    keep_frequency = true;
-    setRig(1296065000);
-    QTimer::singleShot (250, [=] {keep_frequency = false;});
-  }
-  setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency (1296065000, 1296065000);
 }
 
 void MainWindow::on_pb13_clicked()
 {
-  auto const& row = m_config.frequencies ()->best_working_frequency (2304065000);
-  ui->bandComboBox->setCurrentIndex (row);
-  if (row >= 0) {
-    on_bandComboBox_activated (row);
-  } else {
-    keep_frequency = true;
-    setRig(2304065000);
-    QTimer::singleShot (250, [=] {keep_frequency = false;});
-  }
-  setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency (2304065000, 2304065000);
 }
 
 void MainWindow::on_pb9_clicked()
 {
-  auto const& row = m_config.frequencies ()->best_working_frequency (3400065000);
-  ui->bandComboBox->setCurrentIndex (row);
-  if (row >= 0) {
-    on_bandComboBox_activated (row);
-  } else {
-    keep_frequency = true;
-    setRig(3400065000);
-    QTimer::singleShot (250, [=] {keep_frequency = false;});
-  }
-  setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency (3400065000, 3400065000);
 }
 
 void MainWindow::on_pb5G_clicked()
 {
-  auto const& row = m_config.frequencies ()->best_working_frequency (5760200000);
-  ui->bandComboBox->setCurrentIndex (row);
-  if (row >= 0) {
-    on_bandComboBox_activated (row);
-  } else {
-    keep_frequency = true;
-    setRig(5760200000);
-    QTimer::singleShot (250, [=] {keep_frequency = false;});
-  }
-  setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency (5760200000, 5760200000);
 }
 
 void MainWindow::on_pb10G_clicked()
 {
-  auto const& row = m_config.frequencies ()->best_working_frequency (10368200000);
-  ui->bandComboBox->setCurrentIndex (row);
-  if (row >= 0) {
-    on_bandComboBox_activated (row);
-  } else {
-    keep_frequency = true;
-    setRig(10368200000);
-    QTimer::singleShot (250, [=] {keep_frequency = false;});
-  }
-  setXIT (ui->TxFreqSpinBox->value ());
+  selectBandFrequency (10368200000, 10368200000);
 }
 
 void MainWindow::on_pb24G_clicked()
 {
-  auto const& row = m_config.frequencies ()->best_working_frequency (24048200000);
-  ui->bandComboBox->setCurrentIndex (row);
+  selectBandFrequency (24048200000, 24048200000);
+}
+
+void MainWindow::selectBandFrequency (Frequency preferredFrequency, Frequency fallbackFrequency)
+{
+  auto const& row = m_config.frequencies ()->best_working_frequency (preferredFrequency);
   if (row >= 0) {
+    ui->bandComboBox->setCurrentIndex (row);
     on_bandComboBox_activated (row);
   } else {
     keep_frequency = true;
-    setRig(24048200000);
+    setRig (fallbackFrequency);
     QTimer::singleShot (250, [=] {keep_frequency = false;});
   }
   setXIT (ui->TxFreqSpinBox->value ());
@@ -20845,6 +20720,10 @@ void MainWindow::on_actionDownload_from_LOTW_triggered()
   redirect_count = 0;
   dlQsoReqReply = false;  //known Qt bug where finished signal generates duplicate calls to slot
   sav_file.setFileName(tmpFilePathName);
+  download_post_data_.clear();
+  download_content_type_.clear();
+  download_strict_https_same_host_ = false;
+  download_expected_host_.clear();
   
   m_nonQsl = m_config.nonQsl();   //copy in case any change in settings 
   QString startDate;
@@ -20854,12 +20733,18 @@ void MainWindow::on_actionDownload_from_LOTW_triggered()
     startDate = "1970-01-01";
   }
   
-  auto url = QString{"https://lotw.arrl.org/lotwuser/lotwreport.adi?login=%1&password=%2&qso_query=1&qso_qsorxsince=%3&qso_qsl=no"}
-      .arg(m_config.my_callsign())
-      .arg(m_config.lotw_pwd())
-      .arg(startDate);
-  debugToFile("actionDow    url:" + url);
-  current_url = QUrl(url);
+  current_url = QUrl(QStringLiteral("https://lotw.arrl.org/lotwuser/lotwreport.adi"));
+  QUrlQuery postBody;
+  postBody.addQueryItem(QStringLiteral("login"), m_config.my_callsign());
+  postBody.addQueryItem(QStringLiteral("password"), m_config.lotw_pwd());
+  postBody.addQueryItem(QStringLiteral("qso_query"), QStringLiteral("1"));
+  postBody.addQueryItem(QStringLiteral("qso_qsorxsince"), startDate);
+  postBody.addQueryItem(QStringLiteral("qso_qsl"), QStringLiteral("no"));
+  download_post_data_ = postBody.query(QUrl::FullyEncoded).toUtf8();
+  download_content_type_ = QByteArrayLiteral("application/x-www-form-urlencoded; charset=UTF-8");
+  download_strict_https_same_host_ = true;
+  download_expected_host_ = QStringLiteral("lotw.arrl.org");
+  debugToFile(QStringLiteral("actionDow    LOTW request prepared (POST, credentials redacted)"));
   connect(this, &MainWindow::download_finished, this, &MainWindow::downloadQsoComplete);
   download(current_url);
 }
@@ -20947,13 +20832,24 @@ void MainWindow::downloadQslOnly()
   redirect_count = 0;
   dlQslReqReply = false;  //known Qt bug where finished signal generates duplicate calls to slot
   sav_file.setFileName(tmpFilePathName);
+  download_post_data_.clear();
+  download_content_type_.clear();
+  download_strict_https_same_host_ = false;
+  download_expected_host_.clear();
   QString endDate = (QDateTime::currentDateTimeUtc().addDays(-28)).toString("yyyy-MM-dd");
-  auto url = QString{"https://lotw.arrl.org/lotwuser/lotwreport.adi?login=%1&password=%2&qso_query=1&qso_qsorxsince=1970-01-01&qso_qsl=yes&qso_enddate=%3"}
-      .arg(m_config.my_callsign())
-      .arg(m_config.lotw_pwd())
-      .arg(endDate);
-  debugToFile("dlQslOnly    url:" + url);
-  current_url = QUrl(url);
+  current_url = QUrl(QStringLiteral("https://lotw.arrl.org/lotwuser/lotwreport.adi"));
+  QUrlQuery postBody;
+  postBody.addQueryItem(QStringLiteral("login"), m_config.my_callsign());
+  postBody.addQueryItem(QStringLiteral("password"), m_config.lotw_pwd());
+  postBody.addQueryItem(QStringLiteral("qso_query"), QStringLiteral("1"));
+  postBody.addQueryItem(QStringLiteral("qso_qsorxsince"), QStringLiteral("1970-01-01"));
+  postBody.addQueryItem(QStringLiteral("qso_qsl"), QStringLiteral("yes"));
+  postBody.addQueryItem(QStringLiteral("qso_enddate"), endDate);
+  download_post_data_ = postBody.query(QUrl::FullyEncoded).toUtf8();
+  download_content_type_ = QByteArrayLiteral("application/x-www-form-urlencoded; charset=UTF-8");
+  download_strict_https_same_host_ = true;
+  download_expected_host_ = QStringLiteral("lotw.arrl.org");
+  debugToFile(QStringLiteral("dlQslOnly    LOTW request prepared (POST, credentials redacted)"));
   connect(this, &MainWindow::download_finished, this, &MainWindow::downloadQslComplete);
   download(current_url);
 }
@@ -21247,13 +21143,24 @@ void MainWindow::download (QUrl url) {
   QNetworkRequest request {url};
   request.setRawHeader("User-Agent", "Decodium3FT2-Raptor Downloader");
   request.setOriginatingObject (this);
+  bool const usePost = !download_post_data_.isEmpty();
+  if (usePost)
+    {
+      request.setHeader(QNetworkRequest::ContentTypeHeader,
+                        QString::fromLatin1(download_content_type_.isEmpty()
+                                            ? QByteArrayLiteral("application/x-www-form-urlencoded; charset=UTF-8")
+                                            : download_content_type_));
+    }
 
   // this blocks for a second or two the first time it is used on
   // Windows - annoying
   QPointer<QNetworkReply> network_reply;
-  if (!url_valid) {
+  if (!url_valid && !usePost) {
     debugToFile("download     url not valid, head");
     network_reply = m_network_manager.head (request);
+  } else if (usePost) {
+    debugToFile("download     lotw post");
+    network_reply = m_network_manager.post (request, download_post_data_);
   } else {
     debugToFile("download     url valid, get");
     network_reply = m_network_manager.get (request);
@@ -21273,24 +21180,52 @@ void MainWindow::reply_finished (QPointer<QNetworkReply> reply) {
   if (!reply) {
     return;           // we probably deleted it in an earlier call
   }
+
+  auto reset_download_request = [this] () {
+      download_post_data_.clear();
+      download_content_type_.clear();
+      download_strict_https_same_host_ = false;
+      download_expected_host_.clear();
+    };
   
   QUrl redirect_url {reply->attribute (QNetworkRequest::RedirectionTargetAttribute).toUrl ()};
   
   if (reply->error () == QNetworkReply::NoError && !redirect_url.isEmpty ()) {
     debugToFile("reply_fin    check redirect");
-    if ("https" == redirect_url.scheme () && !QSslSocket::supportsSsl ()) {
+    QUrl const resolved_url = reply->url ().resolved (redirect_url);
+    if (download_strict_https_same_host_)
+      {
+        auto const expected_host = download_expected_host_.trimmed();
+        bool const https_ok = (0 == resolved_url.scheme ().compare (QStringLiteral ("https"), Qt::CaseInsensitive));
+        bool const host_ok = expected_host.isEmpty ()
+          || (0 == resolved_url.host ().compare (expected_host, Qt::CaseInsensitive));
+        if (!https_ok || !host_ok)
+          {
+            MessageBox::information_message (
+              this,
+              tr ("Network Error - Refusing redirect for credentialed LOTW request:\n\'%1\'")
+                .arg (resolved_url.toDisplayString ()));
+            url_valid = false; // reset
+            reset_download_request ();
+            Q_EMIT download_finished (false);
+            return;
+          }
+      }
+    else if ("https" == resolved_url.scheme () && !QSslSocket::supportsSsl ()) {
       MessageBox::information_message (this, (tr ("Network Error - SSL/TLS support not installed, cannot fetch:\n\'%1\'")
-                                            .arg (redirect_url.toDisplayString ())));
+                                            .arg (resolved_url.toDisplayString ())));
       url_valid = false; // reset
+      reset_download_request ();
       Q_EMIT download_finished (false);
     } else if (++redirect_count < 10) { // maintain sanity
       // follow redirect
       debugToFile("reply_fin    redirect");
-      download (reply->url ().resolved (redirect_url));
+      download (resolved_url);
     } else {
       MessageBox::information_message (this, (tr ("Network Error - Too many redirects:\n\'%1\'")
-                                            .arg (redirect_url.toDisplayString ())));
+                                            .arg (resolved_url.toDisplayString ())));
       url_valid = false; // reset
+      reset_download_request ();
       Q_EMIT download_finished (false);
     }
   } else if (reply->error () != QNetworkReply::NoError) {
@@ -21298,6 +21233,7 @@ void MainWindow::reply_finished (QPointer<QNetworkReply> reply) {
     sav_file.cancelWriting ();
     sav_file.commit ();
     url_valid = false;     // reset
+    reset_download_request ();
     // report errors that are not due to abort
     if (QNetworkReply::OperationCanceledError != reply->error ()) {
       MessageBox::information_message (this, (tr ("Network Error:\n%1")
@@ -21310,6 +21246,7 @@ void MainWindow::reply_finished (QPointer<QNetworkReply> reply) {
       MessageBox::information_message (this, (tr ("File System Error - Cannot commit changes to:\n\"%1\"")
                                             .arg (sav_file.fileName ())));
       url_valid = false; // reset
+      reset_download_request ();
       Q_EMIT download_finished (false);
     } else {
       if (!url_valid) {
@@ -21318,6 +21255,7 @@ void MainWindow::reply_finished (QPointer<QNetworkReply> reply) {
         download (reply->url ().resolved (redirect_url));
       } else {
         url_valid = false; // reset
+        reset_download_request ();
         debugToFile("reply_fin    emit:true");
         Q_EMIT download_finished (true);
         debugToFile("reply_fin    emitted");

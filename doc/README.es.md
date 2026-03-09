@@ -6,7 +6,7 @@ Notas especificas del fork macOS dentro de este repositorio.
 
 ## Contexto de release actual
 
-- Ultima release estable: `v1.4.1`
+- Ultima release estable: `v1.4.2`
 - Objetivos: macOS Tahoe ARM64, Sequoia ARM64, Sequoia Intel, Monterey Intel (experimental), Linux x86_64 AppImage
 
 ## Notas de build y runtime
@@ -21,14 +21,18 @@ Notas especificas del fork macOS dentro de este repositorio.
 - Este fork usa `SharedMemorySegment` con backend `mmap` en Darwin.
 - El flujo de release no depende de ajustes `sysctl` System V (`kern.sysv.shmmax/shmall`).
 
-### Resumen consolidado v1.4.1
+### Resumen consolidado v1.4.2
 
-- Estabilizacion del flujo decode FT2 con split de lineas packed + supresion near-duplicate (5 segundos).
-- Control Async L2 visible solo en FT2 y auto-desactivado fuera de FT2.
-- Auto-seleccion startup por frecuencia del rig ahora one-shot; respuesta inicial al cambio de modo restaurada.
-- El cambio de modo ya no fuerza el waterfall al primer plano.
-- Maduracion del dashboard web remoto (config LAN, auth usuario/password, comportamiento mobile/PWA).
-- Hardening CAT/UDP/TCI y opciones mapa (greyline + distancia en ruta) mantenidos.
+- Peticiones LotW migradas de GET URL con credenciales a POST HTTPS.
+- Politica estricta de redirect para LotW con credenciales (HTTPS + host esperado).
+- Bind web remoto LAN/WAN ahora requiere token >= 12 caracteres.
+- Dialogo de ajustes Linux ajustado a geometria visible de pantalla.
+- Hardening decode async con stack/thread-pool dedicado y guardas anti-solapamiento.
+- Comportamiento de controles FT2 finalizado:
+  - Async L2 ON por defecto en FT2 y OFF automatico fuera de FT2,
+  - `Bloquear Freq Tx` y `Tx par/1°` ocultos en FT2.
+- Acciones `View -> Ionospheric Forecast` y `View -> DX Cluster` restauradas.
+- Eventos TX del dashboard remoto preservados correctamente durante refresh.
 
 ### Artefactos de release
 
@@ -63,8 +67,8 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 ## Referencias
 
 - `CHANGELOG.md`
-- `RELEASE_NOTES_v1.4.1.md`
-- `doc/GITHUB_RELEASE_BODY_v1.4.1.md`
+- `RELEASE_NOTES_v1.4.2.md`
+- `doc/GITHUB_RELEASE_BODY_v1.4.2.md`
 - `doc/WEBAPP_SETUP_GUIDE.es.md`
 - `doc/WEBAPP_SETUP_GUIDE.en-GB.md`
 - `doc/WEBAPP_SETUP_GUIDE.it.md`

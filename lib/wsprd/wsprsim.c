@@ -53,13 +53,14 @@ int add_signal_vector(float f0, float t0, float amp, unsigned char* symbols
 char* tobinary(int x)
 {
     static char b[33];
-    b[0] = '\0';
+    int idx = 0;
     
     long unsigned int z;
     for (z = 0x80000000; z > 0; z >>= 1)
     {
-        strcat(b, ((x & z) == z) ? "1" : "0");
+        b[idx++] = ((x & z) == z) ? '1' : '0';
     }
+    b[idx] = '\0';
     
     return b;
 }
@@ -138,7 +139,7 @@ int main(int argc, char *argv[])
     // message length is 22 characters
     message=malloc(sizeof(char)*23);
     
-    strcpy(c2filename,"000000_0001.c2");
+    snprintf(c2filename,15,"%s","000000_0001.c2");
 
     srand(getpid());
 
