@@ -2107,7 +2107,8 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
     }
     int ndepth = qBound (1, m_ndepth, 4);
     int ncontest = qBound (0, int(m_specOp), 16);
-    m_asyncMsg[0][0] = 0;
+    std::memset (m_asyncMsg, 0, sizeof (m_asyncMsg));
+    m_asyncMsgCount = 0;
     m_bAsyncDecoding = true;
 
     m_asyncDecodeWatcher.setFuture(QtConcurrent::run(&m_asyncDecodeThreadPool, [=]() mutable {
@@ -2117,6 +2118,7 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
                             dec_data.params.mycall, dec_data.params.hiscall,
                             &m_asyncMsg[0][0], &nout,
                             (FCL)12, (FCL)12, (FCL)(100*80));
+      m_asyncMsgCount = qBound (0, nout, 100);
     }));
   });
   
@@ -9117,7 +9119,9 @@ void MainWindow::auto_sequence (DecodedText const& message, unsigned start_toler
   QString callerGrid;
   message.deCallAndGrid(callerCall, callerGrid);
   QString const callerBase = Radio::base_callsign(callerCall);
-  QString const qsoPartnerCall = ui->dxCallEntry->text().trimmed();
+  QString const qsoPartnerCall = !m_hisCall.trimmed().isEmpty ()
+      ? m_hisCall.trimmed ()
+      : ui->dxCallEntry->text().trimmed();
   QString const qsoPartnerBase = Radio::base_callsign(qsoPartnerCall);
   QString const hisBase = Radio::base_callsign(m_hisCall);
   bool is_OK=false;
@@ -9157,8 +9161,12 @@ void MainWindow::auto_sequence (DecodedText const& message, unsigned start_toler
               && (message_words.at (3).contains (qsoPartnerBase)
                   || (!qsoPartnerCall.isEmpty ()
                       && message_words.at (3).contains (qsoPartnerCall)))));
+    bool const waitLockEnabled = m_config.Wait_features_enabled ()
+                                 && ui->cbAutoSeq
+                                 && ui->cbAutoSeq->isChecked ();
     bool const lockActiveQso = m_auto
-                               && m_QSOProgress >= REPORT
+                               && waitLockEnabled
+                               && m_QSOProgress >= REPLYING
                                && m_QSOProgress <= SIGNOFF
                                && !qsoPartnerBase.isEmpty ();
     if (lockActiveQso && directedToMe && !fromCurrentPartner) {
@@ -18799,6 +18807,8 @@ void MainWindow::on_cbAsyncDecode_toggled (bool checked)
 {
     if (checked && m_mode == "FT2") {
       m_asyncAudioPos = 0;
+      m_asyncMsgCount = 0;
+      std::memset (m_asyncMsg, 0, sizeof (m_asyncMsg));
       m_asyncDedupeSet.clear();
       m_asyncDedupeLastCleared = QDateTime::currentDateTimeUtc();
       m_pendingAsyncL2MessageLine.clear();
@@ -18812,6 +18822,8 @@ void MainWindow::on_cbAsyncDecode_toggled (bool checked)
     } else {
       m_asyncDecodeTimer.stop();
       m_bAsyncDecoding = false;
+      m_asyncMsgCount = 0;
+      std::memset (m_asyncMsg, 0, sizeof (m_asyncMsg));
       ui->labelAsyncL2Active->setVisible(false);
       m_pendingAsyncL2MessageLine.clear();
       m_pendingAsyncL2Call.clear();
@@ -18828,9 +18840,23 @@ void MainWindow::asyncDecodeDone()
     auto now = QDateTime::currentDateTimeUtc();
     auto hhmmss = now.toString("hhmmss");
 
-    for (int i = 0; m_asyncMsg[i][0] && i < 100; i++) {
-      QString raw = QString::fromLatin1(m_asyncMsg[i]);
-      m_asyncMsg[i][0] = 0;
+    int const maxRows = qBound (0, m_asyncMsgCount, 100);
+    for (int i = 0; i < maxRows; ++i) {
+      QByteArray rowBytes {m_asyncMsg[i], int (sizeof (m_asyncMsg[i]))};
+      std::memset (m_asyncMsg[i], 0, sizeof (m_asyncMsg[i]));
+
+      int end = rowBytes.size ();
+      while (end > 0) {
+        char const c = rowBytes.at (end - 1);
+        if (c == '\0' || c == ' ' || c == '\t' || c == '\r' || c == '\n') {
+          --end;
+          continue;
+        }
+        break;
+      }
+      if (end <= 0) continue;
+
+      QString raw = QString::fromLatin1 (rowBytes.constData (), end);
       if (raw.trimmed().isEmpty()) continue;
       QStringList rows = split_packed_decode_rows (raw);
       if (rows.isEmpty ()) continue;
@@ -18863,6 +18889,7 @@ void MainWindow::asyncDecodeDone()
         auto_sequence(decodedtext, ui->sbFtol->value(), ui->sbFtol->value());
       }
     }
+    m_asyncMsgCount = 0;
 }
 
 void MainWindow::on_ft8Button_clicked()

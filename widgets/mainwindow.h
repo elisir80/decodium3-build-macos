@@ -957,6 +957,7 @@ private:
   int m_asyncAudioPos {0};           // write position in ring buffer
   bool m_bAsyncDecoding {false};     // async decode in progress
   char m_asyncMsg[100][80];          // async decode results
+  int m_asyncMsgCount {0};           // number of valid async decode rows
   QSet<QString> m_asyncDedupeSet;    // deduplication within sliding window
   QDateTime m_asyncDedupeLastCleared;
   struct DecodeDedupeEntry

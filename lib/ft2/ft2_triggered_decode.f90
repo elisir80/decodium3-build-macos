@@ -281,6 +281,7 @@ subroutine ft2_triggered_decode(iwave, nqsoprogress, nfqso, nfa, nfb, &
         enddo
         if(idupe.eq.1) exit
 
+        if(ndecodes.ge.100) exit
         ndecodes = ndecodes + 1
         decodes(ndecodes) = message
 
@@ -295,6 +296,7 @@ subroutine ft2_triggered_decode(iwave, nqsoprogress, nfqso, nfa, nfb, &
 ! DT from known sync position
         xdt = xibest/1333.33 - 0.5
         annot = '  '
+        if(nout.ge.100) exit
         nout = nout + 1
         write(outlines(nout), 1001) nsnr, xdt, nint(f1), message, annot
 1001    format(i4,f5.1,i5,' ~ ',1x,a37,1x,a2)
