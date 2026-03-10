@@ -6,7 +6,7 @@ Notas especificas del fork macOS dentro de este repositorio.
 
 ## Contexto de release actual
 
-- Ultima release estable: `v1.4.2`
+- Ultima release estable: `v1.4.3`
 - Objetivos: macOS Tahoe ARM64, Sequoia ARM64, Sequoia Intel, Monterey Intel (experimental), Linux x86_64 AppImage
 
 ## Notas de build y runtime
@@ -21,18 +21,17 @@ Notas especificas del fork macOS dentro de este repositorio.
 - Este fork usa `SharedMemorySegment` con backend `mmap` en Darwin.
 - El flujo de release no depende de ajustes `sysctl` System V (`kern.sysv.shmmax/shmall`).
 
-### Resumen consolidado v1.4.2
+### Resumen consolidado v1.4.3
 
-- Peticiones LotW migradas de GET URL con credenciales a POST HTTPS.
-- Politica estricta de redirect para LotW con credenciales (HTTPS + host esperado).
-- Bind web remoto LAN/WAN ahora requiere token >= 12 caracteres.
-- Dialogo de ajustes Linux ajustado a geometria visible de pantalla.
-- Hardening decode async con stack/thread-pool dedicado y guardas anti-solapamiento.
-- Comportamiento de controles FT2 finalizado:
-  - Async L2 ON por defecto en FT2 y OFF automatico fuera de FT2,
-  - `Bloquear Freq Tx` y `Tx par/1°` ocultos en FT2.
-- Acciones `View -> Ionospheric Forecast` y `View -> DX Cluster` restauradas.
-- Eventos TX del dashboard remoto preservados correctamente durante refresh.
+- Hardening del crash Linux FT2 Async L2:
+  - limites estrictos de filas Fortran async (`ndecodes/nout <= 100`);
+  - parsing C++ de filas async seguro con longitud fija;
+  - reset explicito de buffers/counters async por ciclo decode y toggle.
+- Lock de QSO activo con Wait Features + AutoSeq reforzado:
+  - pareja runtime (`m_hisCall`) ahora es fuente primaria de lock;
+  - lock activo desde `REPLYING` hasta `SIGNOFF`.
+- El hardening v1.4.2 sigue incluido en v1.4.3:
+  LotW POST + redirects estrictos, token minimo para bind remoto, clamp de geometria Linux, visibilidad de controles FT2, restauracion de ventanas View y continuidad de eventos TX remotos.
 
 ### Artefactos de release
 
@@ -67,8 +66,8 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 ## Referencias
 
 - `CHANGELOG.md`
-- `RELEASE_NOTES_v1.4.2.md`
-- `doc/GITHUB_RELEASE_BODY_v1.4.2.md`
+- `RELEASE_NOTES_v1.4.3.md`
+- `doc/GITHUB_RELEASE_BODY_v1.4.3.md`
 - `doc/WEBAPP_SETUP_GUIDE.es.md`
 - `doc/WEBAPP_SETUP_GUIDE.en-GB.md`
 - `doc/WEBAPP_SETUP_GUIDE.it.md`

@@ -6,7 +6,7 @@ Note specifiche del fork macOS nel repository.
 
 ## Contesto release attuale
 
-- Ultima release stabile: `v1.4.2`
+- Ultima release stabile: `v1.4.3`
 - Target: macOS Tahoe ARM64, Sequoia ARM64, Sequoia Intel, Monterey Intel (sperimentale), Linux x86_64 AppImage
 
 ## Note build e runtime
@@ -21,18 +21,17 @@ Note specifiche del fork macOS nel repository.
 - Il fork usa `SharedMemorySegment` con backend `mmap` su Darwin.
 - Il flusso release non dipende da tuning `sysctl` System V (`kern.sysv.shmmax/shmall`).
 
-### Evidenze consolidate v1.4.2
+### Evidenze consolidate v1.4.3
 
-- Richieste LotW migrate da GET URL con credenziali a POST HTTPS.
-- Redirect policy stretta per richieste LotW con credenziali (HTTPS + host atteso).
-- Bind web remoto LAN/WAN ora richiede token >= 12 caratteri.
-- Dialog impostazioni Linux clampato alla geometria schermo visibile.
-- Hardening decode async con stack/thread-pool dedicato e guardie anti-overlap.
-- Comportamento controlli FT2 finalizzato:
-  - Async L2 ON di default in FT2 e OFF automatico fuori FT2,
-  - `Blocca la Freq Tx` e `Tx pari/1°` nascosti in FT2.
-- Azioni `View -> Ionospheric Forecast` e `View -> DX Cluster` ripristinate.
-- Eventi TX dashboard remota preservati correttamente durante i refresh.
+- Hardening crash Linux FT2 Async L2:
+  - limiti rigidi output Fortran async (`ndecodes/nout <= 100`);
+  - parsing C++ righe async sicuro a lunghezza fissa;
+  - reset esplicito buffer async/contatori su ciclo decode e toggle.
+- Lock QSO attivo con Wait Features + AutoSeq irrigidito:
+  - partner runtime (`m_hisCall`) usato come sorgente lock primaria;
+  - lock attivo da `REPLYING` fino a `SIGNOFF`.
+- L'hardening v1.4.2 resta incluso in v1.4.3:
+  LotW POST + redirect stretti, token minimo bind remoto, clamp geometria Linux, visibilita' controlli FT2, ripristino finestre View, continuita' eventi TX dashboard remota.
 
 ### Artifact release
 
@@ -67,8 +66,8 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 ## Riferimenti
 
 - `CHANGELOG.md`
-- `RELEASE_NOTES_v1.4.2.md`
-- `doc/GITHUB_RELEASE_BODY_v1.4.2.md`
+- `RELEASE_NOTES_v1.4.3.md`
+- `doc/GITHUB_RELEASE_BODY_v1.4.3.md`
 - `doc/WEBAPP_SETUP_GUIDE.it.md`
 - `doc/WEBAPP_SETUP_GUIDE.en-GB.md`
 - `doc/WEBAPP_SETUP_GUIDE.es.md`

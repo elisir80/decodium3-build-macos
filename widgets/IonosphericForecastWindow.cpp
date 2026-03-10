@@ -32,6 +32,33 @@ QUrl const kSolarXmlUrl {"https://www.hamqsl.com/solarxml.php"};
 QUrl const kSolarHtmlUrl {"https://www.hamqsl.com/solar.html"};
 QUrl const kSolarSunUrl {"https://www.hamqsl.com/solarsun.php"};
 int const kRefreshMs = 15 * 60 * 1000;
+qint64 const kMaxSolarXmlReplyBytes = 256 * 1024;
+qint64 const kMaxSolarImageReplyBytes = 2 * 1024 * 1024;
+
+QByteArray read_reply_payload_limited (QNetworkReply * reply, qint64 max_bytes, QString * error = nullptr)
+{
+  if (!reply)
+    {
+      if (error) *error = QObject::tr ("empty reply");
+      return {};
+    }
+
+  auto const length_header = reply->header (QNetworkRequest::ContentLengthHeader);
+  if (length_header.isValid () && length_header.toLongLong () > max_bytes)
+    {
+      if (error) *error = QObject::tr ("reply too large");
+      return {};
+    }
+
+  auto const payload = reply->read (max_bytes + 1);
+  if (payload.size () > max_bytes || !reply->atEnd ())
+    {
+      if (error) *error = QObject::tr ("reply exceeds limit");
+      return {};
+    }
+
+  return payload;
+}
 }
 
 IonosphericForecastWindow::IonosphericForecastWindow(QSettings * settings, QWidget * parent)
@@ -181,12 +208,27 @@ void IonosphericForecastWindow::onNetworkFinished(QNetworkReply * reply)
   if (kind == "sun")
     {
       auto err = reply->error();
-      QByteArray payload = reply->readAll();
+      QString payloadError;
+      auto payload = (err == QNetworkReply::NoError)
+          ? read_reply_payload_limited(reply, kMaxSolarImageReplyBytes, &payloadError)
+          : QByteArray {};
       reply->deleteLater();
 
       if (err == QNetworkReply::NoError)
         {
-          updateSunImage(payload);
+          if (payloadError.isEmpty ())
+            {
+              updateSunImage(payload);
+            }
+          else
+            {
+              hasSunImage_ = false;
+              sunImageDataUri_.clear();
+              if (hasSnapshot_)
+                {
+                  reportView_->setHtml(buildHtml(lastSnapshot_));
+                }
+            }
         }
       else if (!hasSunImage_)
         {
@@ -208,14 +250,22 @@ void IonosphericForecastWindow::onNetworkFinished(QNetworkReply * reply)
       return;
     }
 
-  QByteArray payload = reply->readAll();
   auto err = reply->error();
   auto errText = reply->errorString();
+  QString payloadError;
+  auto payload = (err == QNetworkReply::NoError)
+      ? read_reply_payload_limited(reply, kMaxSolarXmlReplyBytes, &payloadError)
+      : QByteArray {};
   reply->deleteLater();
 
   if (err != QNetworkReply::NoError)
     {
       setStatus(tr("Update failed: %1").arg(errText), true);
+      return;
+    }
+  if (!payloadError.isEmpty())
+    {
+      setStatus(tr("Update failed: %1").arg(payloadError), true);
       return;
     }
 

@@ -29,6 +29,40 @@ namespace
 {
   char const * samples_dir_name = "samples";
   QString const contents_file_name = "contents_" + version (false) + ".json";
+
+  bool is_safe_entry_name (QString const& name)
+  {
+    if (name.isEmpty ())
+      {
+        return false;
+      }
+
+    auto const normalized = QDir::fromNativeSeparators (name).trimmed ();
+    if (normalized.isEmpty () || normalized == "." || normalized == "..")
+      {
+        return false;
+      }
+
+    return !normalized.contains (QRegularExpression {R"([/:;\\])"});
+  }
+
+  bool path_within_samples_root (QDir const& root_dir, QString const& relative_path, QString * absolute_path = nullptr)
+  {
+    auto const samples_root = QDir::cleanPath (root_dir.absoluteFilePath (samples_dir_name));
+    auto const candidate = QDir::cleanPath (root_dir.absoluteFilePath (relative_path));
+    auto const prefix = samples_root + QDir::separator ();
+
+    if (candidate != samples_root && !candidate.startsWith (prefix))
+      {
+        return false;
+      }
+
+    if (absolute_path)
+      {
+        *absolute_path = candidate;
+      }
+    return true;
+  }
 }
 
 Directory::Directory (Configuration const * configuration
@@ -169,16 +203,25 @@ void Directory::parse_entries (QJsonArray const& entries, QDir const& dir, QTree
             {
               auto const& entry = value.toObject ();
               auto const& name = entry["name"].toString ();
-              if (name.size () && !name.contains (QRegularExpression {R"([/:;])"}))
+              if (is_safe_entry_name (name))
                 {
                   auto const& type = entry["type"].toString ();
+                  auto const relative_path = QDir::cleanPath (QDir::fromNativeSeparators (dir.filePath (name)));
+                  QString absolute_path;
+                  if (!path_within_samples_root (root_dir_, relative_path, &absolute_path))
+                    {
+                      MessageBox::warning_message (this, tr ("JSON Error")
+                                                   , tr ("Contents entries must stay within \"%1\"")
+                                                   .arg (samples_dir_name));
+                      continue;
+                    }
                   if ("file" == type)
                     {
-                      QUrl url {url_root_.resolved (dir.filePath (name))};
+                      QUrl url {url_root_.resolved (QDir::fromNativeSeparators (relative_path))};
                       if (url.isValid ())
                         {
                           auto node = new FileNode {parent, network_manager_
-                                                    , QDir {root_dir_.filePath (dir.path ())}.absoluteFilePath (name)
+                                                    , absolute_path
                                                     , url, http_only_};
                           FileNode::sync_blocker b {node};
                           node->setIcon (0, file_icon_);
@@ -200,9 +243,7 @@ void Directory::parse_entries (QJsonArray const& entries, QDir const& dir, QTree
                           auto const& entries = entry["entries"];
                           if (entries.isArray ())
                             {
-                              parse_entries (entries.toArray ()
-                                             , QDir {root_dir_.relativeFilePath (dir.path ())}.filePath (name)
-                                             , node);
+                              parse_entries (entries.toArray (), QDir {relative_path}, node);
                             }
                           else
                             {

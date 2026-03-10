@@ -11,6 +11,45 @@
 #include "qt_helpers.hpp"
 #include "Logger.hpp"
 
+namespace
+{
+bool is_head_operation (QNetworkReply const * reply)
+{
+  return reply && reply->operation () == QNetworkAccessManager::HeadOperation;
+}
+
+int http_status_code (QNetworkReply const * reply)
+{
+  return reply ? reply->attribute (QNetworkRequest::HttpStatusCodeAttribute).toInt () : 0;
+}
+
+bool should_retry_head_with_get (QNetworkReply const * reply)
+{
+  if (!is_head_operation (reply))
+    {
+      return false;
+    }
+
+  auto const status = http_status_code (reply);
+  if (status == 405 || status == 501)
+    {
+      return true;
+    }
+
+  switch (reply->error ())
+    {
+    case QNetworkReply::ContentOperationNotPermittedError:
+    case QNetworkReply::ProtocolInvalidOperationError:
+      return true;
+
+    default:
+      break;
+    }
+
+  return false;
+}
+}
+
 FileDownload::FileDownload() : QObject(nullptr)
 {
   redirect_count_ = 0;
@@ -23,16 +62,48 @@ FileDownload::~FileDownload()
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
 void FileDownload::errorOccurred(QNetworkReply::NetworkError code)
 {
-  LOG_INFO(QString{"FileDownload [%1]: errorOccurred %2 -> %3"}.arg(user_agent_).arg(code).arg(reply_->errorString()));
-  Q_EMIT error (reply_->errorString ());
+  auto * failed_reply = qobject_cast<QNetworkReply *> (sender ());
+  if (!failed_reply)
+    {
+      failed_reply = reply_;
+    }
+  if (!failed_reply)
+    {
+      return;
+    }
+  if (should_retry_head_with_get (failed_reply))
+    {
+      LOG_INFO(QString{"FileDownload [%1]: HEAD unsupported for %2, retrying with GET"}
+               .arg(user_agent_)
+               .arg(failed_reply->url().toString()));
+      return;
+    }
+  LOG_INFO(QString{"FileDownload [%1]: errorOccurred %2 -> %3"}.arg(user_agent_).arg(code).arg(failed_reply->errorString()));
+  Q_EMIT error (failed_reply->errorString ());
   destfile_.cancelWriting ();
   destfile_.commit ();
 }
 #else
 void FileDownload::obsoleteError()
 {
-  LOG_INFO(QString{"FileDownload [%1]: error -> %2"}.arg(user_agent_).arg(reply_->errorString()));
-  Q_EMIT error (reply_->errorString ());
+  auto * failed_reply = qobject_cast<QNetworkReply *> (sender ());
+  if (!failed_reply)
+    {
+      failed_reply = reply_;
+    }
+  if (!failed_reply)
+    {
+      return;
+    }
+  if (should_retry_head_with_get (failed_reply))
+    {
+      LOG_INFO(QString{"FileDownload [%1]: HEAD unsupported for %2, retrying with GET"}
+               .arg(user_agent_)
+               .arg(failed_reply->url().toString()));
+      return;
+    }
+  LOG_INFO(QString{"FileDownload [%1]: error -> %2"}.arg(user_agent_).arg(failed_reply->errorString()));
+  Q_EMIT error (failed_reply->errorString ());
   destfile_.cancelWriting ();
   destfile_.commit ();
 }
@@ -48,8 +119,17 @@ void FileDownload::configure(QNetworkAccessManager *network_manager, const QStri
 
 void FileDownload::store()
 {
+  auto * source_reply = qobject_cast<QNetworkReply *> (sender ());
+  if (!source_reply)
+    {
+      source_reply = reply_;
+    }
+  if (!source_reply)
+    {
+      return;
+    }
   if (destfile_.isOpen())
-    destfile_.write (reply_->read (reply_->bytesAvailable ()));
+    destfile_.write (source_reply->read (source_reply->bytesAvailable ()));
   else
     LOG_INFO(QString{ "FileDownload [%1]: file is not open."}.arg(user_agent_));
 }
@@ -60,15 +140,26 @@ void FileDownload::replyComplete()
   QDir tmpdir_(destination_file.absoluteFilePath());
 
   LOG_DEBUG(QString{ "FileDownload [%1]: replyComplete"}.arg(user_agent_));
-  if (!reply_)
+  QPointer<QNetworkReply> finished_reply {qobject_cast<QNetworkReply *> (sender ())};
+  if (!finished_reply)
+    {
+      finished_reply = reply_;
+    }
+  if (!finished_reply)
   {
     Q_EMIT load_finished ();
     return;           // we probably deleted it in an earlier call
   }
+  if (reply_ == finished_reply)
+    {
+      reply_.clear ();
+    }
 
-  QUrl redirect_url {reply_->attribute (QNetworkRequest::RedirectionTargetAttribute).toUrl ()};
+  QUrl const redirect_url {finished_reply->attribute (QNetworkRequest::RedirectionTargetAttribute).toUrl ()};
+  QUrl const finished_url = finished_reply->url ();
+  auto const reply_error = finished_reply->error ();
 
-  if (reply_->error () == QNetworkReply::NoError && !redirect_url.isEmpty ())
+  if (reply_error == QNetworkReply::NoError && !redirect_url.isEmpty ())
   {
     if ("https" == redirect_url.scheme () && !QSslSocket::supportsSsl ())
     {
@@ -80,7 +171,7 @@ void FileDownload::replyComplete()
     else if (++redirect_count_ < 10) // maintain sanity
     {
       // follow redirect
-      download (reply_->url ().resolved (redirect_url));
+      download (finished_url.resolved (redirect_url));
     }
     else
     {
@@ -90,16 +181,21 @@ void FileDownload::replyComplete()
       Q_EMIT load_finished ();
     }
   }
-  else if (reply_->error () != QNetworkReply::NoError)
+  else if (!url_valid_ && should_retry_head_with_get (finished_reply.data ()))
+  {
+    url_valid_ = true;
+    download (finished_url);
+  }
+  else if (reply_error != QNetworkReply::NoError)
   {
     destfile_.cancelWriting();
     destfile_.commit();
     url_valid_ = false;     // reset
     // report errors that are not due to abort
-    if (QNetworkReply::OperationCanceledError != reply_->error ())
+    if (QNetworkReply::OperationCanceledError != reply_error)
     {
       Q_EMIT download_error (tr ("Network Error:\n%1")
-                                              .arg (reply_->errorString ()));
+                                              .arg (finished_reply->errorString ()));
     }
     Q_EMIT load_finished ();
   }
@@ -109,7 +205,7 @@ void FileDownload::replyComplete()
       {
         // now get the body content
         url_valid_ = true;
-        download (reply_->url ().resolved (redirect_url));
+        download (finished_url);
       }
       else // the body has completed. Save it.
       {
@@ -122,9 +218,9 @@ void FileDownload::replyComplete()
       }
   }
 
-  if (reply_ && reply_->isFinished ())
+  if (finished_reply && finished_reply->isFinished ())
   {
-    reply_->deleteLater ();
+    finished_reply->deleteLater ();
   }
 
 }
@@ -219,15 +315,28 @@ void FileDownload::download(QUrl qurl)
   QDir tmpdir{};
   if (!tmpdir.mkpath(tmpfile_path))
   {
-      LOG_INFO(QString{"FileDownload [%1]: Directory %2 does not exist"}.arg(user_agent_).arg(tmpfile_path).arg(
-              destfile_.errorString()));
+      auto const reason = tr("File System Error:\nCannot create directory:\n%1").arg(tmpfile_path);
+      LOG_INFO(QString{"FileDownload [%1]: %2"}.arg(user_agent_).arg(reason));
+      if (reply_)
+        {
+          reply_->abort ();
+        }
+      Q_EMIT error (reason);
+      return;
   }
   
   if (url_valid_) {
       destfile_.setFileName(destination_file.absoluteFilePath());
       if (!destfile_.open(QSaveFile::WriteOnly | QIODevice::WriteOnly)) {
-          LOG_INFO(QString{"FileDownload [%1]: Unable to open %2: %3"}.arg(user_agent_).arg(destfile_.fileName()).arg(
-                  destfile_.errorString()));
+          auto const reason = tr("File System Error:\nCannot open file:\n%1\nError: %2")
+                                  .arg(destfile_.fileName())
+                                  .arg(destfile_.errorString());
+          LOG_INFO(QString{"FileDownload [%1]: %2"}.arg(user_agent_).arg(reason));
+          if (reply_)
+            {
+              reply_->abort ();
+            }
+          Q_EMIT error (reason);
           return;
       }
   }
@@ -236,7 +345,7 @@ void FileDownload::download(QUrl qurl)
 void FileDownload::downloadProgress(qint64 received, qint64 total)
 {
   LOG_DEBUG(QString{"FileDownload: [%1] Progress %2 from %3, total %4, so far %5"}.arg(user_agent_).arg(destination_filename_).arg(source_url_).arg(total).arg(received));
-  Q_EMIT progress(QString{"%4 bytes downloaded"}.arg(received));
+  Q_EMIT progress(QString{"%1 bytes downloaded"}.arg(received));
 }
 
 void FileDownload::abort ()

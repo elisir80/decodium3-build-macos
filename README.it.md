@@ -1,28 +1,23 @@
-# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.4.2 (Italiano)
+# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.4.3 (Italiano)
 
 Per la versione bilingue completa (English + Italiano), vedere [README.md](README.md).
 
-## Sintesi italiana (v1.4.2)
+## Sintesi italiana (v1.4.3)
 
-Questa release copre il ciclo `v1.4.1 -> v1.4.2`:
+Questa release copre il ciclo `v1.4.2 -> v1.4.3`:
 
-- Hardening sicurezza LotW:
-  - richieste LotW con credenziali spostate da GET URL a POST HTTPS,
-  - rimozione logging URL con credenziali,
-  - redirect policy stretta per richieste con credenziali (HTTPS + host atteso).
-- Hardening web remota:
-  - bind LAN/WAN rifiutato con token sotto 12 caratteri,
-  - avviso esplicito su traffico HTTP/WS in chiaro quando il bind e' esposto.
-- Fix stabilita' Linux:
-  - dialog impostazioni clampato alla geometria schermo (pulsanti sempre raggiungibili),
-  - decode async su thread pool dedicato con stack controllato + guardie anti-overlap.
-- Coerenza controlli FT2:
-  - Async L2 ON di default entrando in FT2 e OFF automatico fuori FT2,
-  - `Blocca la Freq Tx` e `Tx pari/1°` nascosti (e forzati OFF) in FT2.
-- Ripristino finestre strumenti:
-  - azioni `View -> Ionospheric Forecast` e `View -> DX Cluster` ripristinate.
-- Dashboard web RX/TX:
-  - eventi TX preservati nei refresh e prima transizione TX ora mostrata correttamente.
+- Hardening crash Linux FT2 Async L2:
+  - aggiunti limiti rigidi output Fortran (`ndecodes/nout <= 100`) nel decode triggered,
+  - parsing righe async C++ reso sicuro a lunghezza fissa,
+  - reset esplicito buffer async e contatori a ogni ciclo decode/toggle.
+- Protezione QSO attivo con Wait Features + AutoSeq:
+  - lock partner ora usa con priorita' il partner runtime (`m_hisCall`),
+  - lock attivato prima (`REPLYING` fino a `SIGNOFF`) quando Wait Features + AutoSeq sono attivi.
+- Comportamento runtime:
+  - eliminati casi di testo "sporco" e over-read al primo decode con Async L2 su Linux.
+- Allineamento release/documentazione:
+  - metadati fork e documentazione aggiornati a `v1.4.3`.
+- Resta incluso tutto l'hardening `v1.4.2` (LotW POST + redirect policy, token minimo bind remoto, regole visibilita' controlli FT2, restore finestre strumenti/mappa, safeguard geometria Linux).
 - `.pkg` non necessario: release solo DMG/ZIP/SHA256 (macOS) e AppImage/SHA256 (Linux).
 
 ## Target release
@@ -70,9 +65,9 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 
 ## Documentazione
 
-- [RELEASE_NOTES_v1.4.2.md](RELEASE_NOTES_v1.4.2.md)
+- [RELEASE_NOTES_v1.4.3.md](RELEASE_NOTES_v1.4.3.md)
 - [CHANGELOG.md](CHANGELOG.md)
-- [doc/GITHUB_RELEASE_BODY_v1.4.2.md](doc/GITHUB_RELEASE_BODY_v1.4.2.md)
+- [doc/GITHUB_RELEASE_BODY_v1.4.3.md](doc/GITHUB_RELEASE_BODY_v1.4.3.md)
 - [doc/README.it.md](doc/README.it.md)
 - [doc/WEBAPP_SETUP_GUIDE.it.md](doc/WEBAPP_SETUP_GUIDE.it.md)
 - [doc/WEBAPP_SETUP_GUIDE.en-GB.md](doc/WEBAPP_SETUP_GUIDE.en-GB.md)

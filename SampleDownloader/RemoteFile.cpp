@@ -9,6 +9,45 @@
 
 #include "moc_RemoteFile.cpp"
 
+namespace
+{
+bool is_head_operation (QNetworkReply const * reply)
+{
+  return reply && reply->operation () == QNetworkAccessManager::HeadOperation;
+}
+
+int http_status_code (QNetworkReply const * reply)
+{
+  return reply ? reply->attribute (QNetworkRequest::HttpStatusCodeAttribute).toInt () : 0;
+}
+
+bool should_retry_head_with_get (QNetworkReply const * reply)
+{
+  if (!is_head_operation (reply))
+    {
+      return false;
+    }
+
+  auto const status = http_status_code (reply);
+  if (status == 405 || status == 501)
+    {
+      return true;
+    }
+
+  switch (reply->error ())
+    {
+    case QNetworkReply::ContentOperationNotPermittedError:
+    case QNetworkReply::ProtocolInvalidOperationError:
+      return true;
+
+    default:
+      break;
+    }
+
+  return false;
+}
+}
+
 RemoteFile::RemoteFile (ListenerInterface * listener, QNetworkAccessManager * network_manager
                         , QString const& local_file_path, bool http_only, QObject * parent)
   : QObject {parent}
@@ -195,17 +234,32 @@ void RemoteFile::abort ()
 
 void RemoteFile::reply_finished ()
 {
-  if (!reply_) return;          // we probably deleted it in an
-                                // earlier call
-  QUrl redirect_url {reply_->attribute (QNetworkRequest::RedirectionTargetAttribute).toUrl ()};
-  if (reply_->error () == QNetworkReply::NoError && !redirect_url.isEmpty ())
+  QPointer<QNetworkReply> finished_reply {qobject_cast<QNetworkReply *> (sender ())};
+  if (!finished_reply)
+    {
+      finished_reply = reply_;
+    }
+  if (!finished_reply)
+    {
+      return;                   // we probably deleted it in an earlier call
+    }
+  if (reply_ == finished_reply)
+    {
+      reply_.clear ();
+    }
+
+  QUrl const redirect_url {finished_reply->attribute (QNetworkRequest::RedirectionTargetAttribute).toUrl ()};
+  QUrl const finished_url = finished_reply->url ();
+  auto const reply_error = finished_reply->error ();
+
+  if (reply_error == QNetworkReply::NoError && !redirect_url.isEmpty ())
     {
       if (!listener_ || listener_->redirect_request (redirect_url))
         {
           if (++redirect_count_ < 10) // maintain sanity
             {
               // follow redirect
-              download (reply_->url ().resolved (redirect_url));
+              download (finished_url.resolved (redirect_url));
             }
           else
             {
@@ -231,7 +285,12 @@ void RemoteFile::reply_finished ()
           is_valid_ = false;    // reset
         }
     }
-  else if (reply_->error () != QNetworkReply::NoError)
+  else if (!is_valid_ && should_retry_head_with_get (finished_reply.data ()))
+    {
+      is_valid_ = true;
+      download (finished_url);
+    }
+  else if (reply_error != QNetworkReply::NoError)
     {
       file_.cancelWriting ();
       file_.commit ();
@@ -241,9 +300,9 @@ void RemoteFile::reply_finished ()
         }
       is_valid_ = false;        // reset
       // report errors that are not due to abort
-      if (listener_ && QNetworkReply::OperationCanceledError != reply_->error ())
+      if (listener_ && QNetworkReply::OperationCanceledError != reply_error)
         {
-          listener_->error (tr ("Network Error"), reply_->errorString ());
+          listener_->error (tr ("Network Error"), finished_reply->errorString ());
         }
     }
   else
@@ -270,7 +329,7 @@ void RemoteFile::reply_finished ()
             {
               // now get the body content
               is_valid_ = true;
-              download (reply_->url ().resolved (redirect_url));
+              download (finished_url);
             }
           else
             {
@@ -282,14 +341,23 @@ void RemoteFile::reply_finished ()
             }
         }
     }
-  if (reply_ && reply_->isFinished ())
+  if (finished_reply && finished_reply->isFinished ())
     {
-      reply_->deleteLater ();
+      finished_reply->deleteLater ();
     }
 }
 
 void RemoteFile::store ()
 {
+  auto * source_reply = qobject_cast<QNetworkReply *> (sender ());
+  if (!source_reply)
+    {
+      source_reply = reply_;
+    }
+  if (!source_reply)
+    {
+      return;
+    }
   if (is_valid_)
     {
       if (!file_.isOpen ())
@@ -322,7 +390,7 @@ void RemoteFile::store ()
                 }
             }
         }
-      if (file_.write (reply_->read (reply_->bytesAvailable ())) < 0)
+      if (file_.write (source_reply->read (source_reply->bytesAvailable ())) < 0)
         {
           abort ();
           if (listener_)

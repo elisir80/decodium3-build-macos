@@ -24,6 +24,10 @@
 
 namespace
 {
+constexpr qint64 kMaxHttpHeaderBytes = 8 * 1024;
+constexpr qint64 kMaxHttpBodyBytes = 64 * 1024;
+constexpr int kHttpConnectionTimeoutMs = 10000;
+
 QString normalize_call(QString call)
 {
   call = call.trimmed().toUpper();
@@ -2371,6 +2375,7 @@ void RemoteCommandServer::sendHttpJson(QTcpSocket * socket, int statusCode, QJso
   static const QHash<int, QByteArray> statusText {
     {200, "OK"},
     {400, "Bad Request"},
+    {408, "Request Timeout"},
     {401, "Unauthorized"},
     {404, "Not Found"},
     {405, "Method Not Allowed"},
@@ -2448,6 +2453,25 @@ void RemoteCommandServer::onHttpNewConnection()
         }
 
       httpStates_.insert(socket, HttpConnectionState {});
+      socket->setReadBufferSize(kMaxHttpHeaderBytes + kMaxHttpBodyBytes);
+      QPointer<QTcpSocket> guarded_socket {socket};
+      QTimer::singleShot(kHttpConnectionTimeoutMs, this, [this, guarded_socket] {
+          if (!guarded_socket)
+            {
+              return;
+            }
+          auto it = httpStates_.find(guarded_socket.data());
+          if (it == httpStates_.end())
+            {
+              return;
+            }
+          auto const& state = it.value();
+          if (!state.headersParsed || state.buffer.size() < state.contentLength)
+            {
+              sendHttpJson(guarded_socket.data(), 408, QJsonObject {{"error", "request_timeout"}});
+              guarded_socket->disconnectFromHost();
+            }
+        });
       connect(socket, &QTcpSocket::readyRead, this, &RemoteCommandServer::onHttpSocketReadyRead);
       connect(socket, &QTcpSocket::disconnected, this, &RemoteCommandServer::onHttpSocketDisconnected);
     }
@@ -2486,6 +2510,17 @@ void RemoteCommandServer::onHttpSocketReadyRead()
       int headerEnd = state.buffer.indexOf("\r\n\r\n");
       if (headerEnd < 0)
         {
+          if (state.buffer.size() > kMaxHttpHeaderBytes)
+            {
+              sendHttpJson(socket, 413, QJsonObject {{"error", "headers_too_large"}});
+              socket->disconnectFromHost();
+            }
+          return;
+        }
+      if (headerEnd + 4 > kMaxHttpHeaderBytes)
+        {
+          sendHttpJson(socket, 413, QJsonObject {{"error", "headers_too_large"}});
+          socket->disconnectFromHost();
           return;
         }
 
@@ -2535,7 +2570,7 @@ void RemoteCommandServer::onHttpSocketReadyRead()
         {
           state.contentLength = 0;
         }
-      if (state.contentLength > 65536)
+      if (state.contentLength > kMaxHttpBodyBytes)
         {
           sendHttpJson(socket, 413, QJsonObject {{"error", "payload_too_large"}});
           socket->disconnectFromHost();

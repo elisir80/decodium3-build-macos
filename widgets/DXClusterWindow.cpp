@@ -32,6 +32,32 @@ namespace
 QUrl const kSourcePage {"https://www.hamqth.com/developers.php#dxcluster"};
 int const kRefreshMs = 15 * 1000;
 int const kMaxSpots = 120;
+qint64 const kMaxDxClusterReplyBytes = 256 * 1024;
+
+QByteArray read_reply_payload_limited (QNetworkReply * reply, qint64 max_bytes, QString * error = nullptr)
+{
+  if (!reply)
+    {
+      if (error) *error = QObject::tr ("empty reply");
+      return {};
+    }
+
+  auto const length_header = reply->header (QNetworkRequest::ContentLengthHeader);
+  if (length_header.isValid () && length_header.toLongLong () > max_bytes)
+    {
+      if (error) *error = QObject::tr ("reply too large");
+      return {};
+    }
+
+  auto const payload = reply->read (max_bytes + 1);
+  if (payload.size () > max_bytes || !reply->atEnd ())
+    {
+      if (error) *error = QObject::tr ("reply exceeds limit");
+      return {};
+    }
+
+  return payload;
+}
 }
 
 DXClusterWindow::DXClusterWindow(QSettings * settings, QWidget * parent)
@@ -483,12 +509,15 @@ void DXClusterWindow::onNetworkFinished(QNetworkReply * reply)
     {
       setStatus(tr("Update failed: empty network reply"), true);
       return;
-    }
+  }
 
   auto replyBand = reply->property("band").toString();
-  auto payload = reply->readAll();
   auto err = reply->error();
   auto errText = reply->errorString();
+  QString payloadError;
+  auto payload = (err == QNetworkReply::NoError)
+      ? read_reply_payload_limited(reply, kMaxDxClusterReplyBytes, &payloadError)
+      : QByteArray {};
   reply->deleteLater();
 
   requestInFlight_ = false;
@@ -502,6 +531,11 @@ void DXClusterWindow::onNetworkFinished(QNetworkReply * reply)
   if (err != QNetworkReply::NoError)
     {
       setStatus(tr("Update failed: %1").arg(errText), true);
+      return;
+    }
+  if (!payloadError.isEmpty())
+    {
+      setStatus(tr("Update failed: %1").arg(payloadError), true);
       return;
     }
 

@@ -1,5 +1,73 @@
 # Changelog / Registro Modifiche
 
+## [1.4.3] - 2026-03-10
+
+### English
+
+Release focused on FT2 Async L2 Linux crash hardening and active-QSO protection logic with Wait Features + AutoSeq.
+
+#### Changed
+
+- Updated fork/release/documentation/workflow defaults to `v1.4.3` (EN/IT/ES).
+- Added strict async decode output bounds in FT2 triggered Fortran path (`ndecodes/nout <= 100`).
+- Hardened async result handoff parser in C++:
+  - fixed-length row parsing,
+  - explicit buffer clearing,
+  - explicit valid-row counter handling.
+- Tightened Wait Features + AutoSeq lock logic:
+  - active partner resolution prioritizes runtime partner (`m_hisCall`),
+  - lock window starts from `REPLYING` and runs through `SIGNOFF` when enabled.
+
+#### Fixed
+
+- Fixed Linux FT2 Async L2 crash pattern at first decode under heavy/noisy traffic.
+- Fixed occasional garbage decode text caused by unsafe implicit C-string interpretation of fixed-length async rows.
+- Reduced risk of unintended transmit takeover during ongoing QSO when Wait Features + AutoSeq are active.
+
+### Italiano
+
+Release focalizzata su hardening crash Linux FT2 Async L2 e protezione QSO attivo con Wait Features + AutoSeq.
+
+#### Modificato
+
+- Allineati default fork/release/documentazione/workflow a `v1.4.3` (EN/IT/ES).
+- Aggiunti limiti rigidi output decode async nel percorso Fortran FT2 triggered (`ndecodes/nout <= 100`).
+- Hardening parser C++ handoff risultati async:
+  - parsing righe a lunghezza fissa,
+  - pulizia esplicita buffer,
+  - gestione esplicita contatore righe valide.
+- Irrigidita logica lock Wait Features + AutoSeq:
+  - risoluzione partner attivo con priorita' a partner runtime (`m_hisCall`),
+  - finestra lock da `REPLYING` a `SIGNOFF` quando abilitata.
+
+#### Corretto
+
+- Corretto pattern crash Linux FT2 Async L2 al primo decode in presenza di traffico intenso/rumoroso.
+- Corretti testi decode "sporchi" dovuti a interpretazione implicita non sicura C-string su righe async a lunghezza fissa.
+- Ridotto rischio takeover TX non voluto su QSO in corso con Wait Features + AutoSeq attivi.
+
+### Espanol
+
+Release centrada en hardening del crash Linux FT2 Async L2 y proteccion de QSO activo con Wait Features + AutoSeq.
+
+#### Cambios
+
+- Defaults de fork/release/docs/workflows alineados a `v1.4.3` (EN/IT/ES).
+- Anadidos limites estrictos en salida decode async del flujo Fortran FT2 triggered (`ndecodes/nout <= 100`).
+- Hardening del parser C++ de handoff async:
+  - parsing de filas de longitud fija,
+  - limpieza explicita de buffers,
+  - manejo explicito de contador de filas validas.
+- Reforzada logica lock Wait Features + AutoSeq:
+  - resolucion de pareja activa prioriza pareja runtime (`m_hisCall`),
+  - ventana lock desde `REPLYING` hasta `SIGNOFF` cuando esta habilitada.
+
+#### Corregido
+
+- Corregido patron de crash Linux FT2 Async L2 en el primer decode bajo trafico intenso/ruidoso.
+- Corregido texto decode basura por interpretacion implicita insegura de C-string en filas async de longitud fija.
+- Reducido riesgo de takeover TX no deseado durante QSO en curso con Wait Features + AutoSeq activos.
+
 ## [1.4.2] - 2026-03-10
 
 ### English

@@ -35,6 +35,13 @@ namespace
   using dictionary = QHash<QString, QDate>;
   constexpr qint64 kMaxCloudlogReplyBytes = 64 * 1024;
 
+  enum class CloudlogApiKeyState
+  {
+    invalid,
+    read_only,
+    writable,
+  };
+
   QUrl ensure_https_cloudlog_url (QString base, QString const& endpoint_path, QString * error = nullptr)
   {
     base = base.trimmed ();
@@ -59,6 +66,69 @@ namespace
     endpoint.setScheme ("https");
     endpoint.setPath ("/index.php/api/" + endpoint_path);
     return endpoint;
+  }
+
+  QString read_limited_reply (QNetworkReply * reply, QString * error = nullptr)
+  {
+    if (!reply)
+      {
+        if (error) *error = QObject::tr ("empty reply");
+        return {};
+      }
+
+    auto const length_header = reply->header (QNetworkRequest::ContentLengthHeader);
+    if (length_header.isValid () && length_header.toLongLong () > kMaxCloudlogReplyBytes)
+      {
+        if (error) *error = QObject::tr ("reply too large");
+        return {};
+      }
+
+    auto const body = reply->read (kMaxCloudlogReplyBytes + 1);
+    if (body.size () > kMaxCloudlogReplyBytes || !reply->atEnd ())
+      {
+        if (error) *error = QObject::tr ("reply exceeds limit");
+        return {};
+      }
+
+    return QString::fromUtf8 (body);
+  }
+
+  CloudlogApiKeyState parse_cloudlog_api_test_reply (QString const& result)
+  {
+    if (result.contains ("<status>Valid</status>", Qt::CaseInsensitive))
+      {
+        return result.contains ("<rights>rw</rights>", Qt::CaseInsensitive)
+            ? CloudlogApiKeyState::writable
+            : CloudlogApiKeyState::read_only;
+      }
+
+    auto const document = QJsonDocument::fromJson (result.toUtf8 ());
+    if (document.isObject ())
+      {
+        auto const object = document.object ();
+        auto const status = object.value ("status").toString ().trimmed ().toLower ();
+        auto const reason = object.value ("reason").toString ().trimmed ().toLower ();
+
+        if (status == "ok" || status == "success")
+          {
+            return CloudlogApiKeyState::writable;
+          }
+        if (reason.contains ("missing api key"))
+          {
+            return CloudlogApiKeyState::invalid;
+          }
+        if (reason.contains ("station profile id"))
+          {
+            return CloudlogApiKeyState::writable;
+          }
+      }
+
+    if (result.contains ("station profile id", Qt::CaseInsensitive))
+      {
+        return CloudlogApiKeyState::writable;
+      }
+
+    return CloudlogApiKeyState::invalid;
   }
 }
 
@@ -94,8 +164,11 @@ public:
 
     QNetworkRequest request {u};
     request.setHeader(QNetworkRequest::ContentTypeHeader, QVariant("application/json"));
-    reply_ = network_manager_->post(request, data);
-    connect (reply_.data (), &QNetworkReply::finished, this, &Cloudlog::impl::reply_logqso);
+    auto * reply = network_manager_->post(request, data);
+    reply_ = reply;
+    connect (reply, &QNetworkReply::finished, this, [this, reply] {
+        reply_logqso (reply);
+      });
 
   }
 
@@ -111,7 +184,7 @@ public:
 #endif
 
     QString url_error;
-    QUrl endpoint = ensure_https_cloudlog_url (apiUrl, "auth/" + QString::fromLatin1 (QUrl::toPercentEncoding (apiKey)), &url_error);
+    QUrl endpoint = ensure_https_cloudlog_url (apiUrl, "qso", &url_error);
     if (!endpoint.isValid ())
       {
         qWarning () << "Cloudlog API test aborted:" << url_error;
@@ -120,80 +193,120 @@ public:
       }
 
     QNetworkRequest request {endpoint};
+    request.setHeader (QNetworkRequest::ContentTypeHeader, QVariant ("application/json"));
     request.setRawHeader ("User-Agent", "Decodium3SE-KP5 Cloudlog API");
     request.setOriginatingObject (this);
-    reply_ = network_manager_->get (request);
-    connect (reply_.data (), &QNetworkReply::finished, this, &Cloudlog::impl::reply_apitest);
+    QJsonObject payload;
+    payload.insert ("key", apiKey);
+    payload.insert ("station_profile_id", QStringLiteral ("0"));
+    payload.insert ("type", QStringLiteral ("adif"));
+    payload.insert ("string", QStringLiteral ("<eor>"));
+    auto * reply = network_manager_->post (request, QJsonDocument (payload).toJson (QJsonDocument::Compact));
+    reply_ = reply;
+    connect (reply, &QNetworkReply::finished, this, [this, reply] {
+        reply_apitest (reply);
+      });
   }
 
-  void reply_apitest()
+  void reply_apitest(QNetworkReply * finished_reply)
   {
-    QString result;
-    if (reply_ && reply_->isFinished ())
-      {
-        auto const length_header = reply_->header (QNetworkRequest::ContentLengthHeader);
-        if (length_header.isValid () && length_header.toLongLong () > kMaxCloudlogReplyBytes)
-          {
-            qWarning () << "Cloudlog API reply too large";
-            reply_->abort ();
-            return;
-          }
-        auto body = reply_->read (kMaxCloudlogReplyBytes + 1);
-        if (body.size () > kMaxCloudlogReplyBytes)
-          {
-            qWarning () << "Cloudlog API reply exceeds limit";
-            reply_->abort ();
-            return;
-          }
-        result = QString::fromUtf8 (body);
-        if (result.contains("<status>Valid</status>"))
-          {
-            if (result.contains("<rights>rw</rights>"))
-              {
-                // fprintf(stderr, "API key OK\n");
-                Q_EMIT self_->apikey_ok ();
-              } else {
-                // fprintf(stderr, "API key not writable!\n");
-		Q_EMIT self_->apikey_ro ();
-              }
-          } else {
-            // fprintf(stderr, "API key invalid!\n");
-	    Q_EMIT self_->apikey_invalid ();
-          }
-      }
-  }
-
-  void reply_logqso()
-  {
-    QString result;
-    if (reply_ && reply_->isFinished ())
-      {
-        auto const length_header = reply_->header (QNetworkRequest::ContentLengthHeader);
-        if (length_header.isValid () && length_header.toLongLong () > kMaxCloudlogReplyBytes)
-          {
-            qWarning () << "Cloudlog upload reply too large";
-            reply_->abort ();
-            return;
-          }
-        auto body = reply_->read (kMaxCloudlogReplyBytes + 1);
-        if (body.size () > kMaxCloudlogReplyBytes)
-          {
-            qWarning () << "Cloudlog upload reply exceeds limit";
-            reply_->abort ();
-            return;
-          }
-        result = QString::fromUtf8 (body);
-        QJsonDocument data = QJsonDocument::fromJson(result.toUtf8());
-        QJsonObject obj = data.object();
-        if (obj["status"] == "failed") {
-          auto * msgBox = new QMessageBox {QMessageBox::Warning,
-                                           tr ("Cloudlog Error!"),
-                                           tr ("QSO could not be sent to Cloudlog!\nPlease check your log.")};
-          msgBox->setAttribute (Qt::WA_DeleteOnClose, true);
-          msgBox->setDetailedText (tr ("Reason: %1").arg (obj["reason"].toString ()));
-          msgBox->open ();
+    QPointer<QNetworkReply> reply {finished_reply};
+    auto const finalize = [this, &reply] {
+      if (reply_ == reply)
+        {
+          reply_.clear ();
         }
+      if (reply)
+        {
+          reply->deleteLater ();
+        }
+    };
+
+    if (!reply || !reply->isFinished ())
+      {
+        finalize ();
+        Q_EMIT self_->apikey_invalid ();
+        return;
       }
+
+    if (reply->error () != QNetworkReply::NoError)
+      {
+        qWarning () << "Cloudlog API test failed:" << reply->errorString ();
+        finalize ();
+        Q_EMIT self_->apikey_invalid ();
+        return;
+      }
+
+    QString read_error;
+    auto const result = read_limited_reply (reply.data (), &read_error);
+    if (!read_error.isEmpty ())
+      {
+        qWarning () << "Cloudlog API test rejected:" << read_error;
+        finalize ();
+        Q_EMIT self_->apikey_invalid ();
+        return;
+      }
+
+    auto const state = parse_cloudlog_api_test_reply (result);
+    finalize ();
+    switch (state)
+      {
+      case CloudlogApiKeyState::writable:
+        Q_EMIT self_->apikey_ok ();
+        break;
+
+      case CloudlogApiKeyState::read_only:
+        Q_EMIT self_->apikey_ro ();
+        break;
+
+      case CloudlogApiKeyState::invalid:
+      default:
+        Q_EMIT self_->apikey_invalid ();
+        break;
+      }
+  }
+
+  void reply_logqso(QNetworkReply * finished_reply)
+  {
+    QPointer<QNetworkReply> reply {finished_reply};
+    auto const finalize = [this, &reply] {
+      if (reply_ == reply)
+        {
+          reply_.clear ();
+        }
+      if (reply)
+        {
+          reply->deleteLater ();
+        }
+    };
+
+    if (!reply || !reply->isFinished ())
+      {
+        finalize ();
+        return;
+      }
+
+    QString read_error;
+    auto const result = read_limited_reply (reply.data (), &read_error);
+    if (!read_error.isEmpty ())
+      {
+        qWarning () << "Cloudlog upload reply rejected:" << read_error;
+        finalize ();
+        return;
+      }
+
+    auto const data = QJsonDocument::fromJson(result.toUtf8());
+    auto const obj = data.object();
+    if (obj["status"] == "failed")
+      {
+        auto * msgBox = new QMessageBox {QMessageBox::Warning,
+                                         tr ("Cloudlog Error!"),
+                                         tr ("QSO could not be sent to Cloudlog!\nPlease check your log.")};
+        msgBox->setAttribute (Qt::WA_DeleteOnClose, true);
+        msgBox->setDetailedText (tr ("Reason: %1").arg (obj["reason"].toString ()));
+        msgBox->open ();
+      }
+    finalize ();
   }
 
   void abort ()

@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. v1.4.2)"
+        description: "Release version (e.g. v1.4.3)"
         required: true
-        default: "v1.4.2"
+        default: "v1.4.3"
       publish_release:
         description: "Publish GitHub release"
         required: true
@@ -175,12 +175,10 @@ jobs:
             echo
             echo "## English (UK)"
             echo "This release includes:"
-            echo "- CAT/remote Configure hardening: mode is no longer forced to FT2 when external controllers send generic Configure packets."
-            echo "- UDP control hardening: control messages now require direct target id (no ALLCALL/BROADCAST wildcard control)."
-            echo "- Optional greyline toggle in Settings -> General (disabled = always daylight map rendering)."
-            echo "- Active map path now shows distance badge in km/mi based on configured units."
-            echo "- DX-ped button/top controls layout refinements for compact screens."
-            echo "- Interactive map + DX Cluster + Ionospheric Forecast workflow from previous releases retained."
+            echo "- FT2 Async L2 Linux crash hardening: bounded Fortran output rows + fixed-length-safe C++ parsing."
+            echo "- Explicit async buffer/counter reset on each decode/toggle cycle."
+            echo "- Wait Features + AutoSeq lock tightened to protect active QSO (runtime partner + REPLYING..SIGNOFF lock window)."
+            echo "- Existing v1.4.2 security/runtime hardening retained (LotW POST/redirect policy, remote token checks, FT2 control visibility rules)."
             echo "- Existing mmap shared-memory release flow retained (no .pkg required)."
             echo "- Apple Silicon build for macOS Tahoe."
             echo "- Apple Silicon build for macOS Sequoia."
@@ -206,12 +204,10 @@ jobs:
             echo
             echo "## Italiano"
             echo "Questa release include:"
-            echo "- Hardening CAT/Configure remoto: la modalita' non viene piu' forzata a FT2 con pacchetti Configure generici."
-            echo "- Hardening controllo UDP: i messaggi di controllo richiedono target id diretto (niente ALLCALL/BROADCAST/wildcard)."
-            echo "- Toggle greyline opzionale in Settings -> General (disattivo = mappa sempre illuminata)."
-            echo "- Badge distanza sul path mappa attivo in km/mi in base all'unita' configurata."
-            echo "- Rifinitura layout controlli top e pulsante DX-ped su schermi compatti."
-            echo "- Workflow mappa interattiva + DX Cluster + Ionospheric Forecast delle versioni precedenti mantenuto."
+            echo "- Hardening crash Linux FT2 Async L2: limiti rigidi output Fortran + parsing C++ async sicuro a lunghezza fissa."
+            echo "- Reset esplicito buffer async/contatori su ogni ciclo decode e toggle."
+            echo "- Lock Wait Features + AutoSeq irrigidito per proteggere il QSO attivo (partner runtime + finestra REPLYING..SIGNOFF)."
+            echo "- Hardening sicurezza/runtime v1.4.2 mantenuto (LotW POST/redirect policy, controlli token remoto, regole visibilita' FT2)."
             echo "- Flusso shared-memory macOS su mmap confermato (nessun .pkg richiesto)."
             echo "- Build Apple Silicon per macOS Tahoe."
             echo "- Build Apple Silicon per macOS Sequoia."
@@ -237,12 +233,10 @@ jobs:
             echo
             echo "## Espanol"
             echo "Esta release incluye:"
-            echo "- Hardening CAT/Configure remoto: el modo ya no queda forzado en FT2 con Configure generico."
-            echo "- Hardening de control UDP: los mensajes de control exigen target id directo (sin ALLCALL/BROADCAST/comodin)."
-            echo "- Opcion greyline en Settings -> General (desactivada = mapa siempre iluminado)."
-            echo "- Distancia sobre la ruta activa del mapa en km/mi segun unidad configurada."
-            echo "- Ajustes de layout de controles superiores y boton DX-ped en pantallas pequenas."
-            echo "- Se mantiene el flujo de mapa interactivo + DX Cluster + Ionospheric Forecast de versiones previas."
+            echo "- Hardening del crash Linux FT2 Async L2: limites Fortran estrictos + parsing C++ async seguro de longitud fija."
+            echo "- Reset explicito de buffers/counters async por ciclo decode/toggle."
+            echo "- Lock Wait Features + AutoSeq reforzado para proteger QSO activo (pareja runtime + ventana REPLYING..SIGNOFF)."
+            echo "- Hardening de seguridad/runtime v1.4.2 mantenido (LotW POST/redirect policy, control de token remoto, visibilidad FT2)."
             echo "- Flujo mmap compartido en macOS confirmado (no se requiere .pkg)."
             echo
             echo "Requisitos minimos Linux:"

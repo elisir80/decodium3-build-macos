@@ -16,36 +16,31 @@ security fixes, and release automation for:
 ## Current Baseline
 
 - Source branch: `master`
-- Latest stable release: `v1.4.2`
+- Latest stable release: `v1.4.3`
 - App bundle/executable: `ft2.app` / `ft2`
 
-## Key Notes for v1.4.2
+## Key Notes for v1.4.3
 
-This release covers the `v1.4.1 -> v1.4.2` cycle:
+This release covers the `v1.4.2 -> v1.4.3` cycle:
 
-- LotW security hardening:
-  - moved credentialed LotW download requests from URL GET to HTTPS POST body,
-  - removed credential-bearing URL-style logging,
-  - enforced strict redirect policy for credentialed requests (HTTPS + expected host).
-- Remote web hardening:
-  - LAN/WAN bind is refused when token length is below 12 characters,
-  - explicit warning is shown for plaintext HTTP/WS usage on exposed binds.
-- Linux stability fixes:
-  - settings dialog is clamped to visible screen geometry (action buttons reachable),
-  - async decode now runs with dedicated thread pool stack sizing + overlap guards.
-- FT2 control consistency:
-  - Async L2 defaults ON when entering FT2 and auto-disables outside FT2,
-  - `Lock Tx Freq` and `Tx even/1st` are hidden (and forced OFF) in FT2.
-- UI/tooling restoration:
-  - `View -> Ionospheric Forecast` and `View -> DX Cluster` window actions restored.
-- Web dashboard RX/TX activity:
-  - TX events are preserved across refresh and initial TX transitions are now reported correctly.
+- FT2 Async L2 Linux crash hardening:
+  - added strict Fortran output bounds (`ndecodes/nout <= 100`) in triggered decode,
+  - switched async row parsing to fixed-length-safe handling in C++,
+  - explicit async buffer and counter reset on each decode/toggle cycle.
+- Wait Features + AutoSeq active-QSO protection:
+  - partner lock now prioritizes runtime partner call (`m_hisCall`),
+  - lock engages earlier (`REPLYING` through `SIGNOFF`) while Wait Features + AutoSeq are enabled.
+- Runtime behavior:
+  - removes first-decode garbage text/over-read edge cases seen with Async L2 on Linux.
+- Release/doc alignment:
+  - fork metadata and docs bumped to `v1.4.3`.
+- Existing `v1.4.2` hardening remains included (LotW POST + redirect policy, remote bind token enforcement, FT2 control visibility rules, map/tool windows, Linux geometry safeguards).
 - No `.pkg` installer flow (DMG/ZIP/SHA256 for macOS, AppImage/SHA256 for Linux).
 
 ## Quick Start (macOS)
 
 ```bash
-cmake -S . -B build -DFORK_RELEASE_VERSION=v1.4.2
+cmake -S . -B build -DFORK_RELEASE_VERSION=v1.4.3
 cmake --build build -j8
 ./build/ft2.app/Contents/MacOS/ft2
 ```
@@ -55,13 +50,13 @@ cmake --build build -j8
 Local release script:
 
 ```bash
-scripts/release-macos.sh v1.4.2 --publish --repo elisir80/decodium3-build-macos
+scripts/release-macos.sh v1.4.3 --publish --repo elisir80/decodium3-build-macos
 ```
 
 Per-platform suffix example:
 
 ```bash
-scripts/release-macos.sh v1.4.2 --compat-macos 15.0 --asset-suffix macos-sequoia-arm64
+scripts/release-macos.sh v1.4.3 --compat-macos 15.0 --asset-suffix macos-sequoia-arm64
 ```
 
 ## Hamlib in Release Builds
@@ -106,9 +101,9 @@ sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 - `README.md`
 - `README.it.md`
 - `README.es.md`
-- `RELEASE_NOTES_v1.4.2.md`
+- `RELEASE_NOTES_v1.4.3.md`
 - `CHANGELOG.md`
-- `doc/GITHUB_RELEASE_BODY_v1.4.2.md`
+- `doc/GITHUB_RELEASE_BODY_v1.4.3.md`
 - `doc/WEBAPP_SETUP_GUIDE.en-GB.md`
 - `doc/WEBAPP_SETUP_GUIDE.it.md`
 - `doc/WEBAPP_SETUP_GUIDE.es.md`

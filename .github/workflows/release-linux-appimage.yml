@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. v1.4.2)"
+        description: "Release version (e.g. v1.4.3)"
         required: true
-        default: "v1.4.2"
+        default: "v1.4.3"
       publish_release:
         description: "Upload AppImage to GitHub release"
         required: true
@@ -248,12 +248,11 @@ jobs:
               echo
               echo "Linux x86_64 AppImage release for fork ${VERSION}."
               echo
-              echo "Includes v1.4.2 updates:"
-              echo "- CAT/remote Configure hardening (no forced FT2 mode on generic Configure packets);"
-              echo "- UDP control hardening with direct target id enforcement;"
-              echo "- optional map greyline toggle in Settings -> General;"
-              echo "- active map path distance badge in km/mi;"
-              echo "- compact top-controls/DX-ped layout refinements."
+              echo "Includes v1.4.3 updates:"
+              echo "- FT2 Async L2 Linux crash hardening (bounded Fortran rows + safe fixed-length C++ parsing);"
+              echo "- explicit async buffer/counter reset each decode/toggle cycle;"
+              echo "- Wait Features + AutoSeq active-QSO lock tightened (runtime partner + REPLYING..SIGNOFF lock window);"
+              echo "- v1.4.2 security/runtime hardening retained (LotW POST, redirect policy, remote token checks, FT2 control visibility rules)."
               echo
               echo "Linux minimum requirements:"
               echo "- x86_64 CPU, 4 GB RAM minimum"
@@ -270,10 +269,10 @@ jobs:
               echo "\`./AppRun\`"
               echo
               echo "Italiano:"
-              echo "- aggiornamenti v1.4.2 inclusi (hardening CAT/UDP, toggle greyline, distanza su path mappa, layout DX-ped)."
+              echo "- aggiornamenti v1.4.3 inclusi (fix crash Linux Async L2, parsing async sicuro, lock Wait/AutoSeq su QSO attivo)."
               echo
               echo "Espanol:"
-              echo "- incluye mejoras v1.4.2 (hardening CAT/UDP, opcion greyline, distancia en ruta de mapa, layout DX-ped)."
+              echo "- incluye mejoras v1.4.3 (fix crash Linux Async L2, parsing async seguro y lock Wait/AutoSeq para QSO activo)."
             } > "${NOTES_FILE}"
             gh release create "${VERSION}" "${ASSETS[@]}" \
               --repo "${REPO}" \

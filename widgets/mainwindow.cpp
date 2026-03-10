@@ -5,6 +5,7 @@
 #include <QAudioOutput>
 #include <QSound>
 #include <QCoreApplication>
+#include <QEventLoop>
 #include <cinttypes>
 #include <cstring>
 #include <cmath>
@@ -6543,7 +6544,7 @@ void MainWindow::diskDat()                                   //diskDat()
       if(k > dec_data.params.kin) break;
       dec_data.params.npts8=k/8;
       dataSink(k);
-      qApp->processEvents();                                //Update the waterfall
+      QCoreApplication::processEvents (QEventLoop::ExcludeUserInputEvents); // Update the waterfall
     }
   } else {
     MessageBox::information_message(this, tr("No data read from disk. Wrong file format?"));
@@ -7045,7 +7046,7 @@ void MainWindow::decode()                                       //decode()
       if(m_mode=="MSK144" or m_bFast9) {
         float t0=m_t0;
         float t1=m_t1;
-        qApp->processEvents();                                //Update the waterfall
+        QCoreApplication::processEvents (QEventLoop::ExcludeUserInputEvents); // Update the waterfall
         if(m_nPick > 0) {
           t0=m_t0Pick;
           t1=m_t1Pick;
