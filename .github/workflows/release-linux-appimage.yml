@@ -244,45 +244,45 @@ jobs:
           else
             NOTES_FILE="$(mktemp)"
             cat > "${NOTES_FILE}" <<EOF
-# Decodium 3 FT2 ${VERSION} (Linux AppImage)
+            # Decodium 3 FT2 ${VERSION} (Linux AppImage)
 
-Linux x86_64 AppImage release for fork ${VERSION}.
+            Linux x86_64 AppImage release for fork ${VERSION}.
 
-## English
+            ## English
 
-- Includes DXped certificate workflow, DXped gating, and DXped runtime FSM protections.
-- FT2 Async L2 is mandatory in FT2 (local/remote disable ignored).
-- Includes ASYMX progress states (\`GUARD/TX/RX/IDLE\`) and decode/UI alignment fixes.
+            - Includes DXped certificate workflow, DXped gating, and DXped runtime FSM protections.
+            - FT2 Async L2 is mandatory in FT2 (local/remote disable ignored).
+            - Includes ASYMX progress states (\`GUARD/TX/RX/IDLE\`) and decode/UI alignment fixes.
 
-Linux minimum requirements:
+            Linux minimum requirements:
 
-- x86_64 CPU (dual-core 2.0 GHz+)
-- 4 GB RAM minimum (8 GB recommended)
-- at least 500 MB free storage
-- glibc >= 2.35
-- libfuse2/FUSE2
-- ALSA, PulseAudio, or PipeWire
+            - x86_64 CPU (dual-core 2.0 GHz+)
+            - 4 GB RAM minimum (8 GB recommended)
+            - at least 500 MB free storage
+            - glibc >= 2.35
+            - libfuse2/FUSE2
+            - ALSA, PulseAudio, or PipeWire
 
-If macOS blocks startup:
-\`sudo xattr -r -d com.apple.quarantine /Applications/ft2.app\`
+            If macOS blocks startup:
+            \`sudo xattr -r -d com.apple.quarantine /Applications/ft2.app\`
 
-Linux AppImage recommendation:
-Per evitare problemi dovuti al filesystem in sola lettura delle AppImage, si consiglia di avviare Decodium estraendo prima l'AppImage e poi eseguendo il programma dalla cartella estratta.
+            Linux AppImage recommendation:
+            Per evitare problemi dovuti al filesystem in sola lettura delle AppImage, si consiglia di avviare Decodium estraendo prima l'AppImage e poi eseguendo il programma dalla cartella estratta.
 
-Eseguire i seguenti comandi nel terminale:
-\`chmod +x /path/to/Decodium.AppImage\`
-\`/path/to/Decodium.AppImage --appimage-extract\`
-\`cd squashfs-root\`
-\`./AppRun\`
+            Eseguire i seguenti comandi nel terminale:
+            \`chmod +x /path/to/Decodium.AppImage\`
+            \`/path/to/Decodium.AppImage --appimage-extract\`
+            \`cd squashfs-root\`
+            \`./AppRun\`
 
-## Italiano
+            ## Italiano
 
-- Include aggiornamenti v1.4.4 (certificati DXped, Async L2 obbligatorio FT2, stati ASYMX, fix decode/UI).
+            - Include aggiornamenti v1.4.4 (certificati DXped, Async L2 obbligatorio FT2, stati ASYMX, fix decode/UI).
 
-## Espanol
+            ## Espanol
 
-- Incluye mejoras v1.4.4 (certificados DXped, Async L2 obligatorio FT2, estados ASYMX, fixes decode/UI).
-EOF
+            - Incluye mejoras v1.4.4 (certificados DXped, Async L2 obligatorio FT2, estados ASYMX, fixes decode/UI).
+            EOF
             gh release create "${VERSION}" "${ASSETS[@]}" \
               --repo "${REPO}" \
               --title "Decodium 3 FT2 ${VERSION}" \
