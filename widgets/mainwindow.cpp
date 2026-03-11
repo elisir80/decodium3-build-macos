@@ -1596,14 +1596,17 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
         bool const remoteExposed = !(bindAddress.isLoopback()
                                      || bindAddress == QHostAddress::LocalHost
                                      || bindAddress == QHostAddress::LocalHostIPv6);
-        if (remoteExposed && authToken.size() < 12)
+        if (remoteExposed && authToken.isEmpty())
           {
-            showStatusMessage(tr("Remote Web disabled: token must be at least 12 characters when binding on LAN/WAN."));
+            showStatusMessage(tr("Remote Web warning: LAN/WAN bind without token authentication."));
           }
-        else
+        else if (remoteExposed && authToken.size() < 12)
           {
-            m_remoteCommandServer = new RemoteCommandServer {this};
-            m_remoteCommandServer->setRuntimeStateProvider([this] {
+            showStatusMessage(tr("Remote Web warning: token shorter than 12 characters on LAN/WAN bind."));
+          }
+
+        m_remoteCommandServer = new RemoteCommandServer {this};
+        m_remoteCommandServer->setRuntimeStateProvider([this] {
                 RemoteCommandServer::RuntimeState state;
                 state.mode = m_mode;
                 state.band = ui && ui->bandComboBox ? ui->bandComboBox->currentText().trimmed() : QString {};
@@ -1624,77 +1627,76 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
                 return state;
               });
 
-            bool guardOk {false};
-            auto const guardMs = m_env.value("FT2_REMOTE_GUARD_PRE_MS", "300").toInt(&guardOk);
-            if (guardOk)
-              {
-                m_remoteCommandServer->setGuardPreMs(guardMs);
-              }
+        bool guardOk {false};
+        auto const guardMs = m_env.value("FT2_REMOTE_GUARD_PRE_MS", "300").toInt(&guardOk);
+        if (guardOk)
+          {
+            m_remoteCommandServer->setGuardPreMs(guardMs);
+          }
 
-            bool ageOk {false};
-            auto const maxAgeMs = m_env.value("FT2_REMOTE_MAX_AGE_MS", "7500").toInt(&ageOk);
-            if (ageOk)
-              {
-                m_remoteCommandServer->setMaxCommandAgeMs(maxAgeMs);
-              }
+        bool ageOk {false};
+        auto const maxAgeMs = m_env.value("FT2_REMOTE_MAX_AGE_MS", "7500").toInt(&ageOk);
+        if (ageOk)
+          {
+            m_remoteCommandServer->setMaxCommandAgeMs(maxAgeMs);
+          }
 
-            m_remoteCommandServer->setAuthUser(authUser);
-            if (!authToken.isEmpty())
-              {
-                m_remoteCommandServer->setAuthToken(authToken);
-              }
+        m_remoteCommandServer->setAuthUser(authUser);
+        if (!authToken.isEmpty())
+          {
+            m_remoteCommandServer->setAuthToken(authToken);
+          }
 
-            quint16 httpPort {0};
-            if (!httpPortText.isEmpty())
+        quint16 httpPort {0};
+        if (!httpPortText.isEmpty())
+          {
+            bool httpPortOk {false};
+            auto const httpPortRaw = httpPortText.toUInt(&httpPortOk);
+            if (httpPortOk && httpPortRaw <= 65535u)
               {
-                bool httpPortOk {false};
-                auto const httpPortRaw = httpPortText.toUInt(&httpPortOk);
-                if (httpPortOk && httpPortRaw <= 65535u)
-                  {
-                    httpPort = static_cast<quint16>(httpPortRaw);
-                  }
-                else
-                  {
-                    showStatusMessage(tr("Remote HTTP: invalid FT2_REMOTE_HTTP_PORT=\"%1\" (using default ws+1)")
-                                      .arg(httpPortText));
-                  }
+                httpPort = static_cast<quint16>(httpPortRaw);
               }
-
-            connect(m_remoteCommandServer, &RemoteCommandServer::selectCallerDue,
-                    this, &MainWindow::onRemoteSelectCallerDue);
-            connect(m_remoteCommandServer, &RemoteCommandServer::setModeRequested,
-                    this, &MainWindow::onRemoteSetModeRequested);
-            connect(m_remoteCommandServer, &RemoteCommandServer::setBandRequested,
-                    this, &MainWindow::onRemoteSetBandRequested);
-            connect(m_remoteCommandServer, &RemoteCommandServer::setRxFrequencyRequested,
-                    this, &MainWindow::onRemoteSetRxFrequencyRequested);
-            connect(m_remoteCommandServer, &RemoteCommandServer::setTxEnabledRequested,
-                    this, &MainWindow::onRemoteSetTxEnabledRequested);
-            connect(m_remoteCommandServer, &RemoteCommandServer::setAutoCqRequested,
-                    this, &MainWindow::onRemoteSetAutoCqRequested);
-            connect(m_remoteCommandServer, &RemoteCommandServer::setAsyncL2Requested,
-                    this, &MainWindow::onRemoteSetAsyncL2Requested);
-            connect(m_remoteCommandServer, &RemoteCommandServer::setDualCarrierRequested,
-                    this, &MainWindow::onRemoteSetDualCarrierRequested);
-            connect(m_remoteCommandServer, &RemoteCommandServer::setAlt12Requested,
-                    this, &MainWindow::onRemoteSetAlt12Requested);
-            connect(m_remoteCommandServer, &RemoteCommandServer::waterfallStreamingChanged,
-                    this, &MainWindow::onRemoteWaterfallStreamingChanged);
-            connect(m_remoteCommandServer, &RemoteCommandServer::logMessage, this,
-                    [this] (QString const& message) { showStatusMessage(message); });
-
-            m_remoteWaterfallStreamingEnabled = m_remoteCommandServer->waterfallEnabled();
-
-            if (!m_remoteCommandServer->start(wsPort, bindAddress, httpPort))
+            else
               {
-                showStatusMessage(tr("Remote WS disabled: failed to bind %1:%2")
-                                    .arg(bindAddress.toString())
-                                    .arg(wsPort));
+                showStatusMessage(tr("Remote HTTP: invalid FT2_REMOTE_HTTP_PORT=\"%1\" (using default ws+1)")
+                                  .arg(httpPortText));
               }
-            else if (remoteExposed)
-              {
-                showStatusMessage(tr("Remote Web notice: traffic is plain HTTP/WS. Use only trusted LAN/VPN or a TLS reverse proxy."));
-              }
+          }
+
+        connect(m_remoteCommandServer, &RemoteCommandServer::selectCallerDue,
+                this, &MainWindow::onRemoteSelectCallerDue);
+        connect(m_remoteCommandServer, &RemoteCommandServer::setModeRequested,
+                this, &MainWindow::onRemoteSetModeRequested);
+        connect(m_remoteCommandServer, &RemoteCommandServer::setBandRequested,
+                this, &MainWindow::onRemoteSetBandRequested);
+        connect(m_remoteCommandServer, &RemoteCommandServer::setRxFrequencyRequested,
+                this, &MainWindow::onRemoteSetRxFrequencyRequested);
+        connect(m_remoteCommandServer, &RemoteCommandServer::setTxEnabledRequested,
+                this, &MainWindow::onRemoteSetTxEnabledRequested);
+        connect(m_remoteCommandServer, &RemoteCommandServer::setAutoCqRequested,
+                this, &MainWindow::onRemoteSetAutoCqRequested);
+        connect(m_remoteCommandServer, &RemoteCommandServer::setAsyncL2Requested,
+                this, &MainWindow::onRemoteSetAsyncL2Requested);
+        connect(m_remoteCommandServer, &RemoteCommandServer::setDualCarrierRequested,
+                this, &MainWindow::onRemoteSetDualCarrierRequested);
+        connect(m_remoteCommandServer, &RemoteCommandServer::setAlt12Requested,
+                this, &MainWindow::onRemoteSetAlt12Requested);
+        connect(m_remoteCommandServer, &RemoteCommandServer::waterfallStreamingChanged,
+                this, &MainWindow::onRemoteWaterfallStreamingChanged);
+        connect(m_remoteCommandServer, &RemoteCommandServer::logMessage, this,
+                [this] (QString const& message) { showStatusMessage(message); });
+
+        m_remoteWaterfallStreamingEnabled = m_remoteCommandServer->waterfallEnabled();
+
+        if (!m_remoteCommandServer->start(wsPort, bindAddress, httpPort))
+          {
+            showStatusMessage(tr("Remote WS disabled: failed to bind %1:%2")
+                                .arg(bindAddress.toString())
+                                .arg(wsPort));
+          }
+        else if (remoteExposed)
+          {
+            showStatusMessage(tr("Remote Web notice: traffic is plain HTTP/WS. Use only trusted LAN/VPN or a TLS reverse proxy."));
           }
       }
     else if (!wsPortText.isEmpty())
@@ -6172,7 +6174,13 @@ void MainWindow::on_actionLocal_User_Guide_triggered()
 
 void MainWindow::on_actionWide_Waterfall_triggered()      //Display Waterfalls
 {
+  if (!m_wideGraph)
+    {
+      return;
+    }
   m_wideGraph->showNormal();
+  m_wideGraph->raise();
+  m_wideGraph->activateWindow();
 }
 
 void MainWindow::on_actionEcho_Graph_triggered()

@@ -432,6 +432,11 @@ R"FT2JS((() => {
   const isStandalone = () => (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
     || window.navigator.standalone === true;
   const wsIsUsable = () => !!ws && ws.readyState === WebSocket.OPEN && (!requiresAuth || wsAuthed);
+  const normalizeAuthUser = (v) => {
+    const t = (v || '').toString().trim();
+    return t || 'admin';
+  };
+  const normalizeAuthToken = (v) => (v || '').toString().replace(/[\r\n]+/g, '').trim();
 
   document.addEventListener('gesturestart', (ev) => ev.preventDefault(), {passive:false});
   document.addEventListener('gesturechange', (ev) => ev.preventDefault(), {passive:false});
@@ -448,18 +453,19 @@ R"FT2JS((() => {
         localStorage.removeItem(AUTH_STORAGE_KEY);
         return;
       }
-      authUser = (parsed.user || 'admin').toString().trim() || 'admin';
-      authToken = (parsed.token || '').toString();
+      authUser = normalizeAuthUser(parsed.user);
+      authToken = normalizeAuthToken(parsed.token);
     } catch {
       localStorage.removeItem(AUTH_STORAGE_KEY);
     }
   }
 
   function saveAuth() {
-    if (!authToken) return;
+    const token = normalizeAuthToken(authToken);
+    if (!token) return;
     const payload = {
-      user: authUser || 'admin',
-      token: authToken,
+      user: normalizeAuthUser(authUser),
+      token,
       expires_at: Date.now() + AUTH_TTL_MS
     };
     try { localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(payload)); } catch {}
@@ -754,6 +760,19 @@ R"FT2JS((() => {
     conn.classList.toggle('off', !isConnected);
   }
 
+  function describeInitError(err) {
+    const message = (err && err.message ? String(err.message) : 'unknown error').trim();
+    const lowered = message.toLowerCase();
+    if (lowered.includes('failed to fetch')
+        || lowered.includes('networkerror')
+        || lowered.includes('load failed')) {
+      const host = location.hostname || 'localhost';
+      const port = location.port ? (':' + location.port) : '';
+      return `init error: backend unreachable (${host}${port})`;
+    }
+    return 'init error: ' + (message || 'unknown error');
+  }
+
   function updateTxBadge(transmitting, txEnabled) {
     if (!trxLive) return;
     const isTx = !!transmitting;
@@ -933,8 +952,10 @@ R"FT2JS((() => {
 
   function buildHeaders(base = {}) {
     const headers = {...base};
-    if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
-    if (authUser) headers['X-Auth-User'] = authUser;
+    const token = normalizeAuthToken(authToken);
+    const user = normalizeAuthUser(authUser);
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    if (user) headers['X-Auth-User'] = user;
     return headers;
   }
 
@@ -955,7 +976,7 @@ R"FT2JS((() => {
     health = await r.json();
     requiresAuth = !!health.requires_auth;
     if (typeof health.auth_user === 'string' && health.auth_user.trim()) {
-      authUser = health.auth_user.trim();
+      authUser = normalizeAuthUser(health.auth_user);
       if (loginUser && !loginUser.value) loginUser.value = authUser;
     }
     if (loginCaption) {
@@ -1117,7 +1138,7 @@ R"FT2JS((() => {
       try { m = JSON.parse(ev.data); } catch { return; }
       if (m.event === 'hello' && typeof m.requires_auth === 'boolean') {
         requiresAuth = !!m.requires_auth;
-        if (typeof m.auth_user === 'string' && m.auth_user.trim()) authUser = m.auth_user.trim();
+        if (typeof m.auth_user === 'string' && m.auth_user.trim()) authUser = normalizeAuthUser(m.auth_user);
         if (loginUser && !loginUser.value) loginUser.value = authUser || 'admin';
         if (typeof m.mode === 'string') {
           currentMode = m.mode.toUpperCase();
@@ -1248,8 +1269,8 @@ R"FT2JS((() => {
   }
 
   async function attemptUnlock() {
-    authUser = (loginUser ? loginUser.value.trim() : '').trim() || 'admin';
-    authToken = (loginToken ? loginToken.value.trim() : '').trim();
+    authUser = normalizeAuthUser(loginUser ? loginUser.value : '');
+    authToken = normalizeAuthToken(loginToken ? loginToken.value : '');
     if (!authToken) {
       showLogin(true, 'Password required');
       return;
@@ -1304,7 +1325,7 @@ R"FT2JS((() => {
         setConnectionState(false, 'locked');
         showLogin(true);
       } else {
-        setConnectionState(false, 'init error: ' + e.message);
+        setConnectionState(false, describeInitError(e));
       }
     }
   })();
@@ -1344,7 +1365,7 @@ R"FT2MAN({
 QByteArray dashboard_service_worker_js()
 {
   return QByteArrayLiteral(
-R"FT2SW(const CACHE_NAME = 'decodium-remote-shell-v1';
+R"FT2SW(const CACHE_NAME = 'decodium-remote-shell-v2';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -1457,10 +1478,17 @@ bool RemoteCommandServer::start(quint16 wsPort, QHostAddress const& address, qui
   bool const remoteExposed = !(address.isLoopback()
                                || address == QHostAddress::LocalHost
                                || address == QHostAddress::LocalHostIPv6);
-  if (remoteExposed && authToken_.trimmed().size() < 12)
+  if (remoteExposed)
     {
-      Q_EMIT logMessage(QStringLiteral("Remote WS refused: token must be at least 12 characters for LAN/WAN bind."));
-      return false;
+      auto const token = authToken_.trimmed();
+      if (token.isEmpty())
+        {
+          Q_EMIT logMessage(QStringLiteral("Remote WS warning: LAN/WAN bind without token authentication."));
+        }
+      else if (token.size() < 12)
+        {
+          Q_EMIT logMessage(QStringLiteral("Remote WS warning: token shorter than 12 characters on LAN/WAN bind."));
+        }
     }
 
   server_ = new QWebSocketServer(QStringLiteral("Decodium Remote WS"), QWebSocketServer::NonSecureMode, this);
