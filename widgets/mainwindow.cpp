@@ -660,8 +660,8 @@ namespace
   constexpr int default_tx_audio_buffer_frames {16384}; // ~341ms @ 48kHz, prevents underrun on Windows
   constexpr bool kEnableAutoCqCallerQueue {true};
   constexpr int kRecentDuplicateLogWindowSeconds {90};
-  // In FT2 AutoCQ, keep RR73/73 on air up to 5 cycles before forced close.
-  constexpr int kFt2AutoCqSignoffRetryCount {5};
+  // In AutoCQ, keep RR73/73 on air up to 5 cycles before forced close.
+  constexpr int kAutoCqSignoffRetryCount {5};
   constexpr int kDecDataSampleCount {static_cast<int> (sizeof (dec_data.d2) / sizeof (dec_data.d2[0]))};
   constexpr int kMaxCwSymbols {static_cast<int> (sizeof (icw) / sizeof (icw[0]))};
   constexpr int kFoxWaveSampleCount {static_cast<int> (sizeof (foxcom_.wave) / sizeof (foxcom_.wave[0]))};
@@ -7530,9 +7530,9 @@ void MainWindow::decodeDone ()
   }
 
   // Auto CQ MSHV-style timeout: dopo MAX_MISSED_PERIODS RX senza risposta → salta al prossimo
-  // During FT2 deferred RR73 signoff, do not clear the QSO here: logging/retry is handled elsewhere.
+  // During deferred RR73/73 signoff, do not clear the QSO here: logging/retry is handled elsewhere.
   if (m_autoCQ && m_QSOProgress > CALLING && !m_diskData) {
-    if (m_mode == "FT2" && m_ft2DeferredLogPending) {
+    if (m_ft2DeferredLogPending) {
       m_autoCQPeriodsMissed = 0;
     } else if (!m_receivedReplyThisPeriod) {
       m_autoCQPeriodsMissed++;
@@ -9617,8 +9617,8 @@ void MainWindow::auto_sequence (DecodedText const& message, unsigned start_toler
         || (m_QSOProgress == CALLING)
         || activePartnerBase.isEmpty ();
     bool const calling_reply_eligible = addressed_to_me && (caller_selection_open || from_active_partner);
-    bool const ft2SignoffRetryWindowOpen =
-        (m_mode == "FT2") && m_autoCQ && m_ft2DeferredLogPending && from_active_partner;
+    bool const signoffRetryWindowOpen =
+        m_autoCQ && m_ft2DeferredLogPending && from_active_partner;
     if (m_auto && m_bCallingCQ && calling_reply_eligible
         && !m_bAutoReply && m_specOp != SpecOp::FOX && m_specOp != SpecOp::HOUND) {
       m_bAutoReply = true;
@@ -9638,7 +9638,7 @@ void MainWindow::auto_sequence (DecodedText const& message, unsigned start_toler
                //avt 10/2/25
                && ui->cbAutoSeq->isVisible () && (ui->cbAutoSeq->isEnabled () or is_externalCtrlMode()) && ui->cbAutoSeq->isChecked () // auto-sequencing allowed
                && ((!m_bCallingCQ      // not calling CQ/QRZ
-                    && (!m_sentFirst73 || ft2SignoffRetryWindowOpen) // keep tracking active FT2 AutoCQ partner after first RR73
+                    && (!m_sentFirst73 || signoffRetryWindowOpen) // keep tracking active AutoCQ partner after first RR73/73
                     && ((message_words.at (2).contains (m_baseCall)
                          // being called and not already in a QSO
                          && (message_words.at(3).contains(Radio::base_callsign(ui->dxCallEntry->text()))
@@ -10417,8 +10417,8 @@ void MainWindow::guiUpdate()
       msg_parts[1].remove (QChar {'>'});
     }
     auto is_73 = message_is_73 (m_currentMessageType, msg_parts);
-    bool const ft2AutoCqSignoff =
-        (m_mode == "FT2") && m_autoCQ && !m_bDXpedMode && is_73
+    bool const autoCqDeferredSignoff =
+        m_autoCQ && !m_bDXpedMode && is_73
         && (m_QSOProgress >= ROGERS);
     m_sentFirst73 = is_73
       && !message_is_73 (m_lastMessageType, m_lastMessageSent.split (' ', SkipEmptyParts));
@@ -10427,8 +10427,8 @@ void MainWindow::guiUpdate()
       if(m_config.id_after_73 ()) {
         icw[0] = m_ncw;
       }
-      if (is_73 && ft2AutoCqSignoff) {
-        // In FT2 AutoCQ keep RR73 on-air for a few cycles before closing/logging.
+      if (is_73 && autoCqDeferredSignoff) {
+        // In AutoCQ keep RR73/73 on-air for a few cycles before closing/logging.
         m_ft2DeferredLogPending = true;
         capturePendingAutoLogSnapshot ();
       }
@@ -10437,10 +10437,10 @@ void MainWindow::guiUpdate()
         //avt 10/2/25 possibly stop Tx after sending 73
         if (!is_externalCtrlMode() && m_config.repeat_Tx() && (m_mode=="MSK144" or m_mode=="Q65") && m_ntx != 4) cease_auto_Tx_after_QSO ();    //avt 10/2/25
         if (!is_externalCtrlMode() && !(m_mode=="FT4" && SpecOp::NA_VHF==m_specOp && m_config.NCCC_Sprint())) {
-          if (!ft2AutoCqSignoff) {
-            if (m_autoCQ) capturePendingAutoLogSnapshot ();
-            logQSOTimer.start(0);    //avt 9/30/25
-          }
+	          if (!autoCqDeferredSignoff) {
+	            if (m_autoCQ) capturePendingAutoLogSnapshot ();
+	            logQSOTimer.start(0);    //avt 9/30/25
+	          }
         }
         }
       else
@@ -10451,7 +10451,7 @@ void MainWindow::guiUpdate()
 
     bool b=("FT8"==m_mode or "FT4"==m_mode or "Q65"==m_mode or "JT65"==m_mode or "JT9"==m_mode or m_mode == "FST4" or m_mode == "MSK144" or m_mode == "JT65" or m_mode == "JT9")  //avt 9/30/25
         &&  ui->cbAutoSeq->isVisible () && (ui->cbAutoSeq->isEnabled () or is_externalCtrlMode()) && ui->cbAutoSeq->isChecked ();   //avt 9/30/25
-    if(is_73 and (m_config.disable_TX_on_73() or b) && !ft2AutoCqSignoff) {
+    if(is_73 and (m_config.disable_TX_on_73() or b) && !autoCqDeferredSignoff) {
       m_nextCall="";  //### Temporary: disable use of "TU;" messages;
       if(m_nextCall!="") {
         useNextCall();
@@ -11859,7 +11859,7 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
               }
             else if (partnerSignoff73 || ROGERS == m_QSOProgress)
               {
-                if (m_mode == "FT2" && m_autoCQ && m_ft2DeferredLogPending) {
+                if (m_autoCQ && m_ft2DeferredLogPending) {
                   m_ft2DeferredLogPending = false;
                   m_nTx73 = 0;
                 }
@@ -11956,7 +11956,7 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
              && message_words.at (4) == "73"
              && (!qso_partner_base_call.isEmpty ())
              && (base_call == qso_partner_base_call || qso_partner_matched)) {
-      if (m_mode == "FT2" && m_autoCQ && m_ft2DeferredLogPending) {
+      if (m_autoCQ && m_ft2DeferredLogPending) {
         m_ft2DeferredLogPending = false;
         m_nTx73 = 0;
       }
@@ -11999,7 +11999,7 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
   }
   else if (firstcall == "DE" && message_words.size () > 4 && message_words.at (4) == "73") {
     if (m_QSOProgress >= ROGERS && base_call == qso_partner_base_call && m_currentMessageType) {
-      if (m_mode == "FT2" && m_autoCQ && m_ft2DeferredLogPending) {
+      if (m_autoCQ && m_ft2DeferredLogPending) {
         m_ft2DeferredLogPending = false;
         m_nTx73 = 0;
         if (!is_externalCtrlMode() && (m_config.prompt_to_log() || m_config.autoLog() || m_autoCQ) && !m_tune) {
@@ -12033,7 +12033,7 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
         (!qso_partner_base_call.isEmpty ())
         && (base_call == qso_partner_base_call || qso_partner_matched);
     if (partner73) {
-      if (m_mode == "FT2" && m_autoCQ && m_ft2DeferredLogPending) {
+      if (m_autoCQ && m_ft2DeferredLogPending) {
         m_ft2DeferredLogPending = false;
         m_nTx73 = 0;
         if (!is_externalCtrlMode() && (m_config.prompt_to_log() || m_config.autoLog() || m_autoCQ) && !m_tune) {
@@ -16380,9 +16380,9 @@ void MainWindow::transmit (double snr)
   bool const txIs73 =
       message_is_73 (m_currentMessageType, m_currentMessage.split (' ', SkipEmptyParts));
 // In auto-sequencing mode, track repeated "73"/"RR73" transmissions.
-  if (m_bFastMode || m_bFast9 || m_mode=="FT2") {
+  if (m_bFastMode || m_bFast9 || m_mode=="FT2" || m_autoCQ) {
     if (ui->cbAutoSeq->isVisible () && (ui->cbAutoSeq->isEnabled () or is_externalCtrlMode()) && ui->cbAutoSeq->isChecked ()) {    //avt 9/30/25
-      if (m_ntx == 5 || (m_mode == "FT2" && txIs73)) {
+      if (m_ntx == 5 || txIs73) {
         m_nTx73 += 1;
       } else {
         m_nTx73=0;
@@ -16390,9 +16390,9 @@ void MainWindow::transmit (double snr)
     }
   }
 
-  // FT2 AutoCQ: after a few RR73 repeats without partner 73, close/log and move on.
-  if (m_mode=="FT2" && m_autoCQ && !m_bDXpedMode && m_ft2DeferredLogPending && txIs73) {
-    if (m_nTx73 >= kFt2AutoCqSignoffRetryCount) {
+  // AutoCQ: after a few RR73/73 repeats without partner 73, close/log and move on.
+  if (m_autoCQ && !m_bDXpedMode && m_ft2DeferredLogPending && txIs73) {
+    if (m_nTx73 >= kAutoCqSignoffRetryCount) {
       m_ft2DeferredLogPending = false;
       m_nTx73 = 0;
       if (!is_externalCtrlMode() && (m_config.prompt_to_log() || m_config.autoLog() || m_autoCQ) && !m_tune) {

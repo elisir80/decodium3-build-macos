@@ -843,7 +843,7 @@ private:
   bool    m_bDoubleClicked;
   bool    m_bCallingCQ;
   bool    m_autoCQ;
-  bool    m_ft2DeferredLogPending {false};   // FT2 AutoCQ: delay log/CQ restart while repeating RR73
+  bool    m_ft2DeferredLogPending {false};   // AutoCQ: delay log/CQ restart while repeating RR73/73
   QQueue<QString> m_callerQueue;
   void enqueueCaller (QString const& call, int freq, int snr = -99, float dt = 0.0f);
   void processNextInQueue ();
