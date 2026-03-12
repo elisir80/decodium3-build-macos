@@ -970,6 +970,18 @@ private:
   int m_asyncMsgCount {0};           // number of valid async decode rows
   QSet<QString> m_asyncDedupeSet;    // deduplication within sliding window
   QDateTime m_asyncDedupeLastCleared;
+  // Unified async dedup cache: key -> strongest SNR seen in the recent window.
+  struct DedupeEntry { int snr; qint64 msec; };
+  QHash<QString, DedupeEntry> m_decodeDedup;
+  qint64 m_decodeDedupLastPurge {0};
+
+  // Async confirmation filter: weak decodes must be seen 2x before display.
+  struct PendingDecode { QString msg; int freq; int snr; qint64 msec; int count; };
+  QList<PendingDecode> m_asyncPending;
+  bool isDuplicateDecode(QString const& message);
+  bool asyncConfirmDecode(QString const& message, int freq, int snr);
+  bool m_bAsyncTxArmed {false};       // async TX ready after guard timer
+
   struct DecodeDedupeEntry
   {
     qint64 lastSeenMs {0};
