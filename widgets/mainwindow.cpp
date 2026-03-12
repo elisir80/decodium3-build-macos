@@ -11764,7 +11764,9 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
     }
     else if (m_QSOProgress >= ROGERS
              && message_words.size () > 3 && message_words.at (2).contains (m_baseCall)
-             && message_words.at (3) == "73") {
+             && message_words.at (3) == "73"
+             && (!qso_partner_base_call.isEmpty ())
+             && (base_call == qso_partner_base_call || qso_partner_matched)) {
       // 73 back to compound call holder
       m_ntx=5;
       ui->txrb5->setChecked(true);
@@ -11815,9 +11817,18 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
     }
   }
   else if (is_73 && !message.isStandardMessage ()) {
-    m_ntx=5;
-    ui->txrb5->setChecked(true);
-    m_QSOProgress = SIGNOFF;
+    // Ignore non-standard 73/RR73 that are not from the active QSO partner.
+    // This prevents premature signoff when an old caller sends a late 73.
+    bool const partner73 =
+        (!qso_partner_base_call.isEmpty ())
+        && (base_call == qso_partner_base_call || qso_partner_matched);
+    if (partner73) {
+      m_ntx=5;
+      ui->txrb5->setChecked(true);
+      m_QSOProgress = SIGNOFF;
+    } else {
+      return;
+    }
   } else if (!(m_auto && m_ntx == 3 && message.string().contains("73 "))) {  // don't interrupt Tx3 transmissions
     // just work them
     if (ui->tx1->isEnabled ()) {
