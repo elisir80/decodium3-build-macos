@@ -660,7 +660,8 @@ namespace
   constexpr int default_tx_audio_buffer_frames {16384}; // ~341ms @ 48kHz, prevents underrun on Windows
   constexpr bool kEnableAutoCqCallerQueue {true};
   constexpr int kRecentDuplicateLogWindowSeconds {90};
-  constexpr int kFt2AutoCqSignoffRetryCount {4};
+  // In FT2 AutoCQ, keep RR73/73 on air up to 5 cycles before forced close.
+  constexpr int kFt2AutoCqSignoffRetryCount {5};
   constexpr int kDecDataSampleCount {static_cast<int> (sizeof (dec_data.d2) / sizeof (dec_data.d2[0]))};
   constexpr int kMaxCwSymbols {static_cast<int> (sizeof (icw) / sizeof (icw[0]))};
   constexpr int kFoxWaveSampleCount {static_cast<int> (sizeof (foxcom_.wave) / sizeof (foxcom_.wave[0]))};
@@ -9616,6 +9617,8 @@ void MainWindow::auto_sequence (DecodedText const& message, unsigned start_toler
         || (m_QSOProgress == CALLING)
         || activePartnerBase.isEmpty ();
     bool const calling_reply_eligible = addressed_to_me && (caller_selection_open || from_active_partner);
+    bool const ft2SignoffRetryWindowOpen =
+        (m_mode == "FT2") && m_autoCQ && m_ft2DeferredLogPending && from_active_partner;
     if (m_auto && m_bCallingCQ && calling_reply_eligible
         && !m_bAutoReply && m_specOp != SpecOp::FOX && m_specOp != SpecOp::HOUND) {
       m_bAutoReply = true;
@@ -9635,7 +9638,7 @@ void MainWindow::auto_sequence (DecodedText const& message, unsigned start_toler
                //avt 10/2/25
                && ui->cbAutoSeq->isVisible () && (ui->cbAutoSeq->isEnabled () or is_externalCtrlMode()) && ui->cbAutoSeq->isChecked () // auto-sequencing allowed
                && ((!m_bCallingCQ      // not calling CQ/QRZ
-                    && !m_sentFirst73       // not finished QSO
+                    && (!m_sentFirst73 || ft2SignoffRetryWindowOpen) // keep tracking active FT2 AutoCQ partner after first RR73
                     && ((message_words.at (2).contains (m_baseCall)
                          // being called and not already in a QSO
                          && (message_words.at(3).contains(Radio::base_callsign(ui->dxCallEntry->text()))
