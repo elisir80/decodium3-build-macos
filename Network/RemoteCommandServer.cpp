@@ -70,6 +70,7 @@ R"FT2HTML(<!doctype html>
         <input id="login_user" name="username" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="admin" />
         <label for="login_token">Password</label>
         <input id="login_token" name="token" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Access password" />
+        <div id="login_token_hint" class="login-token-hint"></div>
         <button id="btn_login" type="submit" class="primary">Unlock</button>
       </form>
       <div id="login_error"></div>
@@ -246,6 +247,7 @@ body{margin:0;background:radial-gradient(1600px 800px at 10% -10%,#1a2c4e 0%,var
 #login_form{display:grid;grid-template-columns:1fr;gap:7px}
 #login_form label{font-size:.78rem;color:var(--muted)}
 #login_form input{font-size:16px}
+.login-token-hint{font-size:.76rem;color:#b9cdee;line-height:1.35;margin:2px 0 4px 0}
 #login_error{min-height:1.2em;margin-top:8px;color:#ff9a9a;font-size:.82rem}
 .app{max-width:1600px;margin:0 auto;padding:14px;padding-bottom:calc(14px + env(safe-area-inset-bottom))}
 .top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
@@ -393,8 +395,21 @@ R"FT2JS((() => {
   const loginForm = el('login_form');
   const loginUser = el('login_user');
   const loginToken = el('login_token');
+  const loginTokenHint = el('login_token_hint');
   const loginError = el('login_error');
   const loginCaption = el('login_caption');
+  const isItalianUi = ((navigator.language || navigator.userLanguage || 'en').toLowerCase().startsWith('it'));
+  const uiText = isItalianUi
+    ? {
+        loginCaptionAuth: 'Inserisci username e password per sbloccare la dashboard',
+        loginCaptionNoAuth: 'Autenticazione non richiesta',
+        tokenMinHint: 'La password di accesso deve avere almeno 12 caratteri.'
+      }
+    : {
+        loginCaptionAuth: 'Insert username and password to unlock dashboard',
+        loginCaptionNoAuth: 'Authentication not required',
+        tokenMinHint: 'The access password must be at least 12 characters.'
+      };
   let ws = null;
   let health = null;
   const activityRows = [];
@@ -480,6 +495,8 @@ R"FT2JS((() => {
   loadSavedAuth();
   if (loginUser) loginUser.value = authUser || 'admin';
   if (loginToken && authToken) loginToken.value = authToken;
+  if (loginCaption) loginCaption.textContent = uiText.loginCaptionAuth;
+  if (loginTokenHint) loginTokenHint.textContent = uiText.tokenMinHint;
 
   const set = (id, v) => { const n = el(id); if (n) n.textContent = v ?? '-'; };
   const fmtHz = (v) => Number(v || 0).toLocaleString('en-US');
@@ -981,8 +998,8 @@ R"FT2JS((() => {
     }
     if (loginCaption) {
       loginCaption.textContent = requiresAuth
-        ? 'Insert username and password to unlock dashboard'
-        : 'Authentication not required';
+        ? uiText.loginCaptionAuth
+        : uiText.loginCaptionNoAuth;
     }
     return health;
   }

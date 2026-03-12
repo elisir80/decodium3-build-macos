@@ -370,9 +370,8 @@ static void normalize_ft2_mode_marker (QString& line, QString const& currentMode
   auto const prefixMatch = ft2PrefixRx.match (line);
   if (prefixMatch.hasMatch ()) {
     QString utc = prefixMatch.captured (1).trimmed ();
-    if (utc.size () < 6) {
-      utc = utc.rightJustified (6, QChar {'0'});
-    }
+    int const utcWidth = utc.size () >= 6 ? 6 : 4;
+    utc = utc.rightJustified (utcWidth, QChar {'0'});
 
     QString snrText = prefixMatch.captured (2);
     snrText.replace (QChar {0x2212}, QChar {'-'});
@@ -389,8 +388,10 @@ static void normalize_ft2_mode_marker (QString& line, QString const& currentMode
 
     if (snrOk && dtOk && freqOk) {
       QString const payload = prefixMatch.captured (6).trimmed ();
-      line = QString {"%1 %2 %3 %4 + %5"}
-        .arg (utc, 6, QChar {'0'})
+      // Keep exactly two spaces after the mode marker to preserve
+      // DecodedText fixed columns (mode at 19/21, message at 22/24).
+      line = QString {"%1 %2 %3 %4 +  %5"}
+        .arg (utc, utcWidth, QChar {'0'})
         .arg (snr, 3)
         .arg (dt, 4, 'f', 1)
         .arg (freq, 4)
