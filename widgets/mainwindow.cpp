@@ -2163,7 +2163,13 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
 
   connect(&watcher3, SIGNAL(finished()),this,SLOT(fast_decode_done()));
   connect(&m_asyncDecodeWatcher, &QFutureWatcher<void>::finished, this, &MainWindow::asyncDecodeDone);
-  m_asyncTxGuardTimer.setSingleShot (true);
+  // Async TX guard timer: fires 100ms after decode to start TX immediately
+  m_asyncTxGuardTimer.setSingleShot(true);
+  connect(&m_asyncTxGuardTimer, &QTimer::timeout, this, [this]() {
+    if (m_mode == "FT2" && ui->cbAsyncDecode->isChecked() && m_auto) {
+      m_bAsyncTxArmed = true;  // guiUpdate() will pick this up and start TX
+    }
+  });
   m_asyncDecodeThreadPool.setMaxThreadCount (1);
 #if defined(Q_OS_LINUX)
   // Fortran/OpenMP path in async L2 is stack hungry on some Linux distros.
@@ -5154,10 +5160,10 @@ void MainWindow::process_autoButton (bool checked)   //manually or by controller
   if (checked) {
     m_auto = checked;
 
-    // ASYMX timing bar: arm 300 ms guard window before first TX attempt.
+    // ASYMX timing bar: arm 100 ms guard window before first TX attempt.
     if (m_mode == "FT2" && ui->cbAsyncDecode && ui->cbAsyncDecode->isChecked()) {
       if (!m_asyncTxGuardTimer.isActive()) {
-        m_asyncTxGuardTimer.start (300);
+        m_asyncTxGuardTimer.start(100);
       }
     }
 
@@ -5225,10 +5231,10 @@ void MainWindow::auto_tx_mode (bool state)
   //debugToFile(QString{"autoTxMode   m_autoButtonState:%1"}.arg(m_autoButtonState));   //avt 2/2/24
   on_autoButton_clicked (state);
 
-  // ASYMX timing bar: arm 300 ms guard window before first TX attempt.
+  // ASYMX timing bar: arm 100 ms guard window before first TX attempt.
   if (state && m_mode == "FT2" && ui->cbAsyncDecode && ui->cbAsyncDecode->isChecked()) {
     if (!m_asyncTxGuardTimer.isActive()) {
-      m_asyncTxGuardTimer.start (300);
+      m_asyncTxGuardTimer.start(100);  // 100ms guard before TX
     }
   }
 }
