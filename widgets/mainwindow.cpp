@@ -12590,97 +12590,44 @@ void MainWindow::clearPendingAutoLogSnapshot ()
 
 void MainWindow::enqueueCaller (QString const& call, int freq, int snr, float dt)
 {
-  // In FT2 the decode column now carries TΔ (time since TX), not raw DT.
-  // So queue decisions must not reject callers on this field.
-  if (m_mode == "FT2") {
-    dt = 0.0f;
-  }
-
-  // AutoCQ guard: don't re-queue stations that were just logged/worked on
-  // the same band+mode (late 73/replies can otherwise re-open stale QSOs).
-  {
-    auto const nowUtc = QDateTime::currentDateTimeUtc ();
-    auto const dedupeCall = Radio::base_callsign (call).trimmed ().toUpper ();
-    auto const dedupeBand = m_config.bands ()->find (m_freqNominal).trimmed ().toUpper ();
-    auto const dedupeMode = m_mode.trimmed ().toUpper ();
-    if (!dedupeCall.isEmpty () && !dedupeBand.isEmpty () && !dedupeMode.isEmpty ()) {
-      auto const key = QString {"%1|%2|%3"}.arg (dedupeCall, dedupeBand, dedupeMode);
-      auto it = m_recentQsoLogUtcByKey.constFind (key);
-      if (it != m_recentQsoLogUtcByKey.constEnd ()) {
-        qint64 const ageSec = it.value ().secsTo (nowUtc);
-        if (ageSec >= 0 && ageSec <= (2 * kRecentDuplicateLogWindowSeconds)) {
-          return;
-        }
-      }
+  Q_UNUSED (dt);
+  QString queuedCall = Radio::base_callsign (call).trimmed ();
+  if (queuedCall.isEmpty ()) return;
+  QString entry = queuedCall + " " + QString::number (freq) + " " + QString::number (snr);
+  for (auto const& e : m_callerQueue) {
+    auto parts = e.split (' ', SkipEmptyParts);
+    if (!parts.isEmpty ()
+        && Radio::base_callsign (parts.at (0)).trimmed ().compare (queuedCall, Qt::CaseInsensitive) == 0) {
+      return;   // no duplicates (classic v1.3.8 behavior)
     }
   }
-
-  // Niente duplicati
-  for (auto const& e : m_callerQueue)
-    if (e.startsWith (call + " ")) return;
-  if (m_callerQueue.size () >= 20) return;
-
-  // Score combinato: SNR pesato + bonus timing (|DT| piccolo = meglio)
-  // Scala: ogni 0.1s di DT vale ~0.8 dB. DT=0 → pieno SNR, DT=1.0s → SNR -8.
-  float score = float(snr) - 8.0f * qAbs(dt);
-
-  QString entry = call + " " + QString::number(freq) + " " +
-                  QString::number(snr) + " " +
-                  QString::number(double(dt), 'f', 2);
-
-  // Inserimento ordinato per score decrescente
-  int insertPos = m_callerQueue.size();
-  for (int j = 0; j < m_callerQueue.size(); j++) {
-    auto parts = m_callerQueue.at(j).split(' ');
-    int   eSnr = parts.size() >= 3 ? parts.at(2).toInt()   : -99;
-    float eDt  = parts.size() >= 4 ? parts.at(3).toFloat() : 0.0f;
-    float eScore = float(eSnr) - 8.0f * qAbs(eDt);
-    if (score > eScore) { insertPos = j; break; }
+  if (m_callerQueue.size () < 20) {
+    m_callerQueue.enqueue (entry);   // FIFO (classic v1.3.8 behavior)
   }
-  m_callerQueue.insert(insertPos, entry);
   refreshCallerQueueDisplay();
 }
 
 void MainWindow::processNextInQueue ()
 {
-  while (!m_callerQueue.isEmpty ()) {
-    QString entry = m_callerQueue.dequeue ();
-    auto parts = entry.split (' ');
-    if (parts.size () < 2) continue;   // Bug fix: entry malformata → prova la prossima
-    {
-      // Drop stale queued callers that were already worked recently.
-      auto const nowUtc = QDateTime::currentDateTimeUtc ();
-      auto const dedupeCall = Radio::base_callsign (parts.at (0)).trimmed ().toUpper ();
-      auto const dedupeBand = m_config.bands ()->find (m_freqNominal).trimmed ().toUpper ();
-      auto const dedupeMode = m_mode.trimmed ().toUpper ();
-      if (!dedupeCall.isEmpty () && !dedupeBand.isEmpty () && !dedupeMode.isEmpty ()) {
-        auto const key = QString {"%1|%2|%3"}.arg (dedupeCall, dedupeBand, dedupeMode);
-        auto it = m_recentQsoLogUtcByKey.constFind (key);
-        if (it != m_recentQsoLogUtcByKey.constEnd ()) {
-          qint64 const ageSec = it.value ().secsTo (nowUtc);
-          if (ageSec >= 0 && ageSec <= (2 * kRecentDuplicateLogWindowSeconds)) {
-            refreshCallerQueueDisplay();
-            continue;
-          }
-        }
-      }
-    }
-    int freq = parts.at (1).toInt ();
-    int snr = parts.size () >= 3 ? parts.at (2).toInt () : ui->rptSpinBox->value ();
-    snr = qBound (-50, snr, 49);
-    ui->dxCallEntry->setText (parts.at (0));
-    ui->RxFreqSpinBox->setValue (freq);
-    ui->rptSpinBox->setValue (snr);
-    genStdMsgs (QString::number (snr));
-    m_autoCQPeriodsMissed = 0;
-    m_receivedReplyThisPeriod = false;
-    setTxMsg (2);            // MSHV-style: inizia sempre da Tx2 (report diretto)
-    m_QSOProgress = REPORT;
-    if (!m_auto) auto_tx_mode (true);
-    refreshCallerQueueDisplay();
+  if (m_callerQueue.isEmpty ()) return;
+  QString entry = m_callerQueue.dequeue ();
+  auto parts = entry.split (' ', SkipEmptyParts);
+  if (parts.size () < 2) {
+    refreshCallerQueueDisplay ();
     return;
   }
-  // Coda esaurita: torna a CQ
+  int freq = parts.at (1).toInt ();
+  int snr = parts.size () >= 3 ? parts.at (2).toInt () : ui->rptSpinBox->value ();
+  snr = qBound (-50, snr, 49);
+  ui->dxCallEntry->setText (parts.at (0));
+  ui->RxFreqSpinBox->setValue (freq);
+  ui->rptSpinBox->setValue (snr);
+  genStdMsgs (QString::number (snr));
+  m_autoCQPeriodsMissed = 0;
+  m_receivedReplyThisPeriod = false;
+  setTxMsg (2);            // MSHV-style: start from direct report
+  m_QSOProgress = REPORT;
+  if (!m_auto) auto_tx_mode (true);
   refreshCallerQueueDisplay();
 }
 
