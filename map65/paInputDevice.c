@@ -2,12 +2,15 @@
 #include <stdio.h>
 #include <string.h>
 
+#define PA_NAME_BUFFER_SIZE 128
+#define UI_DEVICE_NAME_SIZE 50
+
 void paInputDevice(int id, char* hostAPI_DeviceName, int* minChan, 
 		   int* maxChan, int* minSpeed, int* maxSpeed)
 {
   int i;
-  char pa_device_name[128];     
-  char pa_device_hostapi[128]; 
+  char pa_device_name[PA_NAME_BUFFER_SIZE];
+  char pa_device_hostapi[PA_NAME_BUFFER_SIZE];
   double pa_device_max_speed;
   double pa_device_min_speed;
   int pa_device_max_bytes;
@@ -43,10 +46,13 @@ void paInputDevice(int id, char* hostAPI_DeviceName, int* minChan,
     p=strstr(pa_device_hostapi,"WDM-KS");
     if(p!=NULL) p1="WDM-KS";
 
-    sprintf(p2,"%-8s %-39s",p1,pa_device_name);
-    for(i=0; i<50; i++) {
+    snprintf(p2,sizeof(p2),"%-8s %-39s",p1,pa_device_name);
+    for(i=0; i<UI_DEVICE_NAME_SIZE; i++) {
       hostAPI_DeviceName[i]=p2[i];
       if(p2[i]==0) break;
+    }
+    if(i == UI_DEVICE_NAME_SIZE) {
+      hostAPI_DeviceName[UI_DEVICE_NAME_SIZE-1]=0;
     }
     *minChan=pa_device_min_channels;
     *maxChan=pa_device_max_channels;

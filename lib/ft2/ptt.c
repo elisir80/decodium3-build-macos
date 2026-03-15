@@ -5,7 +5,7 @@ int ptt_(int *nport, int *ntx, int *ndtr, int *iptt)
 {
   static HANDLE hFile;
   static int open=0, nhold=0;
-  char s[10];
+  char s[32];
   int i3,i4,i5,i6,i9,i00;
 
   if(*nport==0) {
@@ -17,7 +17,10 @@ int ptt_(int *nport, int *ntx, int *ndtr, int *iptt)
   if(*nport>100) nhold=1;
 
   if(*ntx && (!open)) {
-    sprintf(s,"\\\\.\\COM%d",*nport%100);
+    int const portNameLen = snprintf(s, sizeof(s), "\\\\.\\COM%d", *nport%100);
+    if (portNameLen < 0 || portNameLen >= (int)sizeof(s)) {
+      return(-1);
+    }
     hFile=CreateFile(
 		     TEXT(s),
 		     GENERIC_WRITE,

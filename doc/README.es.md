@@ -1,38 +1,37 @@
-# Notas de Documentacion (Espanol) - v1.4.7
+# Notas de Documentacion (Espanol) - v1.4.8
 
 Este indice agrupa la documentacion orientada a release del ciclo actual del fork.
 
-- Release actual: `v1.4.7`
-- Ciclo de actualizacion: `v1.4.6 -> v1.4.7`
-- Foco principal: hardening runtime/decode FT2, continuidad AutoCQ, integracion AutoSpot/DX Cluster y alineacion release.
+- Release actual: `v1.4.8`
+- Ciclo de actualizacion: `v1.4.7 -> v1.4.8`
+- Foco principal: refinamientos timing/operator FT2, correccion signoff FT2, hardening remoto web, fixes bounded de cadenas y robustez release.
 
-## Cambios Tecnicos Principales (`v1.4.6 -> v1.4.7`)
+## Cambios Tecnicos Principales (`v1.4.7 -> v1.4.8`)
 
-- guardia async Tx FT2 subida a `300 ms`.
-- filtro false decode FT2 ampliado con validacion de prefijos `cty.dat`.
-- renderizado FT2 `TΔ` y normalizacion de marcador reforzados para preservar alineacion de columnas.
-- estabilizados lock de pareja / reintentos / retorno a CQ tras `73` confirmado en AutoCQ.
-- ajustes con nueva seccion para endpoint AutoSpot y flag enable.
-- ventana DX Cluster ahora consulta un endpoint DxSpider configurable con manejo telnet/prompt mas robusto.
-- dashboard web con toggle AutoSpot, mejor feedback de comandos y presets de modo mas estables.
-- estado del menu `Datos Astronomicos` ahora sigue el cierre real de la ventana.
+- FT2 ajustado a `103` simbolos con margen Tx reducido a `0.2 s`.
+- anadido soporte FT2 `Speedy`, `D-CW` y `TX NOW`.
+- FT2 ahora espera el ack final de la pareja antes del log y se detiene limpio sin log si se agotan los reintentos.
+- dedupe async FT2 mas robusto contra hipotesis duplicadas en bins cercanos.
+- remote web con token obligatorio fuera de loopback, sin wildcard CORS y validacion `Origin` WebSocket.
+- fixes bounded-formatting en `lib/ptt.c`, `lib/ft2` y varios paths `map65`.
+- packaging release macOS mas robusto frente a mounts DMG residuales de CPack.
 
 ## Artefactos de Release
 
-- `decodium3-ft2-v1.4.7-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-v1.4.7-macos-tahoe-arm64.zip`
-- `decodium3-ft2-v1.4.7-macos-tahoe-arm64-sha256.txt`
-- `decodium3-ft2-v1.4.7-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-v1.4.7-macos-sequoia-arm64.zip`
-- `decodium3-ft2-v1.4.7-macos-sequoia-arm64-sha256.txt`
-- `decodium3-ft2-v1.4.7-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-v1.4.7-macos-sequoia-x86_64.zip`
-- `decodium3-ft2-v1.4.7-macos-sequoia-x86_64-sha256.txt`
-- `decodium3-ft2-v1.4.7-macos-monterey-x86_64.dmg` *(best effort/experimental, si se genera)*
-- `decodium3-ft2-v1.4.7-macos-monterey-x86_64.zip` *(best effort/experimental, si se genera)*
-- `decodium3-ft2-v1.4.7-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, si se genera)*
-- `decodium3-ft2-v1.4.7-linux-x86_64.AppImage`
-- `decodium3-ft2-v1.4.7-linux-x86_64.AppImage.sha256.txt`
+- `decodium3-ft2-v1.4.8-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-v1.4.8-macos-tahoe-arm64.zip`
+- `decodium3-ft2-v1.4.8-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-v1.4.8-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-v1.4.8-macos-sequoia-arm64.zip`
+- `decodium3-ft2-v1.4.8-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-v1.4.8-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-v1.4.8-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-v1.4.8-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-v1.4.8-macos-monterey-x86_64.dmg` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-v1.4.8-macos-monterey-x86_64.zip` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-v1.4.8-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-v1.4.8-linux-x86_64.AppImage`
+- `decodium3-ft2-v1.4.8-linux-x86_64.AppImage.sha256.txt`
 
 ## Requisitos Minimos Linux
 
@@ -66,6 +65,6 @@ cd squashfs-root
 - [README.en-GB.md](../README.en-GB.md)
 - [README.it.md](../README.it.md)
 - [README.es.md](../README.es.md)
-- [RELEASE_NOTES_v1.4.7.md](../RELEASE_NOTES_v1.4.7.md)
-- [doc/GITHUB_RELEASE_BODY_v1.4.7.md](./GITHUB_RELEASE_BODY_v1.4.7.md)
+- [RELEASE_NOTES_v1.4.8.md](../RELEASE_NOTES_v1.4.8.md)
+- [doc/GITHUB_RELEASE_BODY_v1.4.8.md](./GITHUB_RELEASE_BODY_v1.4.8.md)
 - [CHANGELOG.md](../CHANGELOG.md)

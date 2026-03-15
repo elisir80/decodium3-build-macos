@@ -142,6 +142,7 @@ private:
   QString httpBearerToken(HttpConnectionState const& state) const;
   bool authUserMatches(QString const& candidate) const;
   bool isHttpAuthorized(HttpConnectionState const& state) const;
+  bool isAllowedWebSocketOrigin(QWebSocket const* client) const;
   bool isAuthRequired() const { return !authToken_.isEmpty(); }
   bool isClientAuthenticated(QWebSocket * client) const;
   void markClientAuthenticated(QWebSocket * client);

@@ -69,7 +69,7 @@
 #define NUM_FT8_SYMBOLS 79
 #define NUM_SUPERFOX_SYMBOLS 153
 #define NUM_FT4_SYMBOLS 105
-#define NUM_FT2_SYMBOLS 105
+#define NUM_FT2_SYMBOLS 103              // FT2 sync+data symbols; Modulator adds +2 ramp symbols internally
 #define NUM_FST4_SYMBOLS 160             //240/2 data + 5*8 sync
 #define NUM_CW_SYMBOLS 250
 #define MAX_NUM_SYMBOLS 250
@@ -230,6 +230,8 @@ private slots:
   void on_cbDualCarrier_toggled (bool checked);
   void on_cbAsyncDecode_toggled (bool checked);
   void on_cbManualTx_toggled (bool checked);
+  void on_cbSpeedyContest_toggled (bool checked);
+  void on_cbDigitalMorse_toggled (bool checked);
   void asyncDecodeDone ();
   void on_ft8Button_clicked();
   void on_ft4Button_clicked();
@@ -1002,6 +1004,9 @@ private:
   bool isDuplicateDecode(QString const& message);
   bool asyncConfirmDecode(QString const& message, int freq, int snr);
   bool m_bAsyncTxArmed {false};       // async TX ready after guard timer
+  bool m_bSpeedyContest {false};      // FT2: bypass guard/period wait for instant TX
+  bool m_bDigitalMorse {false};       // FT2: preload on click, fire on Space/TX NOW
+  bool m_bTxPreloaded {false};        // FT2 D-CW message prepared, awaiting manual fire
 
   struct DecodeDedupeEntry
   {
@@ -1015,6 +1020,7 @@ private:
   // Manual TX Timing (contest skill mode)
   bool m_bManualTxPending {false};    // decode received, waiting for operator TX
   QTimer m_manualTxWindowTimer;       // countdown timer for TX window
+  QTimer m_txRdyBlinkTimer;           // blink timer for FT2 D-CW TX NOW button
   qint64 m_manualTxWindowStartMs {0}; // when the TX window opened
   QFutureWatcher<QString> m_saveWAVWatcher;
 
@@ -1350,6 +1356,7 @@ private:
   void initExternalCtrl();     //avt 12/5/20
   void externalCtrlDisconnected();  //avt 12/16/21
   void debugToFile(QString str);        //avt 12/6/23
+  bool ft2AutoSeqEnabled() const;
   void setCallPriority(QString call, int txFirst);   //avt 12/7/23
   void download (QUrl);     //avt 9/23/25
   void reply_finished (QPointer<QNetworkReply>);     //avt 9/23/25

@@ -1,33 +1,35 @@
-# Decodium 3 FT2 (macOS Fork) - v1.4.7
+# Decodium 3 FT2 (macOS Fork) - v1.4.8
 
 Fork maintained by **Salvatore Raccampo 9H1SR**.
 
 ## Project Description
 
-This repository is a Decodium/WSJT-X fork focused on macOS and Linux packaging, FT2 runtime stability, AutoCQ reliability, and DX cluster / AutoSpot operational workflows.
+This repository is a Decodium/WSJT-X fork focused on macOS and Linux packaging, FT2 operator/runtime stability, AutoCQ correctness, and hardened remote/DX-cluster workflows.
 
-Latest stable release: `v1.4.7`.
+Latest stable release: `v1.4.8`.
 
-## Changes in v1.4.7 (`v1.4.6 -> v1.4.7`)
+## Changes in v1.4.8 (`v1.4.7 -> v1.4.8`)
 
-- FT2 runtime/decode hardening:
-- increased FT2 async Tx guard from `100 ms` to `300 ms`.
-- added FT2 false-decode rejection using `cty.dat` prefix validation.
-- rewrote FT2 `TΔ` rendering through structured parsing so columns stay aligned with packed rows and variable markers.
-- kept FT2 mode-marker normalization consistent when `~` appears in decode flow.
-- AutoCQ/QSO sequencing:
-- stronger active-partner lock so another caller cannot take over an in-progress QSO.
-- missed-period logic now matches the full `5` retry budget.
-- stale missed-period state is cleared as soon as a valid caller/partner reply advances the QSO.
-- after a confirmed partner `73`, AutoCQ returns to CQ instead of sending an extra `RR73`.
-- AutoSpot / DX Cluster / web dashboard:
-- new Settings page section for AutoSpot endpoint (`host`, `port`, enabled flag).
-- DX Cluster window now queries a configurable DxSpider telnet node instead of the fixed HamQTH source.
-- improved telnet prompt negotiation, `UNSET/DX` quiet fetch, login fallback, and submit/verify diagnostics in `autospot.log`.
-- dashboard/web app now exposes AutoSpot toggle, better command/auth feedback, and more stable current-mode preset save/apply behavior.
-- Desktop/runtime fixes:
-- `Astronomical Data` menu action now unchecks when the window is closed with the titlebar `X`.
-- Linux settings dialog keeps oversized tab pages scrollable with bottom action buttons still reachable.
+- FT2 timing and operator workflow:
+- aligned `NUM_FT2_SYMBOLS` from `105` to `103` and reduced the FT2 Tx timing margin from `0.5 s` to `0.2 s` above waveform duration.
+- added FT2 `Speedy`, `D-CW`, and `TX NOW` workflow support for immediate or preloaded transmit handling.
+- FT2 auto-sequence logic now stays coherent even when the standard AutoSeq checkbox is hidden in FT2 mode.
+- FT2 QSO/signoff correctness:
+- FT2 no longer logs a QSO before the local final signoff has been sent and the partner final acknowledgment has actually arrived.
+- if FT2 exhausts the RR73/73 retry budget without partner acknowledgment, transmission stops without auto-log.
+- partner `RR73/73` handling no longer skips the local final `73` in FT2 AutoCQ/auto-sequence flows.
+- FT2 async duplicate suppression now removes repeated same-payload hypotheses across nearby audio bins, so split duplicate exchanges no longer reach the decode flow.
+- Remote Web / dashboard hardening:
+- RemoteCommandServer is now blocked on non-loopback bind when no access token is configured.
+- non-loopback token length must be at least `12` characters.
+- wildcard CORS headers were removed from the remote HTTP API.
+- WebSocket connections now require an allowed same-origin `Origin` instead of accepting arbitrary browser origins.
+- String/buffer safety:
+- fixed the concrete COM-port formatting overflow risk in `lib/ptt.c`.
+- applied bounded formatting to related PTT code in `lib/ft2` and `map65`.
+- hardened `map65` device-info, status-label, and astronomical text formatting.
+- Release/build pipeline:
+- macOS packaging now tolerates leftover CPack mounted DMG images instead of failing the whole release when staged output is already valid.
 
 ## Release Targets
 
@@ -82,9 +84,9 @@ cmake --build build -j6
 - [README.md](README.md)
 - [README.it.md](README.it.md)
 - [README.es.md](README.es.md)
-- [RELEASE_NOTES_v1.4.7.md](RELEASE_NOTES_v1.4.7.md)
+- [RELEASE_NOTES_v1.4.8.md](RELEASE_NOTES_v1.4.8.md)
 - [CHANGELOG.md](CHANGELOG.md)
-- [doc/GITHUB_RELEASE_BODY_v1.4.7.md](doc/GITHUB_RELEASE_BODY_v1.4.7.md)
+- [doc/GITHUB_RELEASE_BODY_v1.4.8.md](doc/GITHUB_RELEASE_BODY_v1.4.8.md)
 - [doc/README.en-GB.md](doc/README.en-GB.md)
 - [doc/README.it.md](doc/README.it.md)
 - [doc/README.es.md](doc/README.es.md)

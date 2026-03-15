@@ -1662,9 +1662,7 @@ void MainWindow::guiUpdate()
       int ierr = ptt_(&m_pttPort,&itx,&iptt);       // Raise PTT
       if(ierr != 0) {
         on_stopTxButton_clicked();
-        char s[18];
-        sprintf(s,"Cannot open COM%d",m_pttPort);
-        msgBox(s);
+        msgBox(QStringLiteral("Cannot open COM%1").arg(m_pttPort));
       }
 
       if(m_bIQxt) m_wide_graph_window->tx570();     // Set Si570 to Tx Freq
@@ -1814,9 +1812,7 @@ void MainWindow::guiUpdate()
       } else {
         lab1->setStyleSheet("QLabel{background-color: #ffff33}");
       }
-      char s[37];
-      sprintf(s,"Tx: %s",msgsent);
-      lab1->setText(s);
+      lab1->setText(QStringLiteral("Tx: %1").arg(QString::fromLatin1(msgsent)));
     } else if(m_monitoring) {
       lab1->setStyleSheet("QLabel{background-color: #00ff00}");
       m_nrx=soundInThread.nrx();

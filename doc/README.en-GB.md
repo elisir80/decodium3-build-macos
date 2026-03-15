@@ -1,38 +1,37 @@
-# Documentation Notes (English) - v1.4.7
+# Documentation Notes (English) - v1.4.8
 
 This index groups the release-facing documentation for the current fork cycle.
 
-- Current release: `v1.4.7`
-- Update cycle: `v1.4.6 -> v1.4.7`
-- Primary focus: FT2 runtime/decode hardening, AutoCQ continuity, AutoSpot/DX Cluster integration, and release alignment.
+- Current release: `v1.4.8`
+- Update cycle: `v1.4.7 -> v1.4.8`
+- Primary focus: FT2 timing/operator refinements, FT2 signoff correctness, remote-web hardening, string-safety fixes, and release robustness.
 
-## Key Technical Changes (`v1.4.6 -> v1.4.7`)
+## Key Technical Changes (`v1.4.7 -> v1.4.8`)
 
-- FT2 async Tx guard raised to `300 ms`.
-- FT2 false-decode filtering extended with `cty.dat` prefix validation.
-- FT2 `TΔ` rendering and marker normalization hardened to preserve column alignment.
-- AutoCQ partner lock / retry / confirmed-73 return-to-CQ behavior stabilized.
-- Settings now expose AutoSpot endpoint configuration and enable flag.
-- DX Cluster window now queries a configurable DxSpider telnet endpoint with better telnet/prompt handling.
-- Web dashboard adds AutoSpot toggle, stronger command feedback, and more stable mode presets.
-- `Astronomical Data` menu state now follows real window close events.
+- FT2 symbol/timing alignment updated to `103` symbols and `0.2 s` timing margin.
+- FT2 `Speedy`, `D-CW`, and `TX NOW` workflow support added.
+- FT2 signoff/logging waits for real partner acknowledgment and stops cleanly without logging when retries are exhausted.
+- FT2 duplicate decode suppression hardened for async nearby-bin hypotheses.
+- Remote web now enforces token authentication on non-loopback bind, removes wildcard CORS, and validates WebSocket `Origin`.
+- concrete bounded-formatting fixes applied in `lib/ptt.c`, `lib/ft2`, and multiple `map65` paths.
+- macOS release packaging now survives leftover CPack DMG mounts.
 
 ## Release Artifacts
 
-- `decodium3-ft2-v1.4.7-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-v1.4.7-macos-tahoe-arm64.zip`
-- `decodium3-ft2-v1.4.7-macos-tahoe-arm64-sha256.txt`
-- `decodium3-ft2-v1.4.7-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-v1.4.7-macos-sequoia-arm64.zip`
-- `decodium3-ft2-v1.4.7-macos-sequoia-arm64-sha256.txt`
-- `decodium3-ft2-v1.4.7-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-v1.4.7-macos-sequoia-x86_64.zip`
-- `decodium3-ft2-v1.4.7-macos-sequoia-x86_64-sha256.txt`
-- `decodium3-ft2-v1.4.7-macos-monterey-x86_64.dmg` *(best effort/experimental, if generated)*
-- `decodium3-ft2-v1.4.7-macos-monterey-x86_64.zip` *(best effort/experimental, if generated)*
-- `decodium3-ft2-v1.4.7-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, if generated)*
-- `decodium3-ft2-v1.4.7-linux-x86_64.AppImage`
-- `decodium3-ft2-v1.4.7-linux-x86_64.AppImage.sha256.txt`
+- `decodium3-ft2-v1.4.8-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-v1.4.8-macos-tahoe-arm64.zip`
+- `decodium3-ft2-v1.4.8-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-v1.4.8-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-v1.4.8-macos-sequoia-arm64.zip`
+- `decodium3-ft2-v1.4.8-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-v1.4.8-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-v1.4.8-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-v1.4.8-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-v1.4.8-macos-monterey-x86_64.dmg` *(best effort/experimental, if generated)*
+- `decodium3-ft2-v1.4.8-macos-monterey-x86_64.zip` *(best effort/experimental, if generated)*
+- `decodium3-ft2-v1.4.8-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, if generated)*
+- `decodium3-ft2-v1.4.8-linux-x86_64.AppImage`
+- `decodium3-ft2-v1.4.8-linux-x86_64.AppImage.sha256.txt`
 
 ## Linux Minimum Requirements
 
@@ -66,6 +65,6 @@ cd squashfs-root
 - [README.en-GB.md](../README.en-GB.md)
 - [README.it.md](../README.it.md)
 - [README.es.md](../README.es.md)
-- [RELEASE_NOTES_v1.4.7.md](../RELEASE_NOTES_v1.4.7.md)
-- [doc/GITHUB_RELEASE_BODY_v1.4.7.md](./GITHUB_RELEASE_BODY_v1.4.7.md)
+- [RELEASE_NOTES_v1.4.8.md](../RELEASE_NOTES_v1.4.8.md)
+- [doc/GITHUB_RELEASE_BODY_v1.4.8.md](./GITHUB_RELEASE_BODY_v1.4.8.md)
 - [CHANGELOG.md](../CHANGELOG.md)

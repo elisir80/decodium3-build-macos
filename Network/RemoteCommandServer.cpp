@@ -3,6 +3,7 @@
 
 #include <QDateTime>
 #include <QBuffer>
+#include <QHostInfo>
 #include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -39,6 +40,15 @@ QString normalize_call(QString call)
 QString normalize_grid(QString grid)
 {
   return grid.trimmed().toUpper();
+}
+
+bool is_loopback_origin_host(QString const& host)
+{
+  auto normalized = host.trimmed().toLower();
+  return normalized == QStringLiteral("localhost")
+      || normalized == QStringLiteral("127.0.0.1")
+      || normalized == QStringLiteral("::1")
+      || normalized == QStringLiteral("[::1]");
 }
 
 QByteArray dashboard_html()
@@ -445,7 +455,7 @@ R"FT2JS((() => {
   const AUTH_TTL_MS = 30 * 60 * 1000;
   const AUTH_STORAGE_KEY = 'ft2_remote_auth_v1';
   const MODE_FREQ_STORAGE_KEY = 'ft2_remote_mode_freq_v1';
-  const SW_VERSION = 'v1.4.7';
+  const SW_VERSION = 'v1.4.8';
   const MODE_PRESET_MODES = ['FT2','FT8','FT4','MSK144','Q65','JT65','JT9','FST4','WSPR'];
   let activeMode = '';
   let activeBand = '';
@@ -1886,16 +1896,18 @@ bool RemoteCommandServer::start(quint16 wsPort, QHostAddress const& address, qui
   bool const remoteExposed = !(address.isLoopback()
                                || address == QHostAddress::LocalHost
                                || address == QHostAddress::LocalHostIPv6);
+  auto const token = authToken_.trimmed();
   if (remoteExposed)
     {
-      auto const token = authToken_.trimmed();
       if (token.isEmpty())
         {
-          Q_EMIT logMessage(QStringLiteral("Remote WS warning: LAN/WAN bind without token authentication."));
+          Q_EMIT logMessage(QStringLiteral("Remote WS disabled: non-loopback bind requires token authentication."));
+          return false;
         }
       else if (token.size() < 12)
         {
-          Q_EMIT logMessage(QStringLiteral("Remote WS warning: token shorter than 12 characters on LAN/WAN bind."));
+          Q_EMIT logMessage(QStringLiteral("Remote WS disabled: token must be at least 12 characters on LAN/WAN bind."));
+          return false;
         }
     }
 
@@ -2191,6 +2203,16 @@ void RemoteCommandServer::onNewConnection()
           continue;
         }
 
+      if (!isAllowedWebSocketOrigin(client))
+        {
+          auto const origin = client->origin().trimmed();
+          Q_EMIT logMessage(QString {"Remote WS rejected origin \"%1\""}
+                              .arg(origin.isEmpty() ? QStringLiteral("<empty>") : origin));
+          client->close();
+          client->deleteLater();
+          continue;
+        }
+
       clients_.append(client);
       connect(client, &QWebSocket::textMessageReceived, this, &RemoteCommandServer::onTextMessageReceived);
       connect(client, &QWebSocket::disconnected, this, &RemoteCommandServer::onSocketDisconnected);
@@ -2215,6 +2237,76 @@ void RemoteCommandServer::onNewConnection()
     }
 
   Q_EMIT logMessage(QString {"Remote WS client connected (%1 clients)"}.arg(clients_.size()));
+}
+
+bool RemoteCommandServer::isAllowedWebSocketOrigin(QWebSocket const* client) const
+{
+  if (!client)
+    {
+      return false;
+    }
+
+  bool const loopbackOnly = bindAddress_.isLoopback()
+                            || bindAddress_ == QHostAddress::LocalHost
+                            || bindAddress_ == QHostAddress::LocalHostIPv6;
+
+  auto const originText = client->origin().trimmed();
+  if (originText.isEmpty())
+    {
+      return loopbackOnly;
+    }
+
+  QUrl const originUrl {originText};
+  if (!originUrl.isValid())
+    {
+      return false;
+    }
+
+  auto const scheme = originUrl.scheme().trimmed().toLower();
+  if (scheme != QStringLiteral("http") && scheme != QStringLiteral("https"))
+    {
+      return false;
+    }
+
+  int const defaultPort = (scheme == QStringLiteral("https")) ? 443 : 80;
+  int const originPort = originUrl.port(defaultPort);
+  int const expectedPort = httpPort_ > 0 ? static_cast<int>(httpPort_) : static_cast<int>(wsPort_);
+  if (originPort != expectedPort)
+    {
+      return false;
+    }
+
+  auto const originHost = originUrl.host().trimmed().toLower();
+  if (originHost.isEmpty())
+    {
+      return false;
+    }
+
+  if (loopbackOnly)
+    {
+      return is_loopback_origin_host(originHost);
+    }
+
+  if (!(bindAddress_ == QHostAddress::Any
+        || bindAddress_ == QHostAddress::AnyIPv4
+        || bindAddress_ == QHostAddress::AnyIPv6))
+    {
+      return originHost == bindAddress_.toString().trimmed().toLower();
+    }
+
+  if (is_loopback_origin_host(originHost))
+    {
+      return true;
+    }
+
+  QHostAddress parsedOriginHost;
+  if (parsedOriginHost.setAddress(originHost))
+    {
+      return true;
+    }
+
+  auto const localHostName = QHostInfo::localHostName().trimmed().toLower();
+  return !localHostName.isEmpty() && originHost == localHostName;
 }
 
 void RemoteCommandServer::removeClient(QWebSocket * client)
@@ -2882,9 +2974,6 @@ void RemoteCommandServer::sendHttpJson(QTcpSocket * socket, int statusCode, QJso
   response += QByteArray::number(body.size());
   response += "\r\n";
   response += "Connection: close\r\n";
-  response += "Access-Control-Allow-Origin: *\r\n";
-  response += "Access-Control-Allow-Headers: Content-Type, Authorization, X-Auth-Token, X-Auth-User\r\n";
-  response += "Access-Control-Allow-Methods: POST, GET, OPTIONS\r\n";
   response += "\r\n";
   response += body;
   socket->write(response);
@@ -2910,9 +2999,6 @@ void RemoteCommandServer::sendHttpNoContent(QTcpSocket * socket, int statusCode,
   response += "\r\n";
   response += "Content-Length: 0\r\n";
   response += "Connection: close\r\n";
-  response += "Access-Control-Allow-Origin: *\r\n";
-  response += "Access-Control-Allow-Headers: Content-Type, Authorization, X-Auth-Token, X-Auth-User\r\n";
-  response += "Access-Control-Allow-Methods: POST, GET, OPTIONS\r\n";
   if (!extraHeaders.isEmpty())
     {
       response += extraHeaders;

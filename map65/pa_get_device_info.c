@@ -3,6 +3,7 @@
 #include <string.h>
 
 #define MAX_LATENCY 20
+#define PA_NAME_BUFFER_SIZE 128
 
 PaStream *in_stream;
 //------------------------------------------------------- pa_get_device_info
@@ -53,8 +54,9 @@ int pa_get_device_info (int  n,
   if(n >= Pa_GetDeviceCount() ) return -1;
   deviceInfo = Pa_GetDeviceInfo(n);
   if (deviceInfo->maxInputChannels==0) return -1; 
-  sprintf((char*)(pa_device_name),"%s",deviceInfo->name);
-  sprintf((char*)(pa_device_hostapi),"%s",
+  snprintf((char*)(pa_device_name), PA_NAME_BUFFER_SIZE, "%s",
+           deviceInfo->name ? deviceInfo->name : "");
+  snprintf((char*)(pa_device_hostapi), PA_NAME_BUFFER_SIZE, "%s",
 	  Pa_GetHostApiInfo( deviceInfo->hostApi )->name);
   speed_warning=0;
 

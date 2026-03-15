@@ -1,29 +1,31 @@
-# Decodium 3 FT2 (Fork macOS) - v1.4.7
+# Decodium 3 FT2 (Fork macOS) - v1.4.8
 
 Fork mantenido por **Salvatore Raccampo 9H1SR**.
 
 Para la vista general bilingue, ver [README.md](README.md).
 
-## Cambios en v1.4.7 (`v1.4.6 -> v1.4.7`)
+## Cambios en v1.4.8 (`v1.4.7 -> v1.4.8`)
 
-- Hardening runtime/decode FT2:
-- guardia async Tx FT2 aumentada de `100 ms` a `300 ms`.
-- anadido filtro de false decode FT2 basado en validacion de prefijos `cty.dat`.
-- renderizado FT2 `TΔ` reescrito con parsing estructurado para mantener columnas alineadas con filas packed y marcadores variables.
-- normalizacion del marcador FT2 mantenida coherente cuando aparece `~` en el flujo decode.
-- Secuenciacion AutoCQ/QSO:
-- lock de pareja activa mas fuerte para evitar takeover por otros callers durante un QSO en curso.
-- logica de periodos perdidos alineada con el presupuesto real de `5` reintentos.
-- estado stale de periodos perdidos limpiado cuando una respuesta valida de caller/pareja hace avanzar el QSO.
-- tras `73` confirmado por la pareja, AutoCQ vuelve a CQ en lugar de enviar un `RR73` extra.
-- AutoSpot / DX Cluster / dashboard web:
-- nueva seccion de ajustes para endpoint AutoSpot (`host`, `puerto`, flag enable).
-- la ventana DX Cluster ahora consulta un nodo DxSpider telnet configurable, no el feed HamQTH fijo.
-- mejor manejo de prompts telnet, fetch silencioso `UNSET/DX`, fallback de login y diagnostico submit/verify en `autospot.log`.
-- la dashboard/web app ahora incluye toggle AutoSpot, feedback mas claro de comandos/auth y presets por modo mas estables en save/apply.
-- Correcciones desktop/runtime:
-- la opcion de menu `Datos Astronomicos` se desmarca al cerrar la ventana con la `X`.
-- el dialogo de ajustes en Linux mantiene scroll en paginas de tabs sobredimensionadas, con botones de accion siempre accesibles.
+- Timing FT2 y workflow de operador:
+- `NUM_FT2_SYMBOLS` alineado de `105` a `103` y margen Tx FT2 reducido de `0.5 s` a `0.2 s` sobre la duracion de onda.
+- anadido soporte FT2 para workflows `Speedy`, `D-CW` y boton `TX NOW` para envio inmediato o precargado.
+- la logica AutoSeq FT2 sigue siendo coherente aunque la checkbox AutoSeq estandar este oculta en el modo FT2.
+- Correccion QSO/signoff FT2:
+- FT2 ya no manda un QSO al log antes de que el signoff local haya sido transmitido y haya llegado el ack final real de la pareja.
+- si FT2 agota el presupuesto de reintentos RR73/73 sin ack de la pareja, la transmision se detiene sin autolog.
+- el manejo de `RR73/73` de la pareja ya no salta el `73` local en flujos FT2 AutoCQ/auto-sequence.
+- la supresion async de duplicados FT2 ahora elimina hipotesis repetidas con el mismo payload en bins de audio cercanos, evitando intercambios duplicados en el flujo decode.
+- Hardening Remote Web / dashboard:
+- RemoteCommandServer ahora se bloquea en bind no-loopback cuando no hay token de acceso configurado.
+- en bind no-loopback el token debe tener al menos `12` caracteres.
+- se eliminaron los headers CORS wildcard del API HTTP remoto.
+- las conexiones WebSocket ahora requieren un `Origin` same-origin permitido en lugar de aceptar origanes arbitrarios del navegador.
+- Seguridad de cadenas/buffer:
+- corregido el riesgo concreto de overflow al formatear la puerta COM en `lib/ptt.c`.
+- aplicada formateacion bounded al codigo PTT relacionado en `lib/ft2` y `map65`.
+- reforzados los paths `map65` para device-info, labels de estado y texto astronomico.
+- Pipeline release/build:
+- el packaging macOS ahora tolera imagenes DMG montadas residuales de CPack sin fallar toda la release cuando el staging ya es valido.
 
 ## Objetivos de release
 
@@ -77,7 +79,7 @@ cmake --build build -j6
 
 - [README.en-GB.md](README.en-GB.md)
 - [README.it.md](README.it.md)
-- [RELEASE_NOTES_v1.4.7.md](RELEASE_NOTES_v1.4.7.md)
+- [RELEASE_NOTES_v1.4.8.md](RELEASE_NOTES_v1.4.8.md)
 - [CHANGELOG.md](CHANGELOG.md)
-- [doc/GITHUB_RELEASE_BODY_v1.4.7.md](doc/GITHUB_RELEASE_BODY_v1.4.7.md)
+- [doc/GITHUB_RELEASE_BODY_v1.4.8.md](doc/GITHUB_RELEASE_BODY_v1.4.8.md)
 - [doc/README.es.md](doc/README.es.md)

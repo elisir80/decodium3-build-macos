@@ -1,29 +1,31 @@
-# Decodium 3 FT2 (Fork macOS) - v1.4.7
+# Decodium 3 FT2 (Fork macOS) - v1.4.8
 
 Fork mantenuto da **Salvatore Raccampo 9H1SR**.
 
 Per la panoramica bilingue, vedere [README.md](README.md).
 
-## Novita' v1.4.7 (`v1.4.6 -> v1.4.7`)
+## Novita' v1.4.8 (`v1.4.7 -> v1.4.8`)
 
-- Hardening runtime/decode FT2:
-- guardia async Tx FT2 aumentata da `100 ms` a `300 ms`.
-- aggiunto filtro false decode FT2 basato su validazione prefissi `cty.dat`.
-- rendering FT2 `TΔ` riscritto con parsing strutturato, cosi' le colonne restano allineate anche con righe packed e marker variabili.
-- normalizzazione marker FT2 mantenuta coerente quando nel flow compare `~`.
-- Sequenziamento AutoCQ/QSO:
-- lock partner attivo piu' rigoroso, per evitare takeover da altri caller durante QSO in corso.
-- logica periodi mancati allineata al budget reale di `5` retry.
-- stato stale dei periodi mancati azzerato non appena una risposta valida del caller/partner fa avanzare il QSO.
-- dopo `73` confermato dal partner, AutoCQ torna a CQ invece di ritrasmettere un `RR73` extra.
-- AutoSpot / DX Cluster / dashboard web:
-- nuova sezione impostazioni per endpoint AutoSpot (`host`, `porta`, flag enable).
-- finestra DX Cluster ora interrogata via nodo DxSpider telnet configurabile, non piu' tramite feed HamQTH fisso.
-- migliorata gestione prompt telnet, fetch silenzioso `UNSET/DX`, fallback login e diagnostica submit/verify in `autospot.log`.
-- dashboard/web app aggiornata con toggle AutoSpot, feedback comandi/auth piu' chiaro e preset per modo piu' stabili in save/apply.
-- Correzioni desktop/runtime:
-- la voce menu `Dati Astronomici` si deseleziona quando la finestra viene chiusa con la `X`.
-- il dialogo impostazioni Linux mantiene scrollabili le pagine tab troppo alte, con pulsanti azione sempre raggiungibili.
+- FT2 timing e workflow operatore:
+- `NUM_FT2_SYMBOLS` allineato da `105` a `103` e margine Tx FT2 ridotto da `0.5 s` a `0.2 s` sopra la durata d'onda.
+- aggiunto supporto FT2 per workflow `Speedy`, `D-CW` e pulsante `TX NOW` per invio immediato o pre-caricato.
+- la logica AutoSeq FT2 resta coerente anche quando la checkbox AutoSeq standard e' nascosta nell'interfaccia FT2.
+- Correttezza QSO/signoff FT2:
+- FT2 non manda piu' il QSO a log prima che il `73` locale sia stato effettivamente trasmesso e il partner abbia inviato l'ack finale.
+- se FT2 esaurisce il budget retry su `RR73/73` senza ack finale del partner, la trasmissione viene fermata senza log automatico.
+- la gestione di `RR73/73` del partner non salta piu' il `73` locale nelle sequenze FT2 AutoCQ/auto-sequence.
+- il dedupe async FT2 ora sopprime ipotesi duplicate con lo stesso payload anche su bin audio vicini, evitando scambi sdoppiati nel flow decode.
+- Hardening Remote Web / dashboard:
+- RemoteCommandServer ora viene bloccato su bind non-loopback se manca il token di accesso.
+- su bind non-loopback il token deve avere almeno `12` caratteri.
+- rimosso il wildcard CORS dall'API HTTP remota.
+- le connessioni WebSocket ora richiedono un `Origin` same-origin ammesso, invece di accettare origini browser arbitrarie.
+- Sicurezza stringhe/buffer:
+- corretto il rischio concreto di overflow nella formattazione porta COM in `lib/ptt.c`.
+- applicata formattazione bounded anche ai moduli PTT correlati in `lib/ft2` e `map65`.
+- induriti i path `map65` per device-info, label di stato e testo astronomico.
+- Pipeline release/build:
+- il packaging macOS ora tollera mount DMG residui di CPack senza fallire l'intera release se lo staging e' valido.
 
 ## Target release
 
@@ -77,7 +79,7 @@ cmake --build build -j6
 
 - [README.en-GB.md](README.en-GB.md)
 - [README.es.md](README.es.md)
-- [RELEASE_NOTES_v1.4.7.md](RELEASE_NOTES_v1.4.7.md)
+- [RELEASE_NOTES_v1.4.8.md](RELEASE_NOTES_v1.4.8.md)
 - [CHANGELOG.md](CHANGELOG.md)
-- [doc/GITHUB_RELEASE_BODY_v1.4.7.md](doc/GITHUB_RELEASE_BODY_v1.4.7.md)
+- [doc/GITHUB_RELEASE_BODY_v1.4.8.md](doc/GITHUB_RELEASE_BODY_v1.4.8.md)
 - [doc/README.it.md](doc/README.it.md)

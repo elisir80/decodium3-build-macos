@@ -2239,6 +2239,32 @@ When not checked you can view the calibration results.</string>
                      </widget>
                     </item>
                     <item>
+                     <widget class="QCheckBox" name="cbSpeedyContest">
+                      <property name="toolTip">
+                       <string>FT2 Speedy: double-click starts TX immediately, bypassing the normal async guard.</string>
+                      </property>
+                      <property name="text">
+                       <string>Speedy</string>
+                      </property>
+                      <property name="visible">
+                       <bool>false</bool>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QCheckBox" name="cbDigitalMorse">
+                      <property name="toolTip">
+                       <string>FT2 D-CW: double-click preloads the message, then Spacebar or TX NOW fires it.</string>
+                      </property>
+                      <property name="text">
+                       <string>D-CW</string>
+                      </property>
+                      <property name="visible">
+                       <bool>false</bool>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
                      <widget class="QDoubleSpinBox" name="sbManualTxWindow">
                       <property name="toolTip">
                        <string>TX Window duration in seconds (time you have to press TX)</string>
@@ -2260,6 +2286,25 @@ When not checked you can view the calibration results.</string>
                       </property>
                       <property name="decimals">
                        <number>1</number>
+                      </property>
+                      <property name="visible">
+                       <bool>false</bool>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QPushButton" name="btnTxNow">
+                      <property name="toolTip">
+                       <string>Transmit the FT2 D-CW preloaded message immediately. Shortcut: Spacebar.</string>
+                      </property>
+                      <property name="text">
+                       <string>TX NOW</string>
+                      </property>
+                      <property name="focusPolicy">
+                       <enum>Qt::NoFocus</enum>
+                      </property>
+                      <property name="styleSheet">
+                       <string>QPushButton { background-color: #cc0000; color: #ffffff; font-weight: bold; font-size: 16px; border-radius: 6px; padding: 4px 16px; min-height: 28px; } QPushButton:hover { background-color: #ff2222; } QPushButton:pressed { background-color: #990000; }</string>
                       </property>
                       <property name="visible">
                        <bool>false</bool>

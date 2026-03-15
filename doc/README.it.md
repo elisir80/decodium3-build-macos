@@ -1,38 +1,37 @@
-# Note di Documentazione (Italiano) - v1.4.7
+# Note di Documentazione (Italiano) - v1.4.8
 
 Questo indice raccoglie la documentazione release-oriented del ciclo corrente del fork.
 
-- Release corrente: `v1.4.7`
-- Ciclo aggiornamento: `v1.4.6 -> v1.4.7`
-- Focus principale: hardening runtime/decode FT2, continuita' AutoCQ, integrazione AutoSpot/DX Cluster e allineamento release.
+- Release corrente: `v1.4.8`
+- Ciclo aggiornamento: `v1.4.7 -> v1.4.8`
+- Focus principale: rifiniture timing/operator FT2, correttezza signoff FT2, hardening remoto web, fix bounded stringhe e robustezza release.
 
-## Cambi Tecnici Principali (`v1.4.6 -> v1.4.7`)
+## Cambi Tecnici Principali (`v1.4.7 -> v1.4.8`)
 
-- guardia async Tx FT2 portata a `300 ms`.
-- filtro false decode FT2 esteso con validazione prefissi `cty.dat`.
-- rendering FT2 `TΔ` e normalizzazione marker resi piu' robusti per preservare l'allineamento colonne.
-- stabilizzati lock partner / retry / ritorno a CQ dopo `73` confermato in AutoCQ.
-- impostazioni con nuova sezione endpoint AutoSpot e flag enable.
-- finestra DX Cluster ora interrogata via endpoint DxSpider configurabile con gestione telnet/prompt piu' robusta.
-- dashboard web con toggle AutoSpot, feedback comandi migliore e preset modo piu' stabili.
-- stato menu `Dati Astronomici` ora coerente con chiusura reale finestra.
+- FT2 portato a `103` simboli con margine Tx ridotto a `0.2 s`.
+- aggiunto supporto FT2 `Speedy`, `D-CW` e `TX NOW`.
+- FT2 ora attende l'ack finale partner prima del log e interrompe pulito senza log se i retry finiscono.
+- dedupe async FT2 piu' robusto contro ipotesi duplicate su bin vicini.
+- remote web con token obbligatorio fuori loopback, niente wildcard CORS e validazione `Origin` WebSocket.
+- fix bounded-formatting in `lib/ptt.c`, `lib/ft2` e diversi path `map65`.
+- packaging release macOS piu' robusto contro mount DMG CPack residui.
 
 ## Artifact Release
 
-- `decodium3-ft2-v1.4.7-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-v1.4.7-macos-tahoe-arm64.zip`
-- `decodium3-ft2-v1.4.7-macos-tahoe-arm64-sha256.txt`
-- `decodium3-ft2-v1.4.7-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-v1.4.7-macos-sequoia-arm64.zip`
-- `decodium3-ft2-v1.4.7-macos-sequoia-arm64-sha256.txt`
-- `decodium3-ft2-v1.4.7-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-v1.4.7-macos-sequoia-x86_64.zip`
-- `decodium3-ft2-v1.4.7-macos-sequoia-x86_64-sha256.txt`
-- `decodium3-ft2-v1.4.7-macos-monterey-x86_64.dmg` *(best effort/sperimentale, se generato)*
-- `decodium3-ft2-v1.4.7-macos-monterey-x86_64.zip` *(best effort/sperimentale, se generato)*
-- `decodium3-ft2-v1.4.7-macos-monterey-x86_64-sha256.txt` *(best effort/sperimentale, se generato)*
-- `decodium3-ft2-v1.4.7-linux-x86_64.AppImage`
-- `decodium3-ft2-v1.4.7-linux-x86_64.AppImage.sha256.txt`
+- `decodium3-ft2-v1.4.8-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-v1.4.8-macos-tahoe-arm64.zip`
+- `decodium3-ft2-v1.4.8-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-v1.4.8-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-v1.4.8-macos-sequoia-arm64.zip`
+- `decodium3-ft2-v1.4.8-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-v1.4.8-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-v1.4.8-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-v1.4.8-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-v1.4.8-macos-monterey-x86_64.dmg` *(best effort/sperimentale, se generato)*
+- `decodium3-ft2-v1.4.8-macos-monterey-x86_64.zip` *(best effort/sperimentale, se generato)*
+- `decodium3-ft2-v1.4.8-macos-monterey-x86_64-sha256.txt` *(best effort/sperimentale, se generato)*
+- `decodium3-ft2-v1.4.8-linux-x86_64.AppImage`
+- `decodium3-ft2-v1.4.8-linux-x86_64.AppImage.sha256.txt`
 
 ## Requisiti Minimi Linux
 
@@ -66,6 +65,6 @@ cd squashfs-root
 - [README.en-GB.md](../README.en-GB.md)
 - [README.it.md](../README.it.md)
 - [README.es.md](../README.es.md)
-- [RELEASE_NOTES_v1.4.7.md](../RELEASE_NOTES_v1.4.7.md)
-- [doc/GITHUB_RELEASE_BODY_v1.4.7.md](./GITHUB_RELEASE_BODY_v1.4.7.md)
+- [RELEASE_NOTES_v1.4.8.md](../RELEASE_NOTES_v1.4.8.md)
+- [doc/GITHUB_RELEASE_BODY_v1.4.8.md](./GITHUB_RELEASE_BODY_v1.4.8.md)
 - [CHANGELOG.md](../CHANGELOG.md)

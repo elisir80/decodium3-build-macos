@@ -547,7 +547,7 @@ bool MainWindow::shouldSuppressNearDuplicateDecode (DecodedText const& decodedte
     return false;
   }
 
-  QString payload = decodedtext.clean_string ().mid (22).simplified ().toUpper ();
+  QString payload = udp_decode_message_text (decodedtext.string ()).remove ("<").remove (">").simplified ().toUpper ();
   if (payload.isEmpty ()) {
     return false;
   }
@@ -573,9 +573,12 @@ bool MainWindow::shouldSuppressNearDuplicateDecode (DecodedText const& decodedte
   }
 
   int const audioFreq = decodedtext.frequencyOffset ();
+  QString const freqKey = (m_mode == "FT2")
+      ? QStringLiteral ("FT2")
+      : QString::number (audioFreq);
   QString const grid4 = deGrid.left (4).toUpper ();
   QString const key = QString {"%1|%2|%3|%4|%5"}
-      .arg (m_mode, keyCall, QString::number (audioFreq), grid4, payload);
+      .arg (m_mode, keyCall, freqKey, grid4, payload);
 
   qint64 const nowMs = QDateTime::currentMSecsSinceEpoch ();
   pruneNearDuplicateDecodeCache (nowMs);
@@ -598,6 +601,12 @@ bool MainWindow::shouldSuppressNearDuplicateDecode (DecodedText const& decodedte
   }
 
   entry.lastSeenMs = nowMs;
+  if (m_mode == "FT2") {
+    if (snr > entry.bestSnr) {
+      entry.bestSnr = snr;
+    }
+    return true;    // FT2 async/sync: suppress same payload even if a later hypothesis is stronger
+  }
   if (snr <= entry.bestSnr) {
     return true;    // duplicate not better than best in the active window
   }
@@ -1753,17 +1762,22 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
         bool const remoteExposed = !(bindAddress.isLoopback()
                                      || bindAddress == QHostAddress::LocalHost
                                      || bindAddress == QHostAddress::LocalHostIPv6);
+        bool remoteServerAllowed {true};
         if (remoteExposed && authToken.isEmpty())
           {
-            showStatusMessage(tr("Remote Web warning: LAN/WAN bind without token authentication."));
+            showStatusMessage(tr("Remote Web disabled: non-loopback bind requires token authentication."));
+            remoteServerAllowed = false;
           }
         else if (remoteExposed && authToken.size() < 12)
           {
-            showStatusMessage(tr("Remote Web warning: token shorter than 12 characters on LAN/WAN bind."));
+            showStatusMessage(tr("Remote Web disabled: token must be at least 12 characters on LAN/WAN bind."));
+            remoteServerAllowed = false;
           }
 
-        m_remoteCommandServer = new RemoteCommandServer {this};
-        m_remoteCommandServer->setRuntimeStateProvider([this] {
+        if (remoteServerAllowed)
+          {
+            m_remoteCommandServer = new RemoteCommandServer {this};
+            m_remoteCommandServer->setRuntimeStateProvider([this] {
                 RemoteCommandServer::RuntimeState state;
                 state.mode = m_mode;
                 QString bandText;
@@ -1794,80 +1808,81 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
                 return state;
               });
 
-        bool guardOk {false};
-        auto const guardMs = m_env.value("FT2_REMOTE_GUARD_PRE_MS", "300").toInt(&guardOk);
-        if (guardOk)
-          {
-            m_remoteCommandServer->setGuardPreMs(guardMs);
-          }
-
-        bool ageOk {false};
-        auto const maxAgeMs = m_env.value("FT2_REMOTE_MAX_AGE_MS", "7500").toInt(&ageOk);
-        if (ageOk)
-          {
-            m_remoteCommandServer->setMaxCommandAgeMs(maxAgeMs);
-          }
-
-        m_remoteCommandServer->setAuthUser(authUser);
-        if (!authToken.isEmpty())
-          {
-            m_remoteCommandServer->setAuthToken(authToken);
-          }
-
-        quint16 httpPort {0};
-        if (!httpPortText.isEmpty())
-          {
-            bool httpPortOk {false};
-            auto const httpPortRaw = httpPortText.toUInt(&httpPortOk);
-            if (httpPortOk && httpPortRaw <= 65535u)
+            bool guardOk {false};
+            auto const guardMs = m_env.value("FT2_REMOTE_GUARD_PRE_MS", "300").toInt(&guardOk);
+            if (guardOk)
               {
-                httpPort = static_cast<quint16>(httpPortRaw);
+                m_remoteCommandServer->setGuardPreMs(guardMs);
               }
-            else
+
+            bool ageOk {false};
+            auto const maxAgeMs = m_env.value("FT2_REMOTE_MAX_AGE_MS", "7500").toInt(&ageOk);
+            if (ageOk)
               {
-                showStatusMessage(tr("Remote HTTP: invalid FT2_REMOTE_HTTP_PORT=\"%1\" (using default ws+1)")
-                                  .arg(httpPortText));
+                m_remoteCommandServer->setMaxCommandAgeMs(maxAgeMs);
               }
-          }
 
-        connect(m_remoteCommandServer, &RemoteCommandServer::selectCallerDue,
-                this, &MainWindow::onRemoteSelectCallerDue);
-        connect(m_remoteCommandServer, &RemoteCommandServer::setModeRequested,
-                this, &MainWindow::onRemoteSetModeRequested);
-        connect(m_remoteCommandServer, &RemoteCommandServer::setBandRequested,
-                this, &MainWindow::onRemoteSetBandRequested);
-        connect(m_remoteCommandServer, &RemoteCommandServer::setRxFrequencyRequested,
-                this, &MainWindow::onRemoteSetRxFrequencyRequested);
-        connect(m_remoteCommandServer, &RemoteCommandServer::setTxFrequencyRequested,
-                this, &MainWindow::onRemoteSetTxFrequencyRequested);
-        connect(m_remoteCommandServer, &RemoteCommandServer::setTxEnabledRequested,
-                this, &MainWindow::onRemoteSetTxEnabledRequested);
-        connect(m_remoteCommandServer, &RemoteCommandServer::setAutoCqRequested,
-                this, &MainWindow::onRemoteSetAutoCqRequested);
-        connect(m_remoteCommandServer, &RemoteCommandServer::setAutoSpotRequested,
-                this, &MainWindow::onRemoteSetAutoSpotRequested);
-        connect(m_remoteCommandServer, &RemoteCommandServer::setAsyncL2Requested,
-                this, &MainWindow::onRemoteSetAsyncL2Requested);
-        connect(m_remoteCommandServer, &RemoteCommandServer::setDualCarrierRequested,
-                this, &MainWindow::onRemoteSetDualCarrierRequested);
-        connect(m_remoteCommandServer, &RemoteCommandServer::setAlt12Requested,
-                this, &MainWindow::onRemoteSetAlt12Requested);
-        connect(m_remoteCommandServer, &RemoteCommandServer::waterfallStreamingChanged,
-                this, &MainWindow::onRemoteWaterfallStreamingChanged);
-        connect(m_remoteCommandServer, &RemoteCommandServer::logMessage, this,
-                [this] (QString const& message) { showStatusMessage(message); });
+            m_remoteCommandServer->setAuthUser(authUser);
+            if (!authToken.isEmpty())
+              {
+                m_remoteCommandServer->setAuthToken(authToken);
+              }
 
-        m_remoteWaterfallStreamingEnabled = m_remoteCommandServer->waterfallEnabled();
+            quint16 httpPort {0};
+            if (!httpPortText.isEmpty())
+              {
+                bool httpPortOk {false};
+                auto const httpPortRaw = httpPortText.toUInt(&httpPortOk);
+                if (httpPortOk && httpPortRaw <= 65535u)
+                  {
+                    httpPort = static_cast<quint16>(httpPortRaw);
+                  }
+                else
+                  {
+                    showStatusMessage(tr("Remote HTTP: invalid FT2_REMOTE_HTTP_PORT=\"%1\" (using default ws+1)")
+                                      .arg(httpPortText));
+                  }
+              }
 
-        if (!m_remoteCommandServer->start(wsPort, bindAddress, httpPort))
-          {
-            showStatusMessage(tr("Remote WS disabled: failed to bind %1:%2")
-                                .arg(bindAddress.toString())
-                                .arg(wsPort));
-          }
-        else if (remoteExposed)
-          {
-            showStatusMessage(tr("Remote Web notice: traffic is plain HTTP/WS. Use only trusted LAN/VPN or a TLS reverse proxy."));
+            connect(m_remoteCommandServer, &RemoteCommandServer::selectCallerDue,
+                    this, &MainWindow::onRemoteSelectCallerDue);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setModeRequested,
+                    this, &MainWindow::onRemoteSetModeRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setBandRequested,
+                    this, &MainWindow::onRemoteSetBandRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setRxFrequencyRequested,
+                    this, &MainWindow::onRemoteSetRxFrequencyRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setTxFrequencyRequested,
+                    this, &MainWindow::onRemoteSetTxFrequencyRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setTxEnabledRequested,
+                    this, &MainWindow::onRemoteSetTxEnabledRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setAutoCqRequested,
+                    this, &MainWindow::onRemoteSetAutoCqRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setAutoSpotRequested,
+                    this, &MainWindow::onRemoteSetAutoSpotRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setAsyncL2Requested,
+                    this, &MainWindow::onRemoteSetAsyncL2Requested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setDualCarrierRequested,
+                    this, &MainWindow::onRemoteSetDualCarrierRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setAlt12Requested,
+                    this, &MainWindow::onRemoteSetAlt12Requested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::waterfallStreamingChanged,
+                    this, &MainWindow::onRemoteWaterfallStreamingChanged);
+            connect(m_remoteCommandServer, &RemoteCommandServer::logMessage, this,
+                    [this] (QString const& message) { showStatusMessage(message); });
+
+            m_remoteWaterfallStreamingEnabled = m_remoteCommandServer->waterfallEnabled();
+
+            if (!m_remoteCommandServer->start(wsPort, bindAddress, httpPort))
+              {
+                showStatusMessage(tr("Remote WS disabled: failed to bind %1:%2")
+                                    .arg(bindAddress.toString())
+                                    .arg(wsPort));
+              }
+            else if (remoteExposed)
+              {
+                showStatusMessage(tr("Remote Web notice: traffic is plain HTTP/WS. Use only trusted LAN/VPN or a TLS reverse proxy."));
+              }
           }
       }
     else if (!wsPortText.isEmpty())
@@ -2333,7 +2348,27 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
 
   connect(&watcher3, SIGNAL(finished()),this,SLOT(fast_decode_done()));
   connect(&m_asyncDecodeWatcher, &QFutureWatcher<void>::finished, this, &MainWindow::asyncDecodeDone);
-  // Async TX guard timer: fires 100ms after decode to start TX immediately
+
+  // FT2 D-CW: blink TX NOW when a message is preloaded and waiting for manual fire.
+  m_txRdyBlinkTimer.setInterval(500);
+  connect(&m_txRdyBlinkTimer, &QTimer::timeout, this, [this]() {
+    if (!m_bTxPreloaded || !m_bDigitalMorse || !ui->btnTxNow) return;
+    static bool bright = false;
+    bright = !bright;
+    ui->btnTxNow->setStyleSheet(bright
+      ? "QPushButton { background-color: #ff2222; color: #ffffff; font-weight: bold; font-size: 16px; border-radius: 6px; padding: 4px 16px; min-height: 28px; }"
+      : "QPushButton { background-color: #cc0000; color: #ffffff; font-weight: bold; font-size: 16px; border-radius: 6px; padding: 4px 16px; min-height: 28px; }");
+  });
+  connect(ui->btnTxNow, &QPushButton::clicked, this, [this]() {
+    if (!m_bDigitalMorse || !m_bTxPreloaded || m_mode != "FT2" || m_transmitting) return;
+    if (!m_auto) auto_tx_mode(true);
+    m_bAsyncTxArmed = true;
+    m_bTxPreloaded = false;
+    ui->btnTxNow->setVisible(false);
+    m_txRdyBlinkTimer.stop();
+  });
+
+  // Async TX guard timer: fires after decode to start TX immediately
   m_asyncTxGuardTimer.setSingleShot(true);
   connect(&m_asyncTxGuardTimer, &QTimer::timeout, this, [this]() {
     if (m_mode == "FT2" && ui->cbAsyncDecode->isChecked() && m_auto) {
@@ -2898,6 +2933,8 @@ void MainWindow::writeSettings()
   m_settings->setValue("FirstLotwDl", m_firstLotwDl);    //avt 9/29/25
   m_settings->setValue("ManualTxTiming", ui->cbManualTx->isChecked());
   m_settings->setValue("ManualTxWindow", ui->sbManualTxWindow->value());
+  m_settings->setValue("SpeedyContest", ui->cbSpeedyContest->isChecked());
+  m_settings->setValue("DigitalMorse", ui->cbDigitalMorse->isChecked());
   m_settings->endGroup();
 
   // do this in the General group because we save the parameters from various places
@@ -3149,6 +3186,8 @@ void MainWindow::readSettings()
   m_debugLog = m_settings->value("DebugLog",false).toBool();    //avt 9/23/25
   ui->cbManualTx->setChecked(m_settings->value("ManualTxTiming",false).toBool());
   ui->sbManualTxWindow->setValue(m_settings->value("ManualTxWindow",3.8).toDouble());
+  ui->cbSpeedyContest->setChecked(m_settings->value("SpeedyContest",false).toBool());
+  ui->cbDigitalMorse->setChecked(m_settings->value("DigitalMorse",false).toBool());
   m_settings->endGroup();
 
   m_settings->beginGroup("Common");
@@ -5433,7 +5472,10 @@ void MainWindow::process_autoButton (bool checked)   //manually or by controller
 
     // ASYMX timing bar: arm a slightly longer guard window before first TX attempt.
     if (m_mode == "FT2" && ui->cbAsyncDecode && ui->cbAsyncDecode->isChecked()) {
-      if (!m_asyncTxGuardTimer.isActive()) {
+      if (m_bSpeedyContest || m_bDigitalMorse) {
+        m_asyncTxGuardTimer.stop();
+        m_bAsyncTxArmed = true;
+      } else if (!m_asyncTxGuardTimer.isActive()) {
         m_asyncTxGuardTimer.start(300);
       }
     }
@@ -5504,7 +5546,10 @@ void MainWindow::auto_tx_mode (bool state)
 
   // ASYMX timing bar: arm a slightly longer guard window before first TX attempt.
   if (state && m_mode == "FT2" && ui->cbAsyncDecode && ui->cbAsyncDecode->isChecked()) {
-    if (!m_asyncTxGuardTimer.isActive()) {
+    if (m_bSpeedyContest || m_bDigitalMorse) {
+      m_asyncTxGuardTimer.stop();
+      m_bAsyncTxArmed = true;
+    } else if (!m_asyncTxGuardTimer.isActive()) {
       m_asyncTxGuardTimer.start(300);  // 300 ms guard before TX
     }
   }
@@ -5523,6 +5568,20 @@ void MainWindow::keyPressEvent (QKeyEvent * e)
     ui->autoButton->setStyleSheet("QPushButton:checked { color: white; background-color: red; border-style: outset; border-width: 1px; border-radius: 5px; border-color: black; min-width: 5em; padding: 3px; }");
     ui->autoButton->setText("E&nable Tx");
     m_bAsyncTxArmed = true;  // arm TX now — guiUpdate will start it
+    return;
+  }
+
+  // FT2 D-CW: Spacebar fires the preloaded message immediately.
+  if (e->key() == Qt::Key_Space
+      && m_bDigitalMorse
+      && m_bTxPreloaded
+      && m_mode == "FT2"
+      && !m_transmitting) {
+    if (!m_auto) auto_tx_mode(true);
+    m_bAsyncTxArmed = true;
+    m_bTxPreloaded = false;
+    ui->btnTxNow->setVisible(false);
+    m_txRdyBlinkTimer.stop();
     return;
   }
 
@@ -8532,7 +8591,10 @@ void MainWindow::readFromStdout()                             //readFromStdout
           navg=line_read.mid(nq+2,1).toInt();
           if(line_read.mid(nq+2,1)=="*") navg=10;
         }
-        if(navg>=2) bAvgMsg=true;
+      if(navg>=2) bAvgMsg=true;
+      }
+      if (m_mode == "FT2" && isDuplicateDecode (rawLine)) {
+        continue;
       }
       if (shouldSuppressNearDuplicateDecode (decodedtext)) {
         continue;
@@ -10083,7 +10145,10 @@ void MainWindow::auto_sequence (DecodedText const& message, unsigned start_toler
       //ui->stopTxButton->click (); // halt any transmission  avt 11/17/20  not necessary, interferes with external controller actions
     } else if (m_auto             // transmit allowed
                //avt 10/2/25
-               && ui->cbAutoSeq->isVisible () && (ui->cbAutoSeq->isEnabled () or is_externalCtrlMode()) && ui->cbAutoSeq->isChecked () // auto-sequencing allowed
+               && (ft2AutoSeqEnabled ()
+                   || (ui->cbAutoSeq->isVisible ()
+                       && (ui->cbAutoSeq->isEnabled () or is_externalCtrlMode())
+                       && ui->cbAutoSeq->isChecked ())) // auto-sequencing allowed
                && (activeQsoReplyMatch || callingReplyMatch)) {
       if(SpecOp::FOX != m_specOp){
         if (m_autoCQ && m_QSOProgress > CALLING && !from_active_partner_effective) {
@@ -10282,6 +10347,19 @@ void MainWindow::guiUpdate()
     }
   }
   if(m_tune) m_bTxTime=true;                 //"Tune" takes precedence
+
+  if (m_mode == "FT2"
+      && ui->cbAsyncDecode
+      && ui->cbAsyncDecode->isChecked()
+      && m_bAsyncTxArmed
+      && m_auto) {
+    if (m_bSpeedyContest || m_bDigitalMorse) {
+      m_bTxTime = true;
+      m_bAsyncTxArmed = false;
+    } else if (m_bTxTime) {
+      m_bAsyncTxArmed = false;
+    }
+  }
 
   if (!m_pendingAsyncL2MessageLine.isEmpty()
       && (m_mode != "FT2" || !ui->cbAsyncDecode->isChecked()))
@@ -10861,11 +10939,16 @@ void MainWindow::guiUpdate()
       msg_parts[1].remove (QChar {'>'});
     }
     auto is_73 = message_is_73 (m_currentMessageType, msg_parts);
+    bool const ft2DeferredSignoff =
+        !m_bDXpedMode && is_73
+        && (m_QSOProgress > CALLING)
+        && (m_mode == "FT2");
     bool const autoCqDeferredSignoff =
         m_autoCQ && !m_bDXpedMode && is_73
         && (m_QSOProgress > CALLING)
-        && (m_mode=="FT2" || m_mode=="FT4" || m_mode=="FT8"
+        && (m_mode=="FT4" || m_mode=="FT8"
             || m_mode=="FST4" || m_mode=="Q65" || m_mode=="MSK144");
+    bool const deferredSignoffPending = ft2DeferredSignoff || autoCqDeferredSignoff;
     m_sentFirst73 = is_73
       && !message_is_73 (m_lastMessageType, m_lastMessageSent.split (' ', SkipEmptyParts));
     if (m_sentFirst73 || (is_73 && CALLING == m_QSOProgress)) {
@@ -10873,8 +10956,9 @@ void MainWindow::guiUpdate()
       if(m_config.id_after_73 ()) {
         icw[0] = m_ncw;
       }
-      if (is_73 && autoCqDeferredSignoff) {
-        // In AutoCQ keep RR73/73 on-air for a few cycles before closing/logging.
+      if (is_73 && deferredSignoffPending) {
+        // In FT2 and AutoCQ signoff, keep RR73/73 on-air for a few cycles
+        // and wait for a final acknowledgment before logging.
         m_ft2DeferredLogPending = true;
         capturePendingAutoLogSnapshot ();
       }
@@ -10883,8 +10967,8 @@ void MainWindow::guiUpdate()
         //avt 10/2/25 possibly stop Tx after sending 73
         if (!is_externalCtrlMode() && m_config.repeat_Tx() && (m_mode=="MSK144" or m_mode=="Q65") && m_ntx != 4) cease_auto_Tx_after_QSO ();    //avt 10/2/25
         if (!is_externalCtrlMode() && !(m_mode=="FT4" && SpecOp::NA_VHF==m_specOp && m_config.NCCC_Sprint())) {
-	          if (!autoCqDeferredSignoff) {
-	            if (m_autoCQ) capturePendingAutoLogSnapshot ();
+	          if (!deferredSignoffPending) {
+	            if (m_mode == "FT2" || m_autoCQ) capturePendingAutoLogSnapshot ();
 	            logQSOTimer.start(0);    //avt 9/30/25
 	          }
         }
@@ -10895,9 +10979,10 @@ void MainWindow::guiUpdate()
         }
     }
 
-    bool b=("FT8"==m_mode or "FT4"==m_mode or "Q65"==m_mode or "JT65"==m_mode or "JT9"==m_mode or m_mode == "FST4" or m_mode == "MSK144" or m_mode == "JT65" or m_mode == "JT9")  //avt 9/30/25
-        &&  ui->cbAutoSeq->isVisible () && (ui->cbAutoSeq->isEnabled () or is_externalCtrlMode()) && ui->cbAutoSeq->isChecked ();   //avt 9/30/25
-    if(is_73 and (m_config.disable_TX_on_73() or b) && !autoCqDeferredSignoff) {
+    bool b=("FT8"==m_mode or "FT4"==m_mode or "FT2"==m_mode or "Q65"==m_mode or "JT65"==m_mode or "JT9"==m_mode or m_mode == "FST4" or m_mode == "MSK144" or m_mode == "JT65" or m_mode == "JT9")  //avt 9/30/25
+        &&  (ft2AutoSeqEnabled ()
+             || (ui->cbAutoSeq->isVisible () && (ui->cbAutoSeq->isEnabled () or is_externalCtrlMode()) && ui->cbAutoSeq->isChecked ()));   //avt 9/30/25
+    if(is_73 and (m_config.disable_TX_on_73() or b) && !deferredSignoffPending) {
       m_nextCall="";  //### Temporary: disable use of "TU;" messages;
       if(m_nextCall!="") {
         useNextCall();
@@ -11969,7 +12054,8 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
   auto ctrl = modifiers.testFlag (Qt::ControlModifier);
   auto alt = modifiers.testFlag (Qt::AltModifier);      //avt 1/1/21
   if (alt) return;                                      //avt 1/1/21
-  auto auto_seq = ui->cbAutoSeq->isVisible () && (ui->cbAutoSeq->isEnabled () or is_externalCtrlMode()) && ui->cbAutoSeq->isChecked ();  //avt
+  auto auto_seq = ft2AutoSeqEnabled ()
+      || (ui->cbAutoSeq->isVisible () && (ui->cbAutoSeq->isEnabled () or is_externalCtrlMode()) && ui->cbAutoSeq->isChecked ());  //avt
   // basic mode sanity checks
   auto const& parts = message.clean_string ().split (' ', SkipEmptyParts);
   if (parts.size () < 5) return;
@@ -12284,14 +12370,17 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
       } else {  // no grid on end of msg
         auto const& word_3 = message_words.at (4);
         auto word_3_as_number = word_3.toInt ();
+        bool const localSignoffAlreadySent =
+            (m_nTx73 > 0)
+            || message_is_73 (m_lastMessageType, m_lastMessageSent.split (' ', SkipEmptyParts));
         bool const partnerSignoff73 =
             (word_3_as_number == 73
-             && (m_QSOProgress >= ROGER_REPORT
-                 || (m_mode == "FT2" && m_autoCQ && m_QSOProgress >= REPORT)));
+             && (m_QSOProgress >= ROGER_REPORT)
+             && !(m_mode == "FT2" && m_autoCQ && !localSignoffAlreadySent));
         bool const partnerSignoffRR73 =
             (word_3 == "RR73"
-             && (m_QSOProgress >= ROGER_REPORT
-                 || (m_mode == "FT2" && m_autoCQ && m_QSOProgress >= REPORT)));
+             && (m_QSOProgress >= ROGER_REPORT)
+             && !(m_mode == "FT2" && m_autoCQ && !localSignoffAlreadySent));
         bool const partnerFinalAck = partnerSignoff73 || partnerSignoffRR73;
         if (("RRR" == word_3
              || partnerFinalAck
@@ -12337,13 +12426,13 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
                          && word_3 != "RRR"
                          && word_3 != "RR73"))
               {
-                if (m_autoCQ && m_ft2DeferredLogPending) {
+                if (m_ft2DeferredLogPending) {
                   m_ft2DeferredLogPending = false;
                   m_nTx73 = 0;
                 }
                 if (m_config.prompt_to_log() || m_config.autoLog() || m_autoCQ) {		//avt 1/5/24
                   if (!is_externalCtrlMode() && !(m_mode=="FT4" && SpecOp::NA_VHF==m_specOp && m_config.NCCC_Sprint())) {
-                    if (m_autoCQ) capturePendingAutoLogSnapshot ();
+                    if (m_mode == "FT2" || m_autoCQ) capturePendingAutoLogSnapshot ();
                     logQSOTimer.start(0);   //avt 9/30/25
                   }
                 }
@@ -12441,13 +12530,13 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
              && message_words.at (4) == "73"
              && (!qso_partner_base_call.isEmpty ())
              && (base_call == qso_partner_base_call || qso_partner_matched)) {
-      if (m_autoCQ && m_ft2DeferredLogPending) {
+      if (m_ft2DeferredLogPending) {
         m_ft2DeferredLogPending = false;
         m_nTx73 = 0;
       }
       if (!is_externalCtrlMode() && (m_config.prompt_to_log() || m_config.autoLog() || m_autoCQ) && !m_tune) {
         if (!logQSOTimer.isActive()) {
-          if (m_autoCQ) capturePendingAutoLogSnapshot ();
+          if (m_mode == "FT2" || m_autoCQ) capturePendingAutoLogSnapshot ();
           logQSOTimer.start(0);
         }
       } else {
@@ -12484,12 +12573,12 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
   }
   else if (firstcall == "DE" && message_words.size () > 4 && message_words.at (4) == "73") {
     if (m_QSOProgress >= ROGERS && base_call == qso_partner_base_call && m_currentMessageType) {
-      if (m_autoCQ && m_ft2DeferredLogPending) {
+      if (m_ft2DeferredLogPending) {
         m_ft2DeferredLogPending = false;
         m_nTx73 = 0;
         if (!is_externalCtrlMode() && (m_config.prompt_to_log() || m_config.autoLog() || m_autoCQ) && !m_tune) {
           if (!logQSOTimer.isActive()) {
-            if (m_autoCQ) capturePendingAutoLogSnapshot ();
+            if (m_mode == "FT2" || m_autoCQ) capturePendingAutoLogSnapshot ();
             logQSOTimer.start(0);
           }
         }
@@ -12518,12 +12607,12 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
         (!qso_partner_base_call.isEmpty ())
         && (base_call == qso_partner_base_call || qso_partner_matched);
     if (partner73) {
-      if (m_autoCQ && m_ft2DeferredLogPending) {
+      if (m_ft2DeferredLogPending) {
         m_ft2DeferredLogPending = false;
         m_nTx73 = 0;
         if (!is_externalCtrlMode() && (m_config.prompt_to_log() || m_config.autoLog() || m_autoCQ) && !m_tune) {
           if (!logQSOTimer.isActive()) {
-            if (m_autoCQ) capturePendingAutoLogSnapshot ();
+            if (m_mode == "FT2" || m_autoCQ) capturePendingAutoLogSnapshot ();
             logQSOTimer.start(0);
           }
         }
@@ -12631,6 +12720,13 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
   }
   if(m_transmitting) m_restart=true;
   if (auto_seq && !m_bDoubleClicked && m_mode!="FT4" && m_mode!="FT2") {
+    return;
+  }
+  if (m_bDigitalMorse && m_mode == "FT2" && m_bDoubleClicked) {
+    m_bTxPreloaded = true;
+    m_bDoubleClicked = false;
+    ui->btnTxNow->setVisible(true);
+    if (!m_txRdyBlinkTimer.isActive()) m_txRdyBlinkTimer.start();
     return;
   }
   if(m_config.quick_call() && m_bDoubleClicked) auto_tx_mode(true);
@@ -14361,7 +14457,8 @@ void MainWindow::cease_auto_Tx_after_QSO ()
   }
 
   if (SpecOp::FOX != m_specOp && m_mode != "MSK144"    //avt 10/2/25
-      && ui->cbAutoSeq->isVisible () && ui->cbAutoSeq->isEnabled () && ui->cbAutoSeq->isChecked ())   //avt
+      && (ft2AutoSeqEnabled ()
+          || (ui->cbAutoSeq->isVisible () && ui->cbAutoSeq->isEnabled () && ui->cbAutoSeq->isChecked ())))   //avt
     {
       // ensure that auto Tx is disabled even if disable Tx
       // on 73 is not checked, unless in Fox mode where it is allowed
@@ -15233,13 +15330,19 @@ void MainWindow::displayWidgets(qint64 n)
   ui->cbAsyncDecode->setVisible(false);  // always hidden: forced on in FT2, off elsewhere
   ui->labelAsymxBadge->setVisible(isFT2);
   ui->cbManualTx->setVisible(isFT2);
+  ui->cbSpeedyContest->setVisible(isFT2);
+  ui->cbDigitalMorse->setVisible(isFT2);
   ui->sbManualTxWindow->setVisible(isFT2 && ui->cbManualTx->isChecked());
+  ui->btnTxNow->setVisible(isFT2 && m_bDigitalMorse && m_bTxPreloaded);
   if (!isFT2 && ui->cbAsyncDecode->isChecked()) {
     ui->cbAsyncDecode->setChecked(false);  // triggers on_cbAsyncDecode_toggled → stops timer
   }
   if (!isFT2) {
     m_bManualTxPending = false;
     m_manualTxWindowTimer.stop();
+    m_bTxPreloaded = false;
+    m_txRdyBlinkTimer.stop();
+    ui->btnTxNow->setVisible(false);
   }
   qint64 j=qint64(1)<<(N_WIDGETS-1);
   bool b;
@@ -15312,6 +15415,11 @@ void MainWindow::displayWidgets(qint64 n)
   ui->sbNB->setVisible(b);
   genStdMsgs (m_rpt, true);
   configActiveStations();
+}
+
+bool MainWindow::ft2AutoSeqEnabled() const
+{
+  return m_mode == "FT2";
 }
 
 void MainWindow::on_actionFST4_triggered()
@@ -15469,7 +15577,10 @@ void MainWindow::on_actionFT2_triggered()
   ui->labelAsyncL2Active->setVisible(false);
   ui->labelAsymxBadge->setVisible(true);
   ui->cbManualTx->setVisible(true);
+  ui->cbSpeedyContest->setVisible(true);
+  ui->cbDigitalMorse->setVisible(true);
   ui->sbManualTxWindow->setVisible(ui->cbManualTx->isChecked());
+  ui->btnTxNow->setVisible(m_bDigitalMorse && m_bTxPreloaded);
 
   // Decodium FT2: faster NTP refresh and tighter RTT filter
   if (m_ntpClient) {
@@ -17484,7 +17595,8 @@ void MainWindow::transmit (double snr)
       message_is_73 (m_currentMessageType, m_currentMessage.split (' ', SkipEmptyParts));
 // In auto-sequencing mode, track repeated "73"/"RR73" transmissions.
   if (m_bFastMode || m_bFast9 || m_mode=="FT2" || m_autoCQ) {
-    if (ui->cbAutoSeq->isVisible () && (ui->cbAutoSeq->isEnabled () or is_externalCtrlMode()) && ui->cbAutoSeq->isChecked ()) {    //avt 9/30/25
+    if (ft2AutoSeqEnabled ()
+        || (ui->cbAutoSeq->isVisible () && (ui->cbAutoSeq->isEnabled () or is_externalCtrlMode()) && ui->cbAutoSeq->isChecked ())) {    //avt 9/30/25
       if (m_ntx == 5 || txIs73) {
         m_nTx73 += 1;
       } else {
@@ -17493,12 +17605,17 @@ void MainWindow::transmit (double snr)
     }
   }
 
-  // AutoCQ: after a few RR73/73 repeats without partner signoff, abandon and move on.
-  if (m_autoCQ && !m_bDXpedMode && m_ft2DeferredLogPending && txIs73) {
+  // FT2 deferred signoff: after a few RR73/73 repeats without partner signoff,
+  // do not auto-log. AutoCQ moves on; plain auto-sequence stops transmitting.
+  if (!m_bDXpedMode && m_ft2DeferredLogPending && txIs73) {
     if (m_nTx73 >= kAutoCqSignoffRetryCount) {
       m_ft2DeferredLogPending = false;
       m_nTx73 = 0;
-      QTimer::singleShot(0, this, [this] { clearDX(); });
+      if (m_autoCQ) {
+        QTimer::singleShot(0, this, [this] { clearDX(); });
+      } else {
+        QTimer::singleShot(0, this, [this] { auto_tx_mode(false); });
+      }
     }
   }
 }
@@ -20776,6 +20893,30 @@ void MainWindow::on_cbManualTx_toggled (bool checked)
       // Restore autoButton normal style
       ui->autoButton->setStyleSheet("QPushButton:checked { color: white; background-color: red; border-style: outset; border-width: 1px; border-radius: 5px; border-color: black; min-width: 5em; padding: 3px; }");
       ui->autoButton->setText("E&nable Tx");
+    }
+}
+
+void MainWindow::on_cbSpeedyContest_toggled (bool checked)
+{
+    m_bSpeedyContest = checked;
+    if (!checked && m_bDigitalMorse) {
+      ui->cbDigitalMorse->setChecked(false);
+    }
+}
+
+void MainWindow::on_cbDigitalMorse_toggled (bool checked)
+{
+    m_bDigitalMorse = checked;
+    if (checked && !ui->cbSpeedyContest->isChecked()) {
+      ui->cbSpeedyContest->setChecked(true);
+    }
+    if (!checked) {
+      m_bTxPreloaded = false;
+      ui->btnTxNow->setVisible(false);
+      m_txRdyBlinkTimer.stop();
+    } else if (m_mode == "FT2" && m_bTxPreloaded) {
+      ui->btnTxNow->setVisible(true);
+      if (!m_txRdyBlinkTimer.isActive()) m_txRdyBlinkTimer.start();
     }
 }
 
