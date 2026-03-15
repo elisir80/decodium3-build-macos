@@ -163,6 +163,8 @@ R"FT2HTML(<!doctype html>
           <div class="inline mode-preset-inline">
             <select id="mode_preset_select"></select>
             <button id="btn_apply_mode_preset" type="button">Apply Preset</button>
+          </div>
+          <div class="inline mode-preset-actions">
             <button id="btn_save_mode_preset" type="button">Save Current</button>
           </div>
         </div>
@@ -171,6 +173,7 @@ R"FT2HTML(<!doctype html>
           <div class="inline tx-inline">
             <button id="btn_tx_on" class="ok">Enable TX</button>
             <button id="btn_auto_cq" type="button">Auto CQ</button>
+            <button id="btn_auto_spot" type="button">AutoSpot</button>
             <button id="btn_tx_off" class="warn">Disable TX</button>
           </div>
         </div>
@@ -314,8 +317,11 @@ button,input{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .rx-inline{grid-template-columns:1fr auto}
 .rxtx-inline{grid-template-columns:1fr 1fr auto}
 .rxtx-actions{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:6px}
-.mode-preset-inline{grid-template-columns:minmax(120px,1fr) auto auto}
-.tx-inline{grid-template-columns:repeat(3,minmax(96px,1fr))}
+.rxtx-actions button{width:100%;min-height:36px}
+.mode-preset-inline{grid-template-columns:minmax(120px,1fr) auto}
+.mode-preset-actions{grid-template-columns:1fr;margin-top:6px}
+.mode-preset-actions button{width:100%;min-height:36px}
+.tx-inline{grid-template-columns:repeat(4,minmax(96px,1fr))}
 .quick-row .inline button{padding:6px 6px;font-size:.75rem}
 input,select{width:100%;padding:8px;border-radius:8px;border:1px solid #37567f;background:#0a1322;color:var(--text)}
 .emission-row{margin-top:8px}
@@ -348,10 +354,6 @@ input,select{width:100%;padding:8px;border-radius:8px;border:1px solid #37567f;b
 #activity_body tr.tx-row:hover td{background:#fff9a8}
 
 .control label{display:block;font-size:.8rem;color:var(--muted);margin:8px 0 4px}
-.action-status{margin-top:10px;padding:8px;border-radius:8px;border:1px solid #2b425f;background:#08101d;font-size:.8rem;color:#cde0ff}
-.action-status.ok{border-color:#2d8b65;color:#9af1c8}
-.action-status.err{border-color:#8a3939;color:#ffc3c3}
-
 @media (max-width:1220px){
   .freq-row{grid-template-columns:1fr}
   .kv-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -389,15 +391,18 @@ R"FT2JS((() => {
   const conn = el('conn');
   const trxLive = el('trx_live');
   const trxPeer = el('trx_peer');
+  const actionStatus = el('action_status');
   const activityBody = el('activity_body');
   const btnActivityPause = el('btn_activity_pause');
   const btnActivityClear = el('btn_activity_clear');
   const btnWfToggle = el('btn_wf_toggle');
   const btnAutoCQ = el('btn_auto_cq');
+  const btnAutoSpot = el('btn_auto_spot');
   const btnTxOn = el('btn_tx_on');
   const btnTxOff = el('btn_tx_off');
   const btnTxFreq = el('btn_txfreq');
   const btnSetRxTx = el('btn_set_rxtx');
+  const rxFreqInput = el('rxfreq');
   const txFreqInput = el('txfreq');
   const modePresetSelect = el('mode_preset_select');
   const btnApplyModePreset = el('btn_apply_mode_preset');
@@ -440,6 +445,7 @@ R"FT2JS((() => {
   const AUTH_TTL_MS = 30 * 60 * 1000;
   const AUTH_STORAGE_KEY = 'ft2_remote_auth_v1';
   const MODE_FREQ_STORAGE_KEY = 'ft2_remote_mode_freq_v1';
+  const SW_VERSION = 'v1.4.7';
   const MODE_PRESET_MODES = ['FT2','FT8','FT4','MSK144','Q65','JT65','JT9','FST4','WSPR'];
   let activeMode = '';
   let activeBand = '';
@@ -453,6 +459,7 @@ R"FT2JS((() => {
   let txPeerFromRows = '';
   let txEnabledState = false;
   let autoCqEnabled = false;
+  let autoSpotEnabled = false;
   let asyncL2Enabled = false;
   let dualCarrierEnabled = false;
   let alt12Enabled = false;
@@ -462,6 +469,14 @@ R"FT2JS((() => {
   let currentRxHz = 0;
   let currentTxHz = 0;
   let pendingRxHz = null;
+  let pendingTxHz = null;
+  let pendingFreqSetDeadlineMs = 0;
+  const PENDING_FREQ_GRACE_MS = 2200;
+  let rxInputDirty = false;
+  let txInputDirty = false;
+  let rxInputEditedAtMs = 0;
+  let txInputEditedAtMs = 0;
+  const INPUT_EDIT_GRACE_MS = 7000;
   let deferredInstallPrompt = null;
   let statePollTimer = null;
   let waterfallPollTimer = null;
@@ -551,27 +566,25 @@ R"FT2JS((() => {
     } catch {}
   }
 
-  function getSelectedPresetMode() {
-    const modeFromSelect = modePresetSelect ? normalizeModeKey(modePresetSelect.value) : '';
-    if (modeFromSelect) return modeFromSelect;
+  function getCurrentPresetMode() {
     const modeNow = normalizeModeKey(currentMode || activeMode);
-    return modeNow || 'FT2';
+    if (modeNow && MODE_PRESET_MODES.includes(modeNow)) return modeNow;
+    return 'FT2';
   }
 
   function updateModePresetSelect() {
     if (!modePresetSelect) return;
-    const desired = getSelectedPresetMode();
-    modePresetSelect.innerHTML = '';
-    MODE_PRESET_MODES.forEach((mode) => {
-      const preset = modeFrequencyPresets[mode];
-      const option = document.createElement('option');
-      option.value = mode;
-      option.textContent = preset ? `${mode} (${preset.rx}/${preset.tx})` : `${mode} (---/---)`;
-      modePresetSelect.appendChild(option);
-    });
-    if (MODE_PRESET_MODES.includes(desired)) {
-      modePresetSelect.value = desired;
+    const mode = getCurrentPresetMode();
+    if (modePresetSelect.options.length !== 1) {
+      modePresetSelect.innerHTML = '';
+      modePresetSelect.appendChild(document.createElement('option'));
     }
+    const preset = modeFrequencyPresets[mode];
+    const option = modePresetSelect.options[0];
+    option.value = mode;
+    option.textContent = preset ? `${mode} (${preset.rx}/${preset.tx})` : `${mode} (---/---)`;
+    modePresetSelect.value = mode;
+    modePresetSelect.disabled = true;
   }
 
   function savePresetForMode(mode, rxHz, txHz) {
@@ -591,12 +604,22 @@ R"FT2JS((() => {
     const key = normalizeModeKey(mode);
     if (!key) return false;
     const preset = modeFrequencyPresets[key];
-    if (!preset) return false;
+    if (!preset) {
+      if (!silent) setActionStatus(`no preset saved for ${key}`, true);
+      return false;
+    }
     const rx = sanitizeFrequency(preset.rx);
     const tx = sanitizeFrequency(preset.tx);
-    if (rx === null || tx === null) return false;
-    if (el('rxfreq')) el('rxfreq').value = rx;
+    if (rx === null || tx === null) {
+      if (!silent) setActionStatus(`invalid preset values for ${key}`, true);
+      return false;
+    }
+    if (rxFreqInput) rxFreqInput.value = rx;
     if (txFreqInput) txFreqInput.value = tx;
+    rxInputDirty = false;
+    txInputDirty = false;
+    rxInputEditedAtMs = 0;
+    txInputEditedAtMs = 0;
     await sendCommand({type:'set_rx_frequency', rx_frequency_hz:rx});
     await sendCommand({type:'set_tx_frequency', tx_frequency_hz:tx});
     if (!silent) {
@@ -612,6 +635,22 @@ R"FT2JS((() => {
   if (loginCaption) loginCaption.textContent = uiText.loginCaptionAuth;
   if (loginTokenHint) loginTokenHint.textContent = uiText.tokenMinHint;
   updateModePresetSelect();
+  if (rxFreqInput) {
+    const markRxEdited = () => {
+      rxInputDirty = true;
+      rxInputEditedAtMs = Date.now();
+    };
+    rxFreqInput.addEventListener('input', markRxEdited);
+    rxFreqInput.addEventListener('change', markRxEdited);
+  }
+  if (txFreqInput) {
+    const markTxEdited = () => {
+      txInputDirty = true;
+      txInputEditedAtMs = Date.now();
+    };
+    txFreqInput.addEventListener('input', markTxEdited);
+    txFreqInput.addEventListener('change', markTxEdited);
+  }
 
   const set = (id, v) => { const n = el(id); if (n) n.textContent = v ?? '-'; };
   const fmtHz = (v) => Number(v || 0).toLocaleString('en-US');
@@ -711,6 +750,12 @@ R"FT2JS((() => {
     btnAutoCQ.textContent = autoCqEnabled ? 'Auto CQ ON' : 'Auto CQ OFF';
   }
 
+  function applyAutoSpotButtonState() {
+    if (!btnAutoSpot) return;
+    btnAutoSpot.classList.toggle('active', autoSpotEnabled);
+    btnAutoSpot.textContent = autoSpotEnabled ? 'AutoSpot ON' : 'AutoSpot OFF';
+  }
+
   function applyTxButtonsState() {
     if (btnTxOn) btnTxOn.classList.toggle('active', txEnabledState);
     if (btnTxOff) btnTxOff.classList.toggle('active', !txEnabledState);
@@ -740,6 +785,11 @@ R"FT2JS((() => {
   function updateAutoCqState(enabled) {
     autoCqEnabled = !!enabled;
     applyAutoCqButtonState();
+  }
+
+  function updateAutoSpotState(enabled) {
+    autoSpotEnabled = !!enabled;
+    applyAutoSpotButtonState();
   }
 
   function updateTxEnabledState(enabled) {
@@ -939,7 +989,51 @@ R"FT2JS((() => {
     renderActivity();
   }
 
-  function setActionStatus() {}
+  function setActionStatus(message, isError = false) {
+    if (!actionStatus) return;
+    const txt = (message || '').toString().trim();
+    actionStatus.textContent = txt || 'Ready';
+    actionStatus.classList.toggle('ok', !!txt && !isError);
+    actionStatus.classList.toggle('err', !!txt && isError);
+  }
+
+  function commandErrorMessage(err) {
+    if (!err) return 'Command failed';
+    if (typeof err === 'string') return err;
+    const msg = (err.message || '').toString().trim();
+    if (msg) return msg;
+    if (err.payload && typeof err.payload === 'object') {
+      const p = err.payload;
+      const status = (p.status || '').toString().trim();
+      const reason = (p.reason || p.error || '').toString().trim();
+      if (status && reason) return `${status}: ${reason}`;
+      if (status) return status;
+      if (reason) return reason;
+    }
+    return 'Command failed';
+  }
+
+  function isAuthErrorMessage(message) {
+    const t = (message || '').toString().toLowerCase();
+    return t.includes('not authorized')
+      || t.includes('not_authorized')
+      || t.includes('auth')
+      || t.includes('token missing')
+      || t.includes('token mismatch')
+      || t.includes('username mismatch');
+  }
+
+  function handleCommandError(err) {
+    const message = commandErrorMessage(err);
+    if (isAuthErrorMessage(message)) {
+      wsAuthed = false;
+      clearAuth();
+      stopStatePolling();
+      showLogin(true, 'Invalid username or password');
+      return;
+    }
+    setActionStatus(message, true);
+  }
 
   async function fetchLatestWaterfall() {
     if (!waterfallEnabled) return;
@@ -1028,7 +1122,7 @@ R"FT2JS((() => {
   function initPwaSupport() {
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => {});
+        navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(SW_VERSION)}`).catch(() => {});
       });
     }
 
@@ -1147,16 +1241,47 @@ R"FT2JS((() => {
   function renderState(s) {
     activeMode = (s.mode || '').toUpperCase();
     currentMode = activeMode;
-    activeBand = (s.band || '').trim();
+    const incomingBand = String(s.band || '').trim();
+    if (incomingBand) activeBand = incomingBand;
+
+    const nowMs = Date.now();
+    const pendingGuardActive = pendingFreqSetDeadlineMs > nowMs;
+    const reportedRxHz = (typeof s.rx_frequency_hz === 'number') ? Number(s.rx_frequency_hz) : null;
+    const reportedTxHz = (typeof s.tx_frequency_hz === 'number') ? Number(s.tx_frequency_hz) : null;
+
+    if (reportedRxHz !== null) {
+      const keepPendingRx = pendingRxHz !== null && pendingGuardActive && reportedRxHz !== pendingRxHz;
+      if (!keepPendingRx) {
+        currentRxHz = reportedRxHz;
+        if (pendingRxHz !== null && reportedRxHz === pendingRxHz) {
+          pendingRxHz = null;
+        }
+      }
+    }
+    if (reportedTxHz !== null) {
+      const keepPendingTx = pendingTxHz !== null && pendingGuardActive && reportedTxHz !== pendingTxHz;
+      if (!keepPendingTx) {
+        currentTxHz = reportedTxHz;
+        if (pendingTxHz !== null && reportedTxHz === pendingTxHz) {
+          pendingTxHz = null;
+        }
+      }
+    }
+    if (!pendingGuardActive) {
+      pendingRxHz = null;
+      pendingTxHz = null;
+      pendingFreqSetDeadlineMs = 0;
+    }
+
+    const displayRxHz = (pendingGuardActive && pendingRxHz !== null) ? pendingRxHz : currentRxHz;
+    const displayTxHz = (pendingGuardActive && pendingTxHz !== null) ? pendingTxHz : currentTxHz;
+
     updateModePresetSelect();
     set('st_mode', s.mode);
-    set('st_band', s.band);
+    set('st_band', incomingBand || activeBand || '-');
     set('st_dial', fmtHz(s.dial_frequency_hz) + ' Hz');
-    set('st_rx', fmtHz(s.rx_frequency_hz) + ' Hz');
-    set('st_tx', fmtHz(s.tx_frequency_hz) + ' Hz');
-    if (typeof s.rx_frequency_hz === 'number') currentRxHz = Number(s.rx_frequency_hz);
-    if (typeof s.tx_frequency_hz === 'number') currentTxHz = Number(s.tx_frequency_hz);
-    pendingRxHz = null;
+    set('st_rx', fmtHz(displayRxHz) + ' Hz');
+    set('st_tx', fmtHz(displayTxHz) + ' Hz');
     if (typeof s.tx_enabled === 'boolean') {
       updateTxEnabledState(s.tx_enabled);
     }
@@ -1179,10 +1304,23 @@ R"FT2JS((() => {
     }
     set('st_mycall', s.my_call || '-');
     set('st_dxcall', s.dx_call || '-');
-    if (typeof s.rx_frequency_hz === 'number') el('rxfreq').value = s.rx_frequency_hz;
-    if (typeof s.tx_frequency_hz === 'number' && txFreqInput) txFreqInput.value = s.tx_frequency_hz;
+    const rxFocused = !!rxFreqInput && document.activeElement === rxFreqInput;
+    const txFocused = !!txFreqInput && document.activeElement === txFreqInput;
+    const rxRecentlyEdited = rxInputDirty && (nowMs - rxInputEditedAtMs) < INPUT_EDIT_GRACE_MS;
+    const txRecentlyEdited = txInputDirty && (nowMs - txInputEditedAtMs) < INPUT_EDIT_GRACE_MS;
+    if (Number.isFinite(displayRxHz) && rxFreqInput && !rxFocused && !rxRecentlyEdited) {
+      rxFreqInput.value = displayRxHz;
+      rxInputDirty = false;
+    }
+    if (Number.isFinite(displayTxHz) && txFreqInput && !txFocused && !txRecentlyEdited) {
+      txFreqInput.value = displayTxHz;
+      txInputDirty = false;
+    }
     if (typeof s.auto_cq_enabled === 'boolean') {
       updateAutoCqState(s.auto_cq_enabled);
+    }
+    if (typeof s.auto_spot_enabled === 'boolean') {
+      updateAutoSpotState(s.auto_spot_enabled);
     }
     if (typeof s.waterfall_enabled === 'boolean') {
       updateWaterfallState(s.waterfall_enabled);
@@ -1198,16 +1336,32 @@ R"FT2JS((() => {
     if (requiresAuth && !authToken) throw new Error('token missing');
     const headers = buildHeaders({'Content-Type':'application/json'});
     const r = await fetch('/api/v1/commands', {method:'POST', headers, body:JSON.stringify(payload)});
-    const j = await r.json();
+    let j = {};
+    try {
+      j = await r.json();
+    } catch {
+      throw new Error('invalid server response');
+    }
     const status = (j.status || '').toString();
     const type = (j.type || payload.type || 'command').toString();
     const isErr = status.startsWith('rejected') || !!j.error;
-    setActionStatus(`${type}: ${status || (isErr ? 'error' : 'ok')}`, isErr);
+    const reason = (j.reason || j.error || '').toString().trim();
+    const statusText = status || (isErr ? 'error' : 'ok');
+    const detail = reason ? `${type}: ${statusText} (${reason})` : `${type}: ${statusText}`;
+    setActionStatus(detail, isErr);
+    if (isErr) {
+      const err = new Error(detail);
+      err.payload = j;
+      throw err;
+    }
     if (type === 'set_waterfall_enabled' && typeof j.enabled === 'boolean') {
       updateWaterfallState(j.enabled);
     }
     if (type === 'set_auto_cq' && typeof j.enabled === 'boolean') {
       updateAutoCqState(j.enabled);
+    }
+    if (type === 'set_auto_spot' && typeof j.enabled === 'boolean') {
+      updateAutoSpotState(j.enabled);
     }
     if (type === 'set_tx_enabled' && typeof j.enabled === 'boolean') {
       updateTxEnabledState(j.enabled);
@@ -1226,7 +1380,6 @@ R"FT2JS((() => {
     }
     if (type === 'set_rx_frequency' && typeof j.rx_frequency_hz === 'number') {
       currentRxHz = Number(j.rx_frequency_hz);
-      pendingRxHz = null;
       drawWaterfallOverlay();
     }
     if (type === 'set_tx_frequency' && typeof j.tx_frequency_hz === 'number') {
@@ -1240,9 +1393,6 @@ R"FT2JS((() => {
       applyEmissionControlVisibility();
       drawWaterfallOverlay();
       refreshButtonHighlights();
-      setTimeout(() => {
-        applyPresetForMode(currentMode, true).catch(() => {});
-      }, 220);
     }
     setTimeout(() => { getState(false).catch(() => {}); }, 120);
     return j;
@@ -1291,6 +1441,9 @@ R"FT2JS((() => {
         if (typeof m.auto_cq_enabled === 'boolean') {
           updateAutoCqState(m.auto_cq_enabled);
         }
+        if (typeof m.auto_spot_enabled === 'boolean') {
+          updateAutoSpotState(m.auto_spot_enabled);
+        }
         if (typeof m.tx_enabled === 'boolean') {
           updateTxEnabledState(m.tx_enabled);
         }
@@ -1330,6 +1483,9 @@ R"FT2JS((() => {
         if (type === 'set_auto_cq' && typeof m.enabled === 'boolean') {
           updateAutoCqState(m.enabled);
         }
+        if (type === 'set_auto_spot' && typeof m.enabled === 'boolean') {
+          updateAutoSpotState(m.enabled);
+        }
         if (type === 'set_tx_enabled' && typeof m.enabled === 'boolean') {
           updateTxEnabledState(m.enabled);
         }
@@ -1361,49 +1517,71 @@ R"FT2JS((() => {
   }
 
   el('btn_rxfreq').onclick = () => {
-    const rx = sanitizeFrequency(el('rxfreq').value);
+    const rx = sanitizeFrequency(rxFreqInput ? rxFreqInput.value : null);
     if (rx === null) return;
+    pendingRxHz = rx;
+    pendingFreqSetDeadlineMs = Date.now() + PENDING_FREQ_GRACE_MS;
+    currentRxHz = rx;
+    if (rxFreqInput) rxFreqInput.value = rx;
+    rxInputDirty = false;
+    rxInputEditedAtMs = 0;
     sendCommand({type:'set_rx_frequency', rx_frequency_hz:rx})
-      .then(() => savePresetForMode(currentMode || activeMode, rx, txFreqInput ? (txFreqInput.value || currentTxHz) : currentTxHz))
-      .catch((e) => showLogin(true, e.message));
+      .catch((e) => {
+        pendingRxHz = null;
+        pendingFreqSetDeadlineMs = 0;
+        handleCommandError(e);
+      });
   };
   if (btnTxFreq) {
     btnTxFreq.onclick = () => {
       const tx = sanitizeFrequency(txFreqInput ? txFreqInput.value : null);
       if (tx === null) return;
+      pendingTxHz = tx;
+      pendingFreqSetDeadlineMs = Date.now() + PENDING_FREQ_GRACE_MS;
+      currentTxHz = tx;
+      if (txFreqInput) txFreqInput.value = tx;
+      txInputDirty = false;
+      txInputEditedAtMs = 0;
       sendCommand({type:'set_tx_frequency', tx_frequency_hz:tx})
-        .then(() => savePresetForMode(currentMode || activeMode, el('rxfreq').value || currentRxHz, tx))
-        .catch((e) => showLogin(true, e.message));
+        .catch((e) => {
+          pendingTxHz = null;
+          pendingFreqSetDeadlineMs = 0;
+          handleCommandError(e);
+        });
     };
   }
   if (btnSetRxTx) {
     btnSetRxTx.onclick = async () => {
-      const rx = sanitizeFrequency(el('rxfreq').value);
+      const rx = sanitizeFrequency(rxFreqInput ? rxFreqInput.value : null);
       const tx = sanitizeFrequency(txFreqInput ? txFreqInput.value : null);
       if (rx === null || tx === null) return;
+      pendingRxHz = rx;
+      pendingTxHz = tx;
+      pendingFreqSetDeadlineMs = Date.now() + PENDING_FREQ_GRACE_MS;
+      currentRxHz = rx;
+      currentTxHz = tx;
+      if (rxFreqInput) rxFreqInput.value = rx;
+      if (txFreqInput) txFreqInput.value = tx;
+      rxInputDirty = false;
+      txInputDirty = false;
+      rxInputEditedAtMs = 0;
+      txInputEditedAtMs = 0;
       try {
         await sendCommand({type:'set_rx_frequency', rx_frequency_hz:rx});
         await sendCommand({type:'set_tx_frequency', tx_frequency_hz:tx});
-        savePresetForMode(currentMode || activeMode, rx, tx);
         setActionStatus(`Rx/Tx set: ${rx}/${tx} Hz`, false);
       } catch (e) {
-        showLogin(true, e.message);
+        pendingRxHz = null;
+        pendingTxHz = null;
+        pendingFreqSetDeadlineMs = 0;
+        handleCommandError(e);
       }
     };
   }
-  if (modePresetSelect) {
-    modePresetSelect.addEventListener('change', () => {
-      const mode = getSelectedPresetMode();
-      const preset = modeFrequencyPresets[mode];
-      if (!preset) return;
-      if (el('rxfreq')) el('rxfreq').value = preset.rx;
-      if (txFreqInput) txFreqInput.value = preset.tx;
-    });
-  }
   if (btnSaveModePreset) {
     btnSaveModePreset.onclick = () => {
-      const mode = getSelectedPresetMode();
-      const rx = sanitizeFrequency(el('rxfreq').value || currentRxHz);
+      const mode = getCurrentPresetMode();
+      const rx = sanitizeFrequency((rxFreqInput ? rxFreqInput.value : null) || currentRxHz);
       const tx = sanitizeFrequency(txFreqInput ? (txFreqInput.value || currentTxHz) : currentTxHz);
       if (rx === null || tx === null) return;
       if (savePresetForMode(mode, rx, tx)) {
@@ -1413,30 +1591,33 @@ R"FT2JS((() => {
   }
   if (btnApplyModePreset) {
     btnApplyModePreset.onclick = () => {
-      applyPresetForMode(getSelectedPresetMode(), false).catch((e) => showLogin(true, e.message));
+      applyPresetForMode(getCurrentPresetMode(), false).catch(handleCommandError);
     };
   }
   if (btnTxOn) {
-    btnTxOn.onclick = () => sendCommand({type:'set_tx_enabled', enabled:true}).catch((e) => showLogin(true, e.message));
+    btnTxOn.onclick = () => sendCommand({type:'set_tx_enabled', enabled:true}).catch(handleCommandError);
   }
   if (btnTxOff) {
-    btnTxOff.onclick = () => sendCommand({type:'set_tx_enabled', enabled:false}).catch((e) => showLogin(true, e.message));
+    btnTxOff.onclick = () => sendCommand({type:'set_tx_enabled', enabled:false}).catch(handleCommandError);
   }
   if (btnAutoCQ) {
-    btnAutoCQ.onclick = () => sendCommand({type:'set_auto_cq', enabled:!autoCqEnabled}).catch((e) => showLogin(true, e.message));
+    btnAutoCQ.onclick = () => sendCommand({type:'set_auto_cq', enabled:!autoCqEnabled}).catch(handleCommandError);
+  }
+  if (btnAutoSpot) {
+    btnAutoSpot.onclick = () => sendCommand({type:'set_auto_spot', enabled:!autoSpotEnabled}).catch(handleCommandError);
   }
   if (btnAsyncL2) {
-    btnAsyncL2.onclick = () => sendCommand({type:'set_async_l2', enabled:!asyncL2Enabled}).catch((e) => showLogin(true, e.message));
+    btnAsyncL2.onclick = () => sendCommand({type:'set_async_l2', enabled:!asyncL2Enabled}).catch(handleCommandError);
   }
   if (btnDualCarrier) {
-    btnDualCarrier.onclick = () => sendCommand({type:'set_dual_carrier', enabled:!dualCarrierEnabled}).catch((e) => showLogin(true, e.message));
+    btnDualCarrier.onclick = () => sendCommand({type:'set_dual_carrier', enabled:!dualCarrierEnabled}).catch(handleCommandError);
   }
   if (btnAlt12) {
-    btnAlt12.onclick = () => sendCommand({type:'set_alt_12', enabled:!alt12Enabled}).catch((e) => showLogin(true, e.message));
+    btnAlt12.onclick = () => sendCommand({type:'set_alt_12', enabled:!alt12Enabled}).catch(handleCommandError);
   }
-  el('btn_call').onclick = () => sendCommand({type:'select_caller', target_call:el('caller_call').value, target_grid:el('caller_grid').value}).catch((e) => showLogin(true, e.message));
+  el('btn_call').onclick = () => sendCommand({type:'select_caller', target_call:el('caller_call').value, target_grid:el('caller_grid').value}).catch(handleCommandError);
   if (btnWfToggle) {
-    btnWfToggle.onclick = () => sendCommand({type:'set_waterfall_enabled', enabled:!waterfallEnabled}).catch((e) => showLogin(true, e.message));
+    btnWfToggle.onclick = () => sendCommand({type:'set_waterfall_enabled', enabled:!waterfallEnabled}).catch(handleCommandError);
   }
   if (wfCanvas) {
     wfCanvas.addEventListener('click', (ev) => {
@@ -1446,19 +1627,21 @@ R"FT2JS((() => {
       const ratio = rect.width > 0 ? relX / rect.width : 0;
       const rxHz = Math.round(waterfallMeta.startHz + ratio * waterfallMeta.spanHz);
       pendingRxHz = rxHz;
+      pendingFreqSetDeadlineMs = Date.now() + PENDING_FREQ_GRACE_MS;
       drawWaterfallOverlay();
       sendCommand({type:'set_rx_frequency', rx_frequency_hz:rxHz}).catch((e) => {
         pendingRxHz = null;
+        pendingFreqSetDeadlineMs = 0;
         drawWaterfallOverlay();
-        showLogin(true, e.message);
+        handleCommandError(e);
       });
     });
   }
   document.querySelectorAll('.mode-btn').forEach((b) => {
-    b.addEventListener('click', () => sendCommand({type:'set_mode', mode:b.dataset.mode}).catch((e) => showLogin(true, e.message)));
+    b.addEventListener('click', () => sendCommand({type:'set_mode', mode:b.dataset.mode}).catch(handleCommandError));
   });
   document.querySelectorAll('.band-btn').forEach((b) => {
-    b.addEventListener('click', () => sendCommand({type:'set_band', band:b.dataset.band}).catch((e) => showLogin(true, e.message)));
+    b.addEventListener('click', () => sendCommand({type:'set_band', band:b.dataset.band}).catch(handleCommandError));
   });
 
   if (btnActivityPause) {
@@ -1574,7 +1757,7 @@ R"FT2MAN({
 QByteArray dashboard_service_worker_js()
 {
   return QByteArrayLiteral(
-R"FT2SW(const CACHE_NAME = 'decodium-remote-shell-v2';
+R"FT2SW(const CACHE_NAME = 'decodium-remote-shell-v3';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -1584,6 +1767,7 @@ const APP_SHELL = [
   '/icon-192.png',
   '/icon-512.png'
 ];
+const APP_SHELL_SET = new Set(APP_SHELL);
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -1610,6 +1794,21 @@ self.addEventListener('fetch', (event) => {
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req).catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
+
+  if (APP_SHELL_SET.has(url.pathname)) {
+    event.respondWith(
+      fetch(req)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(req))
     );
     return;
   }
@@ -2009,6 +2208,7 @@ void RemoteCommandServer::onNewConnection()
         {"dual_carrier_enabled", rt.dualCarrierEnabled},
         {"alt_12_enabled", rt.alt12Enabled},
         {"auto_cq_enabled", rt.autoCqEnabled},
+        {"auto_spot_enabled", rt.autoSpotEnabled},
         {"waterfall_enabled", waterfallEnabled_},
       };
       sendJson(client, hello);
@@ -2431,6 +2631,28 @@ RemoteCommandServer::CommandResult RemoteCommandServer::processCommandObject(QJs
         {"event", QStringLiteral("command_ack")},
         {"command_id", commandId},
         {"type", QStringLiteral("set_auto_cq")},
+        {"status", QStringLiteral("accepted_immediate")},
+        {"enabled", enabled},
+        {"server_now_ms", nowUtcMs},
+      };
+      return result;
+    }
+
+  if (commandType == QStringLiteral("set_auto_spot"))
+    {
+      if (!object.contains(QStringLiteral("enabled")))
+        {
+          result.payload = makeRejectPayload(commandId, QStringLiteral("rejected_invalid_request"), QStringLiteral("enabled is required"));
+          return result;
+        }
+      auto enabled = object.value(QStringLiteral("enabled")).toBool(false);
+      seenCommandIds_.insert(commandId, nowUtcMs);
+      Q_EMIT setAutoSpotRequested(commandId, enabled);
+      result.accepted = true;
+      result.payload = QJsonObject {
+        {"event", QStringLiteral("command_ack")},
+        {"command_id", commandId},
+        {"type", QStringLiteral("set_auto_spot")},
         {"status", QStringLiteral("accepted_immediate")},
         {"enabled", enabled},
         {"server_now_ms", nowUtcMs},
@@ -2865,6 +3087,7 @@ void RemoteCommandServer::onHttpSocketReadyRead()
       auto const body = dashboard_html();
       response += "HTTP/1.1 200 OK\r\n";
       response += "Content-Type: text/html; charset=utf-8\r\n";
+      response += "Cache-Control: no-store, max-age=0\r\n";
       response += "Content-Length: " + QByteArray::number(body.size()) + "\r\n";
       response += "Connection: close\r\n\r\n";
       response += body;
@@ -2879,6 +3102,7 @@ void RemoteCommandServer::onHttpSocketReadyRead()
       auto const body = dashboard_css();
       response += "HTTP/1.1 200 OK\r\n";
       response += "Content-Type: text/css; charset=utf-8\r\n";
+      response += "Cache-Control: no-store, max-age=0\r\n";
       response += "Content-Length: " + QByteArray::number(body.size()) + "\r\n";
       response += "Connection: close\r\n\r\n";
       response += body;
@@ -2893,6 +3117,7 @@ void RemoteCommandServer::onHttpSocketReadyRead()
       auto const body = dashboard_js();
       response += "HTTP/1.1 200 OK\r\n";
       response += "Content-Type: application/javascript; charset=utf-8\r\n";
+      response += "Cache-Control: no-store, max-age=0\r\n";
       response += "Content-Length: " + QByteArray::number(body.size()) + "\r\n";
       response += "Connection: close\r\n\r\n";
       response += body;
@@ -2922,7 +3147,7 @@ void RemoteCommandServer::onHttpSocketReadyRead()
       auto const body = dashboard_service_worker_js();
       response += "HTTP/1.1 200 OK\r\n";
       response += "Content-Type: application/javascript; charset=utf-8\r\n";
-      response += "Cache-Control: no-cache\r\n";
+      response += "Cache-Control: no-store, max-age=0\r\n";
       response += "Content-Length: " + QByteArray::number(body.size()) + "\r\n";
       response += "Connection: close\r\n\r\n";
       response += body;
@@ -2973,6 +3198,7 @@ void RemoteCommandServer::onHttpSocketReadyRead()
           health.insert(QStringLiteral("period_ms"), static_cast<double>(rt.periodMs));
           health.insert(QStringLiteral("tx_enabled"), rt.txEnabled);
           health.insert(QStringLiteral("auto_cq_enabled"), rt.autoCqEnabled);
+          health.insert(QStringLiteral("auto_spot_enabled"), rt.autoSpotEnabled);
           health.insert(QStringLiteral("async_l2_enabled"), rt.asyncL2Enabled);
           health.insert(QStringLiteral("dual_carrier_enabled"), rt.dualCarrierEnabled);
           health.insert(QStringLiteral("alt_12_enabled"), rt.alt12Enabled);
@@ -3018,6 +3244,7 @@ void RemoteCommandServer::onHttpSocketReadyRead()
                       {"period_ms", static_cast<double>(periodMs)},
                       {"tx_enabled", rt.txEnabled},
                       {"auto_cq_enabled", rt.autoCqEnabled},
+                      {"auto_spot_enabled", rt.autoSpotEnabled},
                       {"async_l2_enabled", rt.asyncL2Enabled},
                       {"dual_carrier_enabled", rt.dualCarrierEnabled},
                       {"alt_12_enabled", rt.alt12Enabled},
@@ -3164,6 +3391,7 @@ void RemoteCommandServer::onTelemetryTick()
     {"period_ms", static_cast<double>(periodMs)},
     {"tx_enabled", state.txEnabled},
     {"auto_cq_enabled", state.autoCqEnabled},
+    {"auto_spot_enabled", state.autoSpotEnabled},
     {"async_l2_enabled", state.asyncL2Enabled},
     {"dual_carrier_enabled", state.dualCarrierEnabled},
     {"alt_12_enabled", state.alt12Enabled},

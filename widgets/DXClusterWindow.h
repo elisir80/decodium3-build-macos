@@ -27,6 +27,8 @@ public:
   ~DXClusterWindow() override;
 
   void setBand(QString const& bandName, bool forceSyncToAppBand = false);
+  void setMyCall(QString const& myCall);
+  void suspendRefresh(int ms);
 
 Q_SIGNALS:
   void windowVisibleChanged(bool visible);
@@ -86,6 +88,7 @@ private:
   bool requestInFlight_ {false};
   QString appBand_;
   QString currentBand_;
+  QString myCall_;
   QVector<Spot> spots_;
 };
 

@@ -1,61 +1,57 @@
-# Documentation Notes (English) - v1.4.6
+# Documentation Notes (English) - v1.4.7
 
-## Scope
+This index groups the release-facing documentation for the current fork cycle.
 
-Repository-specific notes for the Decodium macOS fork and Linux AppImage release flow.
+- Current release: `v1.4.7`
+- Update cycle: `v1.4.6 -> v1.4.7`
+- Primary focus: FT2 runtime/decode hardening, AutoCQ continuity, AutoSpot/DX Cluster integration, and release alignment.
 
-## Current Release Context
+## Key Technical Changes (`v1.4.6 -> v1.4.7`)
 
-- Current release: `v1.4.6`
-- Update cycle: `v1.4.5 -> v1.4.6`
-- Targets: Apple Silicon Tahoe, Apple Silicon Sequoia, Apple Intel Sequoia, Apple Intel Monterey (experimental), Linux x86_64 AppImage
+- FT2 async Tx guard raised to `300 ms`.
+- FT2 false-decode filtering extended with `cty.dat` prefix validation.
+- FT2 `TΔ` rendering and marker normalization hardened to preserve column alignment.
+- AutoCQ partner lock / retry / confirmed-73 return-to-CQ behavior stabilized.
+- Settings now expose AutoSpot endpoint configuration and enable flag.
+- DX Cluster window now queries a configurable DxSpider telnet endpoint with better telnet/prompt handling.
+- Web dashboard adds AutoSpot toggle, stronger command feedback, and more stable mode presets.
+- `Astronomical Data` menu state now follows real window close events.
 
-## Key Technical Changes (`v1.4.5 -> v1.4.6`)
+## Release Artifacts
 
-- AutoCQ/QSO sequencing hardening:
-- restored FIFO caller queue behavior from v1.3.8 baseline.
-- stronger active-partner continuity during active QSOs.
-- deferred RR73/73 retry flow generalized across FT2/FT8/FT4/FST4/Q65/MSK144.
-- payload-token partner matching strengthened for edge decode formats.
-- Logging/signoff consistency:
-- deferred autolog context recovery refined after retry windows.
-- reduced cases of premature/no-confirmation logging.
-- reduced delayed logging from stale pending-state transitions.
-- Decode/right-pane continuity:
-- robust payload extraction for variable marker spacing and optional marker frames.
-- reduced cases where valid partner messages stayed only in Band Activity pane.
-- UI/runtime:
-- fixed macOS `View -> World Map` hide/show behavior.
-- improved splitter pane sizing logic for secondary decode/map panels.
-- Linux settings tabs now use scroll wrapping to keep dialog action buttons reachable.
-- added startup audio stream refresh on macOS for already-selected devices.
-- Remote/web dashboard:
-- added remote `set_tx_frequency` command endpoint wiring.
-- web app now supports Rx+Tx set, dedicated Rx/Tx set, and per-mode frequency presets.
-- maintained localized minimum-password hint (12 chars, IT/EN).
-
-## Build and Runtime
-
-- Local build binary: `build/ft2.app/Contents/MacOS/ft2`
-- Helper binaries in bundle: `jt9`, `wsprd`
-- Shared memory backend on macOS remains file-backed `mmap` (no `.pkg` sysctl bootstrap required).
+- `decodium3-ft2-v1.4.7-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-v1.4.7-macos-tahoe-arm64.zip`
+- `decodium3-ft2-v1.4.7-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-v1.4.7-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-v1.4.7-macos-sequoia-arm64.zip`
+- `decodium3-ft2-v1.4.7-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-v1.4.7-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-v1.4.7-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-v1.4.7-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-v1.4.7-macos-monterey-x86_64.dmg` *(best effort/experimental, if generated)*
+- `decodium3-ft2-v1.4.7-macos-monterey-x86_64.zip` *(best effort/experimental, if generated)*
+- `decodium3-ft2-v1.4.7-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, if generated)*
+- `decodium3-ft2-v1.4.7-linux-x86_64.AppImage`
+- `decodium3-ft2-v1.4.7-linux-x86_64.AppImage.sha256.txt`
 
 ## Linux Minimum Requirements
 
-- Architecture: `x86_64` (64-bit)
-- CPU: dual-core 2.0 GHz or better
-- RAM: 4 GB minimum (8 GB recommended)
-- Storage: at least 500 MB free
-- Runtime/software:
-- Linux with `glibc >= 2.35`
+- `x86_64` CPU, dual-core 2.0 GHz+
+- 4 GB RAM minimum (8 GB recommended)
+- 500 MB free disk space
+- `glibc >= 2.35`
 - `libfuse2` / FUSE2
 - ALSA, PulseAudio, or PipeWire
 
-## Linux AppImage Recommendation
+## Startup Guidance
 
-Per evitare problemi dovuti al filesystem in sola lettura delle AppImage, si consiglia di avviare Decodium estraendo prima l'AppImage e poi eseguendo il programma dalla cartella estratta.
+macOS quarantine:
 
-Eseguire i seguenti comandi nel terminale:
+```bash
+sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
+```
+
+Linux AppImage extract-run flow:
 
 ```bash
 chmod +x /path/to/Decodium.AppImage
@@ -64,17 +60,12 @@ cd squashfs-root
 ./AppRun
 ```
 
-## Gatekeeper Quarantine Command
+## Related Files
 
-```bash
-sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
-```
-
-## References
-
+- [README.md](../README.md)
+- [README.en-GB.md](../README.en-GB.md)
+- [README.it.md](../README.it.md)
+- [README.es.md](../README.es.md)
+- [RELEASE_NOTES_v1.4.7.md](../RELEASE_NOTES_v1.4.7.md)
+- [doc/GITHUB_RELEASE_BODY_v1.4.7.md](./GITHUB_RELEASE_BODY_v1.4.7.md)
 - [CHANGELOG.md](../CHANGELOG.md)
-- [RELEASE_NOTES_v1.4.6.md](../RELEASE_NOTES_v1.4.6.md)
-- [doc/GITHUB_RELEASE_BODY_v1.4.6.md](./GITHUB_RELEASE_BODY_v1.4.6.md)
-- [doc/WEBAPP_SETUP_GUIDE.en-GB.md](./WEBAPP_SETUP_GUIDE.en-GB.md)
-- [doc/WEBAPP_SETUP_GUIDE.it.md](./WEBAPP_SETUP_GUIDE.it.md)
-- [doc/WEBAPP_SETUP_GUIDE.es.md](./WEBAPP_SETUP_GUIDE.es.md)

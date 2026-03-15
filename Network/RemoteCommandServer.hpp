@@ -36,6 +36,7 @@ public:
     qint64 periodMs {0};
     bool txEnabled {false};
     bool autoCqEnabled {false};
+    bool autoSpotEnabled {false};
     bool asyncL2Enabled {false};
     bool dualCarrierEnabled {false};
     bool alt12Enabled {false};
@@ -79,6 +80,7 @@ Q_SIGNALS:
   void setTxFrequencyRequested(QString const& commandId, int txFrequencyHz);
   void setTxEnabledRequested(QString const& commandId, bool enabled);
   void setAutoCqRequested(QString const& commandId, bool enabled);
+  void setAutoSpotRequested(QString const& commandId, bool enabled);
   void setAsyncL2Requested(QString const& commandId, bool enabled);
   void setDualCarrierRequested(QString const& commandId, bool enabled);
   void setAlt12Requested(QString const& commandId, bool enabled);

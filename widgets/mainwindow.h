@@ -532,6 +532,7 @@ private slots:
   void onRemoteSetTxFrequencyRequested(QString const& commandId, int txFrequencyHz);
   void onRemoteSetTxEnabledRequested(QString const& commandId, bool enabled);
   void onRemoteSetAutoCqRequested(QString const& commandId, bool enabled);
+  void onRemoteSetAutoSpotRequested(QString const& commandId, bool enabled);
   void onRemoteSetAsyncL2Requested(QString const& commandId, bool enabled);
   void onRemoteSetDualCarrierRequested(QString const& commandId, bool enabled);
   void onRemoteSetAlt12Requested(QString const& commandId, bool enabled);
@@ -759,7 +760,7 @@ private:
   static constexpr int MAX_CQ_RETRIES = 10;   // CQ retries before toggling Tx Even/1st
   int  m_autoCQPeriodsMissed   {0};           // RX periods senza risposta dal caller corrente
   bool m_receivedReplyThisPeriod {false};     // flag reset ogni periodo RX
-  static constexpr int MAX_MISSED_PERIODS = 4;
+  static constexpr int MAX_MISSED_PERIODS = MAX_TX_RETRIES;
   qint32  m_kin0=0;
   qint32  m_earlyDecode=41;
   qint32  m_earlyDecode2=47;
@@ -845,12 +846,26 @@ private:
   bool    m_bCallingCQ;
   bool    m_autoCQ;
   bool    m_ft2DeferredLogPending {false};   // AutoCQ: delay log/CQ restart while repeating RR73/73
+  QString m_autoCqLockedCall;
+  QString m_autoCqLockedGrid;
+  int     m_autoCqLockedNtx {6};
+  int     m_autoCqLockedProgress {0};
   QQueue<QString> m_callerQueue;
   void enqueueCaller (QString const& call, int freq, int snr = -99, float dt = 0.0f);
   void processNextInQueue ();
   void refreshCallerQueueDisplay ();
   void capturePendingAutoLogSnapshot ();
   void clearPendingAutoLogSnapshot ();
+  void clearAutoCqPartnerLock ();
+  void updateAutoCqPartnerLock ();
+  void restoreAutoCqPartnerLock ();
+  void setAutoSpotEnabled(bool enabled, bool fromRemote = false);
+  void sendClusterAutoSpot(QString const& call,
+                           QString const& grid,
+                           Frequency dialFreq,
+                           QString const& mode,
+                           QString const& rptSent,
+                           QString const& rptRcvd);
 
   // DX-pedition 2-slot
   struct DXpedSlot {
@@ -883,6 +898,7 @@ private:
   bool    m_bAutoReply;
   QString m_lastloggedcall; //ft8md
   QHash<QString, QDateTime> m_recentQsoLogUtcByKey;
+  bool    m_autoSpotEnabled {false};
   bool    m_bCheckedContest;
   bool    m_bWarnedSplit=false;
   bool    m_bTUmsg;
@@ -1183,6 +1199,7 @@ private:
   QTimer m_heartbeat;
   MessageClient * m_messageClient;
   QPointer<RemoteCommandServer> m_remoteCommandServer;
+  QCheckBox * m_autoSpotCheckBox {nullptr};
   bool m_remoteWaterfallStreamingEnabled {false};
   QString m_mapLastClickCall;
   qint64 m_mapLastClickMs {0};

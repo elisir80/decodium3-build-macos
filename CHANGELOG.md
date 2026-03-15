@@ -1,5 +1,88 @@
 # Changelog / Registro Modifiche
 
+## [1.4.7] - 2026-03-15
+
+### English
+
+Release focused on FT2 runtime/decode hardening, AutoCQ partner continuity, DxSpider-based AutoSpot/DX Cluster workflows, and release alignment.
+
+#### Added
+
+- Added FT2 false-decode filtering based on `cty.dat` prefix validation.
+- Added Settings controls for AutoSpot endpoint host/port and enable state.
+- Added DxSpider telnet feed support in the DX Cluster window, including separate view-login support when required.
+- Added remote/dashboard AutoSpot toggle and clearer action/auth feedback.
+
+#### Changed
+
+- FT2 async Tx guard increased from `100 ms` to `300 ms`.
+- FT2 `TΔ` rendering now uses structured parsing to preserve decode-column alignment.
+- Cluster feed and AutoSpot submit now use the same configurable endpoint, with explicit telnet prompt/IAC handling and `UNSET/DX` quiet queries.
+- Release/build/workflow defaults aligned to `v1.4.7`.
+
+#### Fixed
+
+- Fixed FT2 decode-column drift when `~` appears in flow or packed rows are re-expanded.
+- Fixed AutoCQ partner takeover during active QSOs and aligned missed-period handling to the full `5` retry budget.
+- Fixed stale missed-period carry-over when a valid caller reply advances the QSO.
+- Fixed extra `RR73` transmission after confirmed partner `73` before returning to CQ.
+- Fixed `Astronomical Data` menu check state when the window is closed with the titlebar `X`.
+- Fixed Linux settings dialog behavior on oversized tab pages by preserving scrollability and bottom actions.
+
+### Italiano
+
+Release focalizzata su hardening runtime/decode FT2, continuita' partner AutoCQ, workflow AutoSpot/DX Cluster basati su DxSpider e allineamento release.
+
+#### Aggiunto
+
+- Aggiunto filtro false decode FT2 basato su validazione prefissi `cty.dat`.
+- Aggiunti controlli impostazioni per host/porta endpoint AutoSpot e stato enable.
+- Aggiunto supporto feed telnet DxSpider nella finestra DX Cluster, inclusa possibilita' di login separato per la sola vista.
+- Aggiunto toggle AutoSpot nella dashboard remota e feedback piu' chiaro su azioni/auth.
+
+#### Modificato
+
+- Guardia async Tx FT2 aumentata da `100 ms` a `300 ms`.
+- Rendering FT2 `TΔ` spostato su parsing strutturato per preservare l'allineamento colonne decode.
+- Feed cluster e submit AutoSpot ora usano lo stesso endpoint configurabile, con gestione esplicita prompt/IAC telnet e query silenziose `UNSET/DX`.
+- Default release/build/workflow allineati a `v1.4.7`.
+
+#### Corretto
+
+- Corretto drift colonne decode FT2 quando nel flow compare `~` o quando righe packed vengono riespanse.
+- Corretto takeover partner AutoCQ durante QSO attivi e allineata la gestione periodi mancati all'intero budget di `5` retry.
+- Corretto carry-over stale dei periodi mancati quando una risposta valida del caller fa avanzare il QSO.
+- Corretto invio di `RR73` extra dopo `73` confermato del partner prima del ritorno a CQ.
+- Corretto stato check della voce `Dati Astronomici` quando la finestra viene chiusa con la `X` della titlebar.
+- Corretto comportamento del dialogo impostazioni Linux su tab troppo alte, mantenendo scroll e pulsanti finali.
+
+### Espanol
+
+Release centrada en hardening runtime/decode FT2, continuidad de pareja AutoCQ, flujos AutoSpot/DX Cluster basados en DxSpider y alineacion release.
+
+#### Anadido
+
+- Anadido filtro false decode FT2 basado en validacion de prefijos `cty.dat`.
+- Anadidos controles de ajustes para host/puerto del endpoint AutoSpot y estado enable.
+- Anadido soporte de feed telnet DxSpider en la ventana DX Cluster, con opcion de login separado para la vista.
+- Anadido toggle AutoSpot en la dashboard remota y feedback mas claro de acciones/auth.
+
+#### Cambios
+
+- Guardia async Tx FT2 subida de `100 ms` a `300 ms`.
+- Renderizado FT2 `TΔ` movido a parsing estructurado para preservar alineacion de columnas decode.
+- Feed cluster y submit AutoSpot usan ahora el mismo endpoint configurable, con manejo explicito de prompt/IAC telnet y consultas silenciosas `UNSET/DX`.
+- Defaults de release/build/workflows alineados a `v1.4.7`.
+
+#### Corregido
+
+- Corregido drift de columnas decode FT2 cuando aparece `~` en el flujo o cuando filas packed se reexpanden.
+- Corregido takeover de pareja AutoCQ durante QSOs activos y alineado el manejo de periodos perdidos con el presupuesto completo de `5` reintentos.
+- Corregido arrastre stale de periodos perdidos cuando una respuesta valida del caller hace avanzar el QSO.
+- Corregido envio de `RR73` extra despues del `73` confirmado de la pareja antes de volver a CQ.
+- Corregido estado del check de `Datos Astronomicos` al cerrar la ventana con la `X` de la titlebar.
+- Corregido comportamiento del dialogo de ajustes Linux en tabs demasiado altas, manteniendo scroll y botones finales.
+
 ## [1.4.6] - 2026-03-14
 
 ### English

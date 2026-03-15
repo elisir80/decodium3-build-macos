@@ -318,6 +318,9 @@ public:
   QString remote_ws_bind () const;
   QString remote_user () const;
   QString remote_token () const;
+  QString dx_cluster_host () const;
+  quint16 dx_cluster_port () const;
+  bool auto_spot_enabled () const;
   void setExternalCtrlMode(bool);         //avt  10/2/25
   bool is_pwr_swr_supported() const;      //avt 1/25/26
   void setPskReporter(bool enable);       //avt 2/4/26

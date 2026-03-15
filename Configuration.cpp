@@ -183,6 +183,8 @@
 #include <QSpinBox>
 #include <QScrollArea>
 #include <QFrame>
+#include <QLayout>
+#include <QSizePolicy>
 #include <vector>
 #include <utility>
 #include <iostream>
@@ -1105,6 +1107,10 @@ private:
   QLineEdit * remote_ws_bind_line_edit_ {nullptr};
   QLineEdit * remote_user_line_edit_ {nullptr};
   QLineEdit * remote_token_line_edit_ {nullptr};
+  QGroupBox * dx_cluster_group_box_ {nullptr};
+  QLineEdit * dx_cluster_host_line_edit_ {nullptr};
+  QSpinBox * dx_cluster_port_spin_box_ {nullptr};
+  QCheckBox * auto_spot_check_box_ {nullptr};
 
   TransceiverFactory::ParameterPack rig_params_;
   TransceiverFactory::ParameterPack saved_rig_params_;
@@ -1179,6 +1185,9 @@ private:
   QString remote_ws_bind_ {"0.0.0.0"};
   QString remote_user_ {"admin"};
   QString remote_token_;
+  QString dx_cluster_host_ {"iq8do.aricaserta.it"};
+  quint16 dx_cluster_port_ {7300};
+  bool auto_spot_enabled_ {false};
 
   QString OTPUrl_;
   QString OTPSeed_;
@@ -2072,6 +2081,21 @@ QString Configuration::remote_token () const
   return m_->remote_token_;
 }
 
+QString Configuration::dx_cluster_host () const
+{
+  return m_->dx_cluster_host_;
+}
+
+quint16 Configuration::dx_cluster_port () const
+{
+  return m_->dx_cluster_port_;
+}
+
+bool Configuration::auto_spot_enabled () const
+{
+  return m_->auto_spot_enabled_;
+}
+
 void Configuration::setExternalCtrlMode(bool active) 
 {         //avt  10/2/25
   m_externalCtrlMode = active;
@@ -2320,6 +2344,50 @@ Configuration::impl::impl (Configuration * self, QNetworkAccessManager * network
       updateRemoteEnabledUi ();
 
       generalLayout->addWidget (remote_web_group_box_);
+
+      dx_cluster_group_box_ = new QGroupBox {tr ("AutoSpot"), this};
+      auto * clusterLayout = new QGridLayout {dx_cluster_group_box_};
+
+      auto * clusterHostLabel = new QLabel {tr ("Submit host:"), dx_cluster_group_box_};
+      dx_cluster_host_line_edit_ = new QLineEdit {dx_cluster_group_box_};
+      dx_cluster_host_line_edit_->setPlaceholderText (QStringLiteral ("iq8do.aricaserta.it"));
+      dx_cluster_host_line_edit_->setToolTip (
+        tr ("DX cluster node host/IP used both by the cluster window feed and by AutoSpot submit.\n"
+            "Use a DxSpider-compatible node that accepts telnet login and spot commands."));
+      clusterHostLabel->setBuddy (dx_cluster_host_line_edit_);
+
+      auto * clusterPortLabel = new QLabel {tr ("Submit port:"), dx_cluster_group_box_};
+      dx_cluster_port_spin_box_ = new QSpinBox {dx_cluster_group_box_};
+      dx_cluster_port_spin_box_->setRange (1, 65535);
+      dx_cluster_port_spin_box_->setValue (7300);
+      dx_cluster_port_spin_box_->setToolTip (
+        tr ("DX cluster node port used both by the cluster window feed and by AutoSpot submit.\n"
+            "Set the telnet port required by your cluster server."));
+      clusterPortLabel->setBuddy (dx_cluster_port_spin_box_);
+
+      auto_spot_check_box_ = new QCheckBox {
+        tr ("Enable AutoSpot after QSO log (after confirmed 73)"),
+        dx_cluster_group_box_};
+      auto_spot_check_box_->setToolTip (
+        tr ("When enabled, Decodium sends a DX cluster spot at QSO close after log.\n"
+            "Requires a writable cluster endpoint."));
+
+      auto * clusterHint = new QLabel {
+        tr ("Default node: iq8do.aricaserta.it:7300\n"
+            "The cluster window and AutoSpot now use the same endpoint."),
+        dx_cluster_group_box_};
+      clusterHint->setStyleSheet (QStringLiteral ("color:#666;"));
+
+      clusterLayout->addWidget (clusterHostLabel, 0, 0);
+      clusterLayout->addWidget (dx_cluster_host_line_edit_, 0, 1);
+      clusterLayout->addWidget (clusterPortLabel, 1, 0);
+      clusterLayout->addWidget (dx_cluster_port_spin_box_, 1, 1);
+      clusterLayout->addWidget (auto_spot_check_box_, 2, 0, 1, 2);
+      clusterLayout->addWidget (clusterHint, 3, 0, 1, 2);
+      clusterLayout->setColumnStretch (0, 0);
+      clusterLayout->setColumnStretch (1, 1);
+
+      generalLayout->addWidget (dx_cluster_group_box_);
     }
 
   {
@@ -2726,6 +2794,18 @@ void Configuration::impl::initialize_models ()
   if (remote_token_line_edit_)
     {
       remote_token_line_edit_->setText (remote_token_);
+    }
+  if (dx_cluster_host_line_edit_)
+    {
+      dx_cluster_host_line_edit_->setText (dx_cluster_host_);
+    }
+  if (dx_cluster_port_spin_box_)
+    {
+      dx_cluster_port_spin_box_->setValue (dx_cluster_port_);
+    }
+  if (auto_spot_check_box_)
+    {
+      auto_spot_check_box_->setChecked (auto_spot_enabled_);
     }
   ui_->ppfx_check_box->setChecked (ppfx_);
   ui_->show_country_names_check_box->setChecked (show_country_names_);
@@ -3233,6 +3313,28 @@ void Configuration::impl::read_settings ()
     secure_service,
     QStringLiteral ("RemoteToken"),
     settings_->value ("RemoteToken", QString {}).toString ());
+  dx_cluster_host_ = settings_->value ("DXClusterHost", QString {"iq8do.aricaserta.it"}).toString ().trimmed ();
+  if (dx_cluster_host_.isEmpty ())
+    {
+      dx_cluster_host_ = QStringLiteral ("iq8do.aricaserta.it");
+    }
+  {
+    bool ok {false};
+    auto port = settings_->value ("DXClusterPort", 7300).toInt (&ok);
+    if (!ok) port = 7300;
+    dx_cluster_port_ = static_cast<quint16> (qBound (1, port, 65535));
+  }
+  if ((dx_cluster_host_.compare (QStringLiteral ("www.hamqth.com"), Qt::CaseInsensitive) == 0
+       && dx_cluster_port_ == 443)
+      || (dx_cluster_host_.compare (QStringLiteral ("ik5pwj-6.dyndns.org"), Qt::CaseInsensitive) == 0
+          && dx_cluster_port_ == 8000)
+      || (dx_cluster_host_.compare (QStringLiteral ("dxc.sv5fri.eu"), Qt::CaseInsensitive) == 0
+          && dx_cluster_port_ == 7300))
+    {
+      dx_cluster_host_ = QStringLiteral ("iq8do.aricaserta.it");
+      dx_cluster_port_ = 7300;
+    }
+  auto_spot_enabled_ = settings_->value ("AutoSpotEnabled", false).toBool ();
   gridMap_ = settings_->value("MapGridEntity", true).toBool();
   gridMapAll_ = settings_->value("MapGridAllEntity", true).toBool();
   ppfx_ = settings_->value ("PrincipalPrefix", false).toBool ();
@@ -3532,6 +3634,9 @@ void Configuration::impl::write_settings ()
   settings_->setValue (
     "RemoteToken",
     secure_settings_value_for_write (secure_service, QStringLiteral ("RemoteToken"), remote_token_));
+  settings_->setValue ("DXClusterHost", dx_cluster_host_);
+  settings_->setValue ("DXClusterPort", dx_cluster_port_);
+  settings_->setValue ("AutoSpotEnabled", auto_spot_enabled_);
   settings_->setValue ("MapGridEntity", gridMap_);
   settings_->setValue ("MapGridAllEntity", gridMapAll_);
   settings_->setValue ("PrincipalPrefix", ppfx_);
@@ -3912,8 +4017,9 @@ int Configuration::impl::exec ()
 #if defined(Q_OS_LINUX)
     // On some Linux desktop/font setups, tab contents exceed screen height.
     // Wrap each tab page into a scroll area so the OK button always stays reachable.
+    // Do this unconditionally on Linux because some desktop themes/font scales
+    // resize tabs after open (especially on KDE), even when initial sizeHint fits.
     if (ui_->configuration_tabs
-        && sizeHint ().height () > maxHeight
         && !ui_->configuration_tabs->property ("ft2_scroll_wrapped").toBool ())
       {
         int const currentTab = ui_->configuration_tabs->currentIndex ();
@@ -3933,12 +4039,21 @@ int Configuration::impl::exec ()
 
             ui_->configuration_tabs->removeTab (i);
 
+            if (auto * pageLayout = page->layout ())
+              {
+                pageLayout->setSizeConstraint (QLayout::SetNoConstraint);
+              }
+            page->setMinimumSize (0, 0);
+            page->setSizePolicy (QSizePolicy::Preferred, QSizePolicy::Preferred);
+
             auto * scroll = new QScrollArea {ui_->configuration_tabs};
             scroll->setObjectName (page->objectName () + QStringLiteral ("_scroll"));
             scroll->setWidgetResizable (true);
             scroll->setFrameShape (QFrame::NoFrame);
             scroll->setHorizontalScrollBarPolicy (Qt::ScrollBarAsNeeded);
             scroll->setVerticalScrollBarPolicy (Qt::ScrollBarAsNeeded);
+            scroll->setSizePolicy (QSizePolicy::Expanding, QSizePolicy::Expanding);
+            scroll->setMinimumSize (0, 0);
             page->setParent (scroll);
             scroll->setWidget (page);
 
@@ -3953,7 +4068,23 @@ int Configuration::impl::exec ()
             ui_->configuration_tabs->setCurrentIndex (qBound (0, currentTab, ui_->configuration_tabs->count () - 1));
           }
       }
+
+    if (ui_->configuration_tabs)
+      {
+        ui_->configuration_tabs->setSizePolicy (QSizePolicy::Expanding, QSizePolicy::Expanding);
+        ui_->configuration_tabs->setMinimumSize (0, 0);
+      }
+    if (auto * rootLayout = layout ())
+      {
+        rootLayout->setSizeConstraint (QLayout::SetNoConstraint);
+      }
 #endif
+
+    if (auto * rootVBox = qobject_cast<QVBoxLayout *> (layout ()))
+      {
+        rootVBox->setStretch (0, 1); // tabs take remaining space
+        rootVBox->setStretch (1, 0); // keep OK/Cancel visible at bottom
+      }
 
     adjustSize ();
     QSize const clamped = size ().boundedTo (QSize {maxWidth, maxHeight});
@@ -4254,6 +4385,22 @@ void Configuration::impl::accept ()
   if (remote_token_line_edit_)
     {
       remote_token_ = remote_token_line_edit_->text ();
+    }
+  if (dx_cluster_host_line_edit_)
+    {
+      dx_cluster_host_ = dx_cluster_host_line_edit_->text ().trimmed ();
+      if (dx_cluster_host_.isEmpty ())
+        {
+          dx_cluster_host_ = QStringLiteral ("iq8do.aricaserta.it");
+        }
+    }
+  if (dx_cluster_port_spin_box_)
+    {
+      dx_cluster_port_ = static_cast<quint16> (qBound (1, dx_cluster_port_spin_box_->value (), 65535));
+    }
+  if (auto_spot_check_box_)
+    {
+      auto_spot_enabled_ = auto_spot_check_box_->isChecked ();
     }
   gridMap_= ui_->Map_Grid_to_State->isChecked ();
   gridMapAll_ = ui_->Map_All_Messages->isChecked();

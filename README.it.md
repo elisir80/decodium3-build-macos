@@ -1,32 +1,29 @@
-# Decodium 3 FT2 (Fork macOS) - v1.4.6
+# Decodium 3 FT2 (Fork macOS) - v1.4.7
 
 Fork mantenuto da **Salvatore Raccampo 9H1SR**.
 
 Per la panoramica bilingue, vedere [README.md](README.md).
 
-## Novita' v1.4.6 (`v1.4.5 -> v1.4.6`)
+## Novita' v1.4.7 (`v1.4.6 -> v1.4.7`)
 
-- Hardening AutoCQ e macchina stati QSO:
-- ripristinato comportamento FIFO stabile della coda caller (baseline logica v1.3.8).
-- lock partner attivo piu rigoroso durante QSO in corso, evitando takeover involontari.
-- gestione retry deferred RR73/73 estesa in modo coerente a FT2, FT8, FT4, FST4, Q65 e MSK144.
-- migliorato matching partner su token payload normalizzati (anche con formati decode borderline).
-- Correttezza signoff/log:
-- recuperato contesto deferred autolog dopo finestre retry.
-- ridotti casi di logging forzato senza conferma reale del partner.
-- ridotte casistiche di log tardivo dovute a stati pending stale.
-- Continuita' decode e pannello Frequenza Rx:
-- estrazione payload decode resa piu robusta con marker variabile/assente.
-- ridotti i casi in cui risposte valide restavano solo su Attivita' di Banda senza seguire il flusso centrale Rx.
-- Correzioni UI/runtime desktop:
-- corretto toggle `Vista -> World Map` su macOS (la mappa ora segue lo stato menu).
-- migliorata gestione layout splitter/pannelli secondari su Linux/macOS.
-- su Linux, tab impostazioni troppo lunghe ora scorrono in `QScrollArea` (pulsante OK sempre raggiungibile).
-- su macOS aggiunto refresh automatico stream audio in avvio per evitare reload manuale periferiche.
-- Aggiornamenti dashboard remota/web app:
-- aggiunto supporto completo al comando remoto `set_tx_frequency`.
-- webapp aggiornata con: set combinato Rx+Tx, set Rx/set Tx separati, preset frequenze per modo (save/apply).
-- mantenuto hint password localizzato con minimo 12 caratteri (IT/EN).
+- Hardening runtime/decode FT2:
+- guardia async Tx FT2 aumentata da `100 ms` a `300 ms`.
+- aggiunto filtro false decode FT2 basato su validazione prefissi `cty.dat`.
+- rendering FT2 `TΔ` riscritto con parsing strutturato, cosi' le colonne restano allineate anche con righe packed e marker variabili.
+- normalizzazione marker FT2 mantenuta coerente quando nel flow compare `~`.
+- Sequenziamento AutoCQ/QSO:
+- lock partner attivo piu' rigoroso, per evitare takeover da altri caller durante QSO in corso.
+- logica periodi mancati allineata al budget reale di `5` retry.
+- stato stale dei periodi mancati azzerato non appena una risposta valida del caller/partner fa avanzare il QSO.
+- dopo `73` confermato dal partner, AutoCQ torna a CQ invece di ritrasmettere un `RR73` extra.
+- AutoSpot / DX Cluster / dashboard web:
+- nuova sezione impostazioni per endpoint AutoSpot (`host`, `porta`, flag enable).
+- finestra DX Cluster ora interrogata via nodo DxSpider telnet configurabile, non piu' tramite feed HamQTH fisso.
+- migliorata gestione prompt telnet, fetch silenzioso `UNSET/DX`, fallback login e diagnostica submit/verify in `autospot.log`.
+- dashboard/web app aggiornata con toggle AutoSpot, feedback comandi/auth piu' chiaro e preset per modo piu' stabili in save/apply.
+- Correzioni desktop/runtime:
+- la voce menu `Dati Astronomici` si deseleziona quando la finestra viene chiusa con la `X`.
+- il dialogo impostazioni Linux mantiene scrollabili le pagine tab troppo alte, con pulsanti azione sempre raggiungibili.
 
 ## Target release
 
@@ -43,7 +40,7 @@ Per la panoramica bilingue, vedere [README.md](README.md).
 - RAM: minimo 4 GB (consigliati 8 GB)
 - Spazio disco: almeno 500 MB liberi (AppImage + log + impostazioni)
 - Runtime/software:
-- Linux con `glibc >= 2.35`
+- Linux con `glibc >= 2.35` (classe Ubuntu 22.04 o successiva)
 - supporto `libfuse2` / FUSE2
 - stack audio ALSA, PulseAudio o PipeWire
 - Integrazione stazione: hardware CAT/audio secondo setup radio
@@ -80,7 +77,7 @@ cmake --build build -j6
 
 - [README.en-GB.md](README.en-GB.md)
 - [README.es.md](README.es.md)
-- [RELEASE_NOTES_v1.4.6.md](RELEASE_NOTES_v1.4.6.md)
+- [RELEASE_NOTES_v1.4.7.md](RELEASE_NOTES_v1.4.7.md)
 - [CHANGELOG.md](CHANGELOG.md)
-- [doc/GITHUB_RELEASE_BODY_v1.4.6.md](doc/GITHUB_RELEASE_BODY_v1.4.6.md)
+- [doc/GITHUB_RELEASE_BODY_v1.4.7.md](doc/GITHUB_RELEASE_BODY_v1.4.7.md)
 - [doc/README.it.md](doc/README.it.md)
