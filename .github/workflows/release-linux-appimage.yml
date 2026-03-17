@@ -12,12 +12,6 @@ on:
         required: true
         default: true
         type: boolean
-  push:
-    branches: [master]
-    paths:
-      - ".github/workflows/release-linux-appimage.yml"
-      - ".github/workflows/build-linux.yml"
-      - "CMakeLists.txt"
 
 permissions:
   contents: write

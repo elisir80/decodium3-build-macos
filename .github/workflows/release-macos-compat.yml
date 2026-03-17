@@ -12,13 +12,6 @@ on:
         required: true
         default: false
         type: boolean
-  push:
-    branches: [master]
-    paths:
-      - ".github/workflows/release-macos-compat.yml"
-      - "scripts/release-macos.sh"
-      - "CMakeLists.txt"
-      - "bundle_fixup/CMakeLists.txt"
 
 permissions:
   contents: write
