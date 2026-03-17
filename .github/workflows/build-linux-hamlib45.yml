@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Experimental version (e.g. v1.4.8-hamlib45)"
+        description: "Experimental version (e.g. v1.4.9-hamlib45)"
         required: true
-        default: "v1.4.8-hamlib45"
+        default: "v1.4.9-hamlib45"
 
 permissions:
   contents: read
@@ -89,6 +89,7 @@ jobs:
 
           cp build-appimage/ft2 build-appimage/jt9 build-appimage/wsprd build-appimage/message_aggregator "${APPDIR}/usr/bin/"
           cp cty.dat "${APPDIR}/usr/share/wsjtx/" 2>/dev/null || true
+          cp contrib/Ephemeris/JPLEPH "${APPDIR}/usr/share/wsjtx/" 2>/dev/null || true
           cp -r sounds "${APPDIR}/usr/share/wsjtx/" 2>/dev/null || true
           cp -r Palettes "${APPDIR}/usr/share/wsjtx/" 2>/dev/null || true
           cp icons/Unix/wsjtx_icon.png "${APPDIR}/usr/share/icons/hicolor/256x256/apps/ft2.png"

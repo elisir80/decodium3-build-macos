@@ -53,6 +53,7 @@
 #include <QAction>
 #include <QButtonGroup>
 #include <QActionGroup>
+#include <QMenu>
 #include <QSplashScreen>
 #include <QUdpSocket>
 #include <QTcpSocket>
@@ -62,6 +63,7 @@
 #include <QtMath> // TCI
 #include <QSignalBlocker>
 #include <QGridLayout>
+#include <QVBoxLayout>
 #include <QMutex>
 #include <QMutexLocker>
 #include <QWriteLocker>
@@ -92,6 +94,7 @@
 #include "messageaveraging.h"
 #include "activeStations.h"
 #include "worldmapwidget.h"
+#include "asyncmodewidget.h"
 #include "colorhighlighting.h"
 #include "widegraph.h"
 #include "sleep.h"
@@ -621,6 +624,7 @@ void MainWindow::updateAsyncL2ControlsVisibility ()
   }
 
   bool const isFt2 = (m_mode == "FT2");
+  bool const asyncEnabled = ui->cbAsyncDecode && ui->cbAsyncDecode->isChecked ();
 
   if (ui->cbAsyncDecode) {
     if (isFt2) {
@@ -638,11 +642,30 @@ void MainWindow::updateAsyncL2ControlsVisibility ()
     ui->cbAsyncDecode->setVisible (false);
   }
 
+  if (ui->labelAsymxBadge) {
+    ui->labelAsymxBadge->setVisible (false);
+  }
+
   if (ui->labelAsyncL2Active) {
-    bool const asyncEnabled = ui->cbAsyncDecode && ui->cbAsyncDecode->isChecked ();
     ui->labelAsyncL2Active->setText (tr ("Async L2 Mode On"));
     ui->labelAsyncL2Active->setStyleSheet ("QLabel{color:#003300; background-color:#00e676; font-weight:bold; font-size:11px; padding:1px 6px; border-radius:7px;}");
     ui->labelAsyncL2Active->setVisible (isFt2 && asyncEnabled);
+  }
+
+  if (m_asyncVis) {
+    bool const showVisualizer = isFt2 && asyncEnabled;
+    m_asyncVis->setTransmitting (m_transmitting);
+    if (showVisualizer) {
+      if (!m_asyncVis->isVisible ()) {
+        m_asyncVis->setVisible (true);
+      }
+      if (m_asyncDecodeTimer.isActive ()) {
+        m_asyncVis->start ();
+      }
+    } else {
+      m_asyncVis->stop ();
+      m_asyncVis->setVisible (false);
+    }
   }
 
   if (ui->cbDualCarrier) {
@@ -1325,6 +1348,61 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   updateAsyncL2ControlsVisibility ();
   ui->decodedTextBrowser->set_configuration (&m_config, true);
   ui->decodedTextBrowser2->set_configuration (&m_config);
+
+  m_asyncVis = new AsyncModeWidget {this};
+  m_asyncVis->setVisible (false);
+  if (auto *vl13 = findChild<QVBoxLayout *> ("verticalLayout_13")) {
+    int idx = vl13->indexOf (ui->cbDigitalMorse);
+    if (idx >= 0) {
+      vl13->insertWidget (idx + 1, m_asyncVis);
+    } else {
+      vl13->addWidget (m_asyncVis);
+    }
+  }
+  updateAsyncL2ControlsVisibility ();
+
+  {
+    struct LangInfo { char const * code; char const * name; };
+    static LangInfo const langs[] = {
+      {"en", "English"},
+      {"it", "Italiano"},
+      {"es", "Español"},
+      {"fr", "Français"},
+      {"de", "Deutsch"},
+      {"pt", "Português"},
+      {"ja", "日本語"},
+      {"zh", "中文"},
+      {"ko", "한국어"},
+      {"tr", "Türkçe"},
+    };
+    auto * menuLang = new QMenu (tr ("Language"), this);
+    QString const currentLang = m_settings->value ("UILanguage").toString ();
+    auto * langGroup = new QActionGroup (this);
+    langGroup->setExclusive (true);
+    for (auto const& li : langs) {
+      auto * act = menuLang->addAction (QString::fromUtf8 (li.name));
+      act->setCheckable (true);
+      act->setData (QString::fromLatin1 (li.code));
+      if (currentLang == QLatin1String {li.code}
+          || (currentLang.isEmpty () && QLatin1String {li.code} == QLatin1String {"en"})) {
+        act->setChecked (true);
+      }
+      langGroup->addAction (act);
+    }
+    connect (langGroup, &QActionGroup::triggered, this, [this] (QAction * act) {
+      auto const lang = act ? act->data ().toString () : QString {};
+      if (lang.isEmpty ()) {
+        return;
+      }
+      m_settings->setValue ("UILanguage", lang);
+      m_settings->sync ();
+      MessageBox::information_message (this,
+                                       tr ("Language changed"),
+                                       tr ("Please restart the application for the language change to take effect."));
+    });
+    ui->menuBar->insertMenu (ui->menuHelp->menuAction (), menuLang);
+  }
+
   m_worldMapWidget = new WorldMapWidget {ui->map_container_widget};
   m_worldMapWidget->setGreylineEnabled(m_config.show_greyline());
   m_worldMapWidget->setDistanceInMiles(m_config.miles());
@@ -2348,6 +2426,8 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
 
   connect(&watcher3, SIGNAL(finished()),this,SLOT(fast_decode_done()));
   connect(&m_asyncDecodeWatcher, &QFutureWatcher<void>::finished, this, &MainWindow::asyncDecodeDone);
+  std::memset (m_asyncAudio, 0, sizeof (m_asyncAudio));
+  std::memset (m_asyncMsg, 0, sizeof (m_asyncMsg));
 
   // FT2 D-CW: blink TX NOW when a message is preloaded and waiting for manual fire.
   m_txRdyBlinkTimer.setInterval(500);
@@ -2405,6 +2485,7 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
 #endif
   connect(&m_asyncDecodeTimer, &QTimer::timeout, this, [this]() {
     if (m_mode != "FT2" || !ui->cbAsyncDecode || !ui->cbAsyncDecode->isChecked()) return;
+    if (m_transmitting) return;
     if (m_bAsyncDecoding) return;  // previous decode still running
     if (m_decoderBusy) return;     // avoid overlap with main decoder path
     if (m_asyncAudioPos < 45000) return;  // not enough audio yet
@@ -3188,10 +3269,6 @@ void MainWindow::readSettings()
   ui->sbManualTxWindow->setValue(m_settings->value("ManualTxWindow",3.8).toDouble());
   ui->cbSpeedyContest->setChecked(m_settings->value("SpeedyContest",false).toBool());
   ui->cbDigitalMorse->setChecked(m_settings->value("DigitalMorse",false).toBool());
-  m_settings->endGroup();
-
-  m_settings->beginGroup("Common");
-  m_mode="FT2";  // Decodium FT2-only: always force FT2 mode
   m_settings->endGroup();
 
   // do this outside of settings group because it uses groups internally
@@ -10101,6 +10178,28 @@ void MainWindow::auto_sequence (DecodedText const& message, unsigned start_toler
     bool const calling_reply_eligible = addressed_to_me && (caller_selection_open || from_active_partner_effective);
     bool const signoffRetryWindowOpen =
         m_autoCQ && m_ft2DeferredLogPending && from_active_partner_effective;
+    QString directedCaller;
+    QString directedGrid;
+    message.deCallAndGrid (directedCaller, directedGrid);
+    auto const directedCallerBase = Radio::base_callsign (normalize_call_token (directedCaller)).trimmed ().toUpper ();
+    bool const ft2ImmediateDirectedReply =
+        (m_mode == "FT2")
+        && m_auto
+        && m_bCallingCQ
+        && !m_bAutoReply
+        && !m_bDXpedMode
+        && m_specOp != SpecOp::FOX
+        && m_specOp != SpecOp::HOUND
+        && calling_reply_eligible
+        && !directedCallerBase.isEmpty ()
+        && directedCallerBase != myBaseEffective
+        && directedCallerBase != activePartnerBase
+        && directedGrid.contains (grid_regexp);
+    if (ft2ImmediateDirectedReply) {
+      m_bAutoReply = true;
+      processMessage (message);
+      return;
+    }
     if (m_auto && m_bCallingCQ && calling_reply_eligible
         && !m_bAutoReply && m_specOp != SpecOp::FOX && m_specOp != SpecOp::HOUND) {
       m_bAutoReply = true;
@@ -12220,6 +12319,21 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
                                       && message_words.size () > 4
                                       && (message_words.at (4).contains (m_baseCall)
                                           || message_words.at (4).contains (m_config.my_callsign ()))));
+  bool const starting_auto_cq_partner =
+      m_autoCQ
+      && !m_bDXpedMode
+      && directed_to_me
+      && !base_call.isEmpty ()
+      && (m_QSOProgress == CALLING || m_bCallingCQ);
+  if (starting_auto_cq_partner) {
+    // Starting a fresh AutoCQ QSO must always clear any stale retry/miss counters
+    // left over from the previous caller or prior CQ cycles.
+    m_txRetryCount = 0;
+    m_lastNtx = -1;
+    m_cqRetryCount = 0;
+    m_autoCQPeriodsMissed = 0;
+    m_receivedReplyThisPeriod = true;
+  }
   bool const hold_auto_cq_partner =
       m_autoCQ
       && !m_bDXpedMode
@@ -15328,7 +15442,7 @@ void MainWindow::displayWidgets(qint64 n)
   // ASYMX: Async L2 visible only in FT2; auto-disable when leaving FT2
   bool isFT2 = (m_mode == "FT2");
   ui->cbAsyncDecode->setVisible(false);  // always hidden: forced on in FT2, off elsewhere
-  ui->labelAsymxBadge->setVisible(isFT2);
+  ui->labelAsymxBadge->setVisible(false);
   ui->cbManualTx->setVisible(isFT2);
   ui->cbSpeedyContest->setVisible(isFT2);
   ui->cbDigitalMorse->setVisible(isFT2);
@@ -15575,12 +15689,13 @@ void MainWindow::on_actionFT2_triggered()
   ui->cbAsyncDecode->setChecked(true);
   ui->cbAsyncDecode->setVisible(false);   // always on in FT2, no user toggle
   ui->labelAsyncL2Active->setVisible(false);
-  ui->labelAsymxBadge->setVisible(true);
+  ui->labelAsymxBadge->setVisible(false);
   ui->cbManualTx->setVisible(true);
   ui->cbSpeedyContest->setVisible(true);
   ui->cbDigitalMorse->setVisible(true);
   ui->sbManualTxWindow->setVisible(ui->cbManualTx->isChecked());
   ui->btnTxNow->setVisible(m_bDigitalMorse && m_bTxPreloaded);
+  updateAsyncL2ControlsVisibility ();
 
   // Decodium FT2: faster NTP refresh and tighter RTT filter
   if (m_ntpClient) {
@@ -17724,6 +17839,10 @@ void MainWindow::pskSetLocal ()
 
 void MainWindow::transmitDisplay (bool transmitting)
 {
+  if (m_asyncVis) {
+    m_asyncVis->setTransmitting (transmitting);
+  }
+
   if (transmitting == m_transmitting) {
     if (transmitting) {
       ui->signal_meter_widget->setValue(0,0);
@@ -20854,10 +20973,15 @@ void MainWindow::on_cbAsyncDecode_toggled (bool checked)
     m_pendingAsyncL2FromRxWindow = false;
     m_asyncL2PinnedCall.clear();
     m_asyncL2PinnedUntil = QDateTime();
-    m_asyncDecodeTimer.start(750);  // Level 2: sync-triggered every 750ms
+    m_asyncDecodeTimer.start(100);  // Turbo async FT2: 100ms polling
     if (ui->labelAsyncL2Active) {
       ui->labelAsyncL2Active->setText (tr ("Async L2 Mode On"));
       ui->labelAsyncL2Active->setVisible(true);
+    }
+    if (m_asyncVis) {
+      m_asyncVis->setVisible (true);
+      m_asyncVis->setTransmitting (m_transmitting);
+      m_asyncVis->start ();
     }
   } else {
     m_asyncDecodeTimer.stop();
@@ -20876,6 +21000,10 @@ void MainWindow::on_cbAsyncDecode_toggled (bool checked)
     m_asyncTxStartMs = 0;
     m_asyncRxStartMs = 0;
     m_wasTransmitting = false;
+    if (m_asyncVis) {
+      m_asyncVis->stop ();
+      m_asyncVis->setVisible (false);
+    }
   }
 }
 
@@ -20925,6 +21053,13 @@ void MainWindow::asyncDecodeDone()
     m_bAsyncDecoding = false;
     auto now = QDateTime::currentDateTimeUtc();
     auto hhmmss = now.toString("hhmmss");
+    struct DeferredDecode
+    {
+      DecodedText decodedText;
+      QString message;
+    };
+    QList<DeferredDecode> deferred;
+    int bestSnr = -99;
 
     int const maxRows = qBound (0, m_asyncMsgCount, 100);
     for (int i = 0; i < maxRows; ++i) {
@@ -20944,19 +21079,32 @@ void MainWindow::asyncDecodeDone()
 
       QString raw = QString::fromLatin1 (rowBytes.constData (), end);
       if (raw.trimmed().isEmpty()) continue;
+
+      if (m_mode == "FT2") {
+        bool ok = false;
+        int const rawSnr = raw.mid (0, 4).trimmed ().toInt (&ok);
+        if (ok && rawSnr > bestSnr) {
+          bestSnr = rawSnr;
+        }
+      }
+
       QStringList rows;
-      if (singleDecodeColumnFlowEnabled() && (m_mode=="FT2" || m_mode=="FT4" || m_mode=="FT8")) {
-        rows = split_packed_decode_rows (raw);
+      if (singleDecodeColumnFlowEnabled() && (m_mode=="FT4" || m_mode=="FT8")) {
+        rows = split_packed_decode_rows (raw.trimmed ());
       } else {
         rows = QStringList {raw};
       }
       if (rows.isEmpty ()) continue;
 
       for (auto row : rows) {
-        QString message = row.trimmed ();
-        if (message.isEmpty ()) continue;
+        QString message = row;
+        if (message.trimmed().isEmpty()) continue;
         if (!has_decode_line_timestamp (message)) {
-          message.prepend (hhmmss + " ");
+          if (m_mode == "FT2") {
+            message.prepend (hhmmss);
+          } else {
+            message.prepend (hhmmss + " ");
+          }
         }
         normalize_ft2_mode_marker (message, m_mode);
 
@@ -21053,12 +21201,21 @@ void MainWindow::asyncDecodeDone()
             }
         }
 
-        postDecode(true, decodedtext);
-        write_all("Rx", message);
-
         // Auto-sequence
         auto_sequence(decodedtext, ui->sbFtol->value(), ui->sbFtol->value());
+        deferred.append ({decodedtext, message});
       }
+    }
+    if (m_asyncVis && bestSnr > -99) {
+      m_asyncVis->setSnr (bestSnr);
+    }
+    if (!deferred.isEmpty ()) {
+      QTimer::singleShot (0, this, [this, deferred] {
+        for (auto const& item : deferred) {
+          postDecode (true, item.decodedText);
+          write_all ("Rx", item.message);
+        }
+      });
     }
     m_asyncMsgCount = 0;
 }

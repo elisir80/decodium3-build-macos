@@ -534,18 +534,17 @@ DXClusterWindow::DXClusterWindow(QSettings * settings, QWidget * parent)
   table_->setSelectionMode(QAbstractItemView::SingleSelection);
   table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
   table_->setAlternatingRowColors(true);
+  table_->setWordWrap(false);
+  table_->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
+  table_->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
   table_->verticalHeader()->setVisible(false);
-  table_->horizontalHeader()->setStretchLastSection(false);
-  table_->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-  table_->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
-  table_->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
-  table_->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
-  table_->horizontalHeader()->setSectionResizeMode(4, QHeaderView::ResizeToContents);
-  table_->horizontalHeader()->setSectionResizeMode(5, QHeaderView::Stretch);
-  table_->horizontalHeader()->setSectionResizeMode(6, QHeaderView::ResizeToContents);
-  table_->horizontalHeader()->setSectionResizeMode(7, QHeaderView::ResizeToContents);
-  table_->horizontalHeader()->setSectionResizeMode(8, QHeaderView::ResizeToContents);
-  table_->horizontalHeader()->setSectionResizeMode(9, QHeaderView::ResizeToContents);
+  auto * header = table_->horizontalHeader();
+  header->setStretchLastSection(false);
+  header->setSectionsMovable(false);
+  header->setMinimumSectionSize(40);
+  header->setDefaultSectionSize(100);
+  header->setSectionResizeMode(QHeaderView::Interactive);
+  applyDefaultColumnWidths();
   root->addWidget(table_, 1);
 
   statusLabel_ = new QLabel {tr("Waiting for first update..."), this};
@@ -575,6 +574,25 @@ DXClusterWindow::DXClusterWindow(QSettings * settings, QWidget * parent)
 DXClusterWindow::~DXClusterWindow()
 {
   write_settings();
+}
+
+void DXClusterWindow::applyDefaultColumnWidths()
+{
+  if (!table_)
+    {
+      return;
+    }
+
+  table_->setColumnWidth(0, 140);
+  table_->setColumnWidth(1, 95);
+  table_->setColumnWidth(2, 95);
+  table_->setColumnWidth(3, 80);
+  table_->setColumnWidth(4, 60);
+  table_->setColumnWidth(5, 460);
+  table_->setColumnWidth(6, 55);
+  table_->setColumnWidth(7, 150);
+  table_->setColumnWidth(8, 55);
+  table_->setColumnWidth(9, 55);
 }
 
 void DXClusterWindow::setMyCall(QString const& myCall)
@@ -1055,6 +1073,11 @@ void DXClusterWindow::read_settings()
     {
       WindowGeometryUtils::restore_window_geometry(this, geometry);
     }
+  auto headerState = settings_->value("header_state").toByteArray();
+  if (!headerState.isEmpty() && table_ && table_->horizontalHeader())
+    {
+      table_->horizontalHeader()->restoreState(headerState);
+    }
   bool followAppBand = settings_->value("follow_app_band", true).toBool();
   auto savedBand = normalizeBand(settings_->value("cluster_band", QString {"20M"}).toString());
   if (!savedBand.isEmpty() && bandFilter_)
@@ -1089,6 +1112,9 @@ void DXClusterWindow::write_settings()
   SettingsGroup g {settings_, "DXClusterWindow"};
   settings_->setValue("window/pos", pos());
   settings_->setValue("geometry", saveGeometry());
+  settings_->setValue("header_state", table_ && table_->horizontalHeader()
+                                     ? table_->horizontalHeader()->saveState()
+                                     : QByteArray {});
   settings_->setValue("follow_app_band", followAppBandCheck_ ? followAppBandCheck_->isChecked() : true);
   settings_->setValue("cluster_band", currentBand_);
   settings_->setValue("mode_filter", modeFilter_ ? modeFilter_->currentText() : QString {"All"});

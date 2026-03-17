@@ -11,7 +11,9 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QCloseEvent>
+#include <QCoreApplication>
 #include <QDebug>
+#include <QStandardPaths>
 #include <math.h>
 
 #include "commons.h"
@@ -33,6 +35,69 @@ extern "C" {
                 double * poloffset, double * xnr, bool extraazel, double * techo, double * width1,
                 double * width2, bool bTx, const char * AzElFileName,
                 const char * jpleph); 
+}
+
+namespace
+{
+QString resolve_jpleph_path(Configuration const * configuration, QStringList * searchedPaths)
+{
+  QStringList candidates;
+  auto add_candidate = [&candidates] (QString const& path) {
+    auto cleaned = QDir::cleanPath(path.trimmed());
+    if (!cleaned.isEmpty() && !candidates.contains(cleaned))
+      {
+        candidates << cleaned;
+      }
+  };
+
+  if (configuration)
+    {
+      add_candidate(configuration->data_dir().absoluteFilePath("JPLEPH"));
+      add_candidate(configuration->writeable_data_dir().absoluteFilePath("JPLEPH"));
+    }
+
+  auto envDataDir = QString::fromLocal8Bit(qgetenv("WSJTX_DATA_DIR")).trimmed();
+  if (!envDataDir.isEmpty())
+    {
+      add_candidate(QDir {envDataDir}.absoluteFilePath("JPLEPH"));
+    }
+
+  auto const appDir = QCoreApplication::applicationDirPath();
+  add_candidate(QDir {appDir}.absoluteFilePath("JPLEPH"));
+  add_candidate(QDir {appDir}.absoluteFilePath("contrib/Ephemeris/JPLEPH"));
+#if CMAKE_BUILD
+  add_candidate(QDir {QStringLiteral(CMAKE_SOURCE_DIR)}.absoluteFilePath("contrib/Ephemeris/JPLEPH"));
+#endif
+  add_candidate(QDir {appDir}.absoluteFilePath("../share/wsjtx/JPLEPH"));
+  add_candidate(QDir {appDir}.absoluteFilePath("../usr/share/wsjtx/JPLEPH"));
+  add_candidate(QDir {appDir}.absoluteFilePath("../share/ft2/JPLEPH"));
+  add_candidate(QDir {appDir}.absoluteFilePath("../contrib/Ephemeris/JPLEPH"));
+  add_candidate(QDir {appDir}.absoluteFilePath("../../contrib/Ephemeris/JPLEPH"));
+  add_candidate(QDir {QDir::currentPath()}.absoluteFilePath("contrib/Ephemeris/JPLEPH"));
+  add_candidate(QStringLiteral("/usr/share/wsjtx/JPLEPH"));
+  add_candidate(QStringLiteral("/usr/local/share/wsjtx/JPLEPH"));
+
+  for (auto const& appDataDir : QStandardPaths::standardLocations(QStandardPaths::AppDataLocation))
+    {
+      add_candidate(QDir {appDataDir}.absoluteFilePath("JPLEPH"));
+    }
+
+  if (searchedPaths)
+    {
+      *searchedPaths = candidates;
+    }
+
+  for (auto const& candidate : candidates)
+    {
+      QFileInfo const info {candidate};
+      if (info.exists() && info.isFile() && info.isReadable())
+        {
+          return candidate;
+        }
+    }
+
+  return {};
+}
 }
 
 Astro::Astro(QSettings * settings, Configuration const * configuration, QWidget * parent)
@@ -122,22 +187,25 @@ auto Astro::astroUpdate(QDateTime const& t, QString const& mygrid, QString const
   double uth {nhr + nmin/60.0 + sec/3600.0};
   if(freq_moon < 1) freq_moon = 144000000;
   auto const& AzElFileName = QDir::toNativeSeparators (configuration_->azel_directory ().absoluteFilePath ("azel.dat"));
-  auto const& jpleph = configuration_->data_dir ().absoluteFilePath ("JPLEPH");
+  QStringList searchedJplephPaths;
+  auto const jpleph = resolve_jpleph_path(configuration_, &searchedJplephPaths);
   QFileInfo const jpleph_file_info {jpleph};
   if (!jpleph_file_info.exists () || !jpleph_file_info.isFile () || !jpleph_file_info.isReadable ())
     {
       static bool missing_jpleph_warned {false};
-      auto const path = QDir::toNativeSeparators (jpleph);
+      auto const path = searchedJplephPaths.isEmpty()
+          ? tr ("No candidate path generated")
+          : QDir::toNativeSeparators(searchedJplephPaths.join("\n"));
       if (!missing_jpleph_warned)
         {
           missing_jpleph_warned = true;
           MessageBox::warning_message (
             this,
             tr ("Astronomical Data Error"),
-            tr ("JPLEPH file not found or unreadable:\n%1\n\nAstronomical calculations are disabled.")
+            tr ("JPLEPH file not found or unreadable.\n\nSearched paths:\n%1\n\nAstronomical calculations are disabled.")
               .arg (path));
         }
-      ui_->text_label->setText (tr ("JPLEPH file not found or unreadable:\n%1").arg (path));
+      ui_->text_label->setText (tr ("JPLEPH file not found or unreadable.\n\nSearched paths:\n%1").arg (path));
       return correction;
     }
   SettingsGroup g (settings_, "Configuration");

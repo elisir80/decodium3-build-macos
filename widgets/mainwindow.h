@@ -130,6 +130,7 @@ class SharedMemorySegment;
 class IonosphericForecastWindow;
 class DXClusterWindow;
 class RemoteCommandServer;
+class AsyncModeWidget;
 
 class MainWindow
   : public MultiGeometryWidget<3, QMainWindow>
@@ -1007,6 +1008,7 @@ private:
   bool m_bSpeedyContest {false};      // FT2: bypass guard/period wait for instant TX
   bool m_bDigitalMorse {false};       // FT2: preload on click, fire on Space/TX NOW
   bool m_bTxPreloaded {false};        // FT2 D-CW message prepared, awaiting manual fire
+  AsyncModeWidget * m_asyncVis {nullptr};
 
   struct DecodeDedupeEntry
   {

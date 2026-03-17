@@ -72,6 +72,7 @@ private:
   void setStatus(QString const& status, bool error = false);
   void read_settings();
   void write_settings();
+  void applyDefaultColumnWidths();
 
   QSettings * settings_ {nullptr};
   QLabel * titleLabel_ {nullptr};

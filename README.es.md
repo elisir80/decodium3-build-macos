@@ -1,53 +1,66 @@
-# Decodium 3 FT2 (Fork macOS) - v1.4.8
+# Decodium 3 FT2 (Fork macOS) - v1.4.9
 
-Fork mantenido por **Salvatore Raccampo 9H1SR**.
+Este fork empaqueta Decodium 3 FT2 para macOS y Linux AppImage, con fixes adicionales de runtime FT2, actualizaciones del decoder y automatizacion release mantenidos en este repositorio.
 
-Para la vista general bilingue, ver [README.md](README.md).
+Release estable actual: `v1.4.9`.
 
-## Cambios en v1.4.8 (`v1.4.7 -> v1.4.8`)
+## Cambios en v1.4.9 (`v1.4.8 -> v1.4.9`)
 
-- Timing FT2 y workflow de operador:
-- `NUM_FT2_SYMBOLS` alineado de `105` a `103` y margen Tx FT2 reducido de `0.5 s` a `0.2 s` sobre la duracion de onda.
-- anadido soporte FT2 para workflows `Speedy`, `D-CW` y boton `TX NOW` para envio inmediato o precargado.
-- la logica AutoSeq FT2 sigue siendo coherente aunque la checkbox AutoSeq estandar este oculta en el modo FT2.
-- Correccion QSO/signoff FT2:
-- FT2 ya no manda un QSO al log antes de que el signoff local haya sido transmitido y haya llegado el ack final real de la pareja.
-- si FT2 agota el presupuesto de reintentos RR73/73 sin ack de la pareja, la transmision se detiene sin autolog.
-- el manejo de `RR73/73` de la pareja ya no salta el `73` local en flujos FT2 AutoCQ/auto-sequence.
-- la supresion async de duplicados FT2 ahora elimina hipotesis repetidas con el mismo payload en bins de audio cercanos, evitando intercambios duplicados en el flujo decode.
-- Hardening Remote Web / dashboard:
-- RemoteCommandServer ahora se bloquea en bind no-loopback cuando no hay token de acceso configurado.
-- en bind no-loopback el token debe tener al menos `12` caracteres.
-- se eliminaron los headers CORS wildcard del API HTTP remoto.
-- las conexiones WebSocket ahora requieren un `Origin` same-origin permitido en lugar de aceptar origanes arbitrarios del navegador.
-- Seguridad de cadenas/buffer:
-- corregido el riesgo concreto de overflow al formatear la puerta COM en `lib/ptt.c`.
-- aplicada formateacion bounded al codigo PTT relacionado en `lib/ft2` y `map65`.
-- reforzados los paths `map65` para device-info, labels de estado y texto astronomico.
-- Pipeline release/build:
-- el packaging macOS ahora tolera imagenes DMG montadas residuales de CPack sin fallar toda la release cuando el staging ya es valido.
+- Decoder FT2:
+- escala LLR del triggered decode FT2 subida de `2.83` a `3.2`.
+- normalizacion de los tres flujos LLR FT2 antes del decode LDPC.
+- anadida channel estimation adaptativa con metricas FT2 MMSE-equalized para canales con fading.
+- introducido `ft2_channel_est.f90` y enlazado al build Fortran FT2.
+- Runtime / async FT2:
+- anadido el nuevo visualizador dedicado FT2 async.
+- S-meter async FT2 alimentado desde el path real de decode FT2.
+- polling async FT2 reducido a `100 ms`.
+- fan-out `postDecode()` / `write_all()` diferido para mantener reactivo el path async.
+- Startup y AutoCQ FT2:
+- el arranque ya no fuerza `FT2`; se respetan otra vez modo/frecuencia guardados.
+- FT2 ahora engancha de inmediato la primera respuesta dirigida mientras estas llamando CQ.
+- la adquisicion de un nuevo partner AutoCQ resetea correctamente contadores retry/miss sucios, evitando cambios prematuros de partner.
+- UI / usabilidad:
+- anadido menu `Language` en la barra principal.
+- el idioma UI se guarda en settings y se reaplica al reinicio si no pasas un override CLI.
+- las columnas de la ventana DX Cluster ahora son redimensionables por el usuario y persistentes entre sesiones.
+- Linux / datos astronomicos:
+- el lookup de `JPLEPH` cubre ahora paths AppImage, paths share Linux, directorio de trabajo actual y builds out-of-source mediante `CMAKE_SOURCE_DIR`.
+- el packaging Linux AppImage ahora incluye `JPLEPH` dentro de `usr/share/wsjtx`.
 
-## Objetivos de release
+## Artefactos de Release
 
-- Apple Silicon Tahoe
-- Apple Silicon Sequoia
-- Apple Intel Sequoia
-- Apple Intel Monterey (experimental / best effort)
-- Linux x86_64 AppImage
+- `decodium3-ft2-v1.4.9-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-v1.4.9-macos-tahoe-arm64.zip`
+- `decodium3-ft2-v1.4.9-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-v1.4.9-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-v1.4.9-macos-sequoia-arm64.zip`
+- `decodium3-ft2-v1.4.9-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-v1.4.9-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-v1.4.9-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-v1.4.9-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-v1.4.9-macos-monterey-x86_64.dmg` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-v1.4.9-macos-monterey-x86_64.zip` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-v1.4.9-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-v1.4.9-linux-x86_64.AppImage`
+- `decodium3-ft2-v1.4.9-linux-x86_64.AppImage.sha256.txt`
 
-## Requisitos minimos Linux
+## Requisitos Minimos Linux
 
-- Arquitectura: `x86_64` (64 bits)
-- CPU: dual-core 2.0 GHz o superior
-- RAM: 4 GB minimo (8 GB recomendado)
-- Disco: al menos 500 MB libres (AppImage + logs + configuracion)
-- Runtime/software:
-- Linux con `glibc >= 2.35` (clase Ubuntu 22.04 o posterior)
+- CPU `x86_64`, dual-core 2.0 GHz+
+- RAM 4 GB minimo (8 GB recomendado)
+- al menos 500 MB libres en disco
+- `glibc >= 2.35`
 - `libfuse2` / FUSE2
 - ALSA, PulseAudio o PipeWire
-- Integracion de estacion: hardware CAT/audio segun configuracion de radio
 
-## Recomendacion de arranque AppImage en Linux
+## Guia de Inicio
+
+Si macOS bloquea el inicio:
+
+```bash
+sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
+```
 
 Para evitar problemas debidos al sistema de archivos de solo lectura de las AppImage, se recomienda iniciar Decodium extrayendo primero la AppImage y ejecutando despues el programa desde la carpeta extraida.
 
@@ -60,26 +73,11 @@ cd squashfs-root
 ./AppRun
 ```
 
-## Comando macOS (cuarentena)
+## Archivos Relacionados
 
-Si Gatekeeper bloquea el inicio, ejecutar:
-
-```bash
-sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
-```
-
-## Build local
-
-```bash
-cmake --build build -j6
-./build/ft2.app/Contents/MacOS/ft2
-```
-
-## Documentacion
-
+- [README.md](README.md)
 - [README.en-GB.md](README.en-GB.md)
 - [README.it.md](README.it.md)
-- [RELEASE_NOTES_v1.4.8.md](RELEASE_NOTES_v1.4.8.md)
+- [RELEASE_NOTES_v1.4.9.md](RELEASE_NOTES_v1.4.9.md)
+- [doc/GITHUB_RELEASE_BODY_v1.4.9.md](doc/GITHUB_RELEASE_BODY_v1.4.9.md)
 - [CHANGELOG.md](CHANGELOG.md)
-- [doc/GITHUB_RELEASE_BODY_v1.4.8.md](doc/GITHUB_RELEASE_BODY_v1.4.8.md)
-- [doc/README.es.md](doc/README.es.md)

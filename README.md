@@ -1,34 +1,33 @@
-# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.4.8
+# Decodium v3.0 SE "Raptor" - Fork 9H1SR v1.4.9
 
-This repository contains the macOS-focused fork build of Decodium 3 FT2, including Linux AppImage release flow, FT2 operator/runtime improvements, and hardened remote-control behavior.
+This repository contains the macOS-focused fork build of Decodium 3 FT2, including Linux AppImage release flow, FT2 decoder/runtime improvements, FT2 AutoCQ correctness fixes, and release packaging updates across macOS and Linux.
 
 - Upstream base: `iu8lmc/Decodium-3.0-Codename-Raptor`
-- Fork release: `v1.4.8`
+- Fork release: `v1.4.9`
 - App bundle/executable on macOS: `ft2.app` / `ft2`
 - Licence: GPLv3
 
-## Release Scope (`v1.4.7 -> v1.4.8`)
+## Release Scope (`v1.4.8 -> v1.4.9`)
 
-- FT2 timing and operator workflow:
-- aligned `NUM_FT2_SYMBOLS` from `105` to `103` and refined FT2 Tx duration margin from `0.5 s` to `0.2 s` over waveform duration.
-- added FT2 `Speedy`, `D-CW`, and `TX NOW` operator workflow support for immediate or preloaded transmit handling.
-- FT2 auto-sequence logic now stays coherent even when the standard AutoSeq checkbox is hidden in FT2 UI.
-- FT2 QSO/signoff correctness:
-- FT2 no longer logs a QSO before the local signoff has been sent and the partner final acknowledgment has really arrived.
-- if FT2 reaches the RR73/73 retry budget without final partner acknowledgment, transmission stops without logging.
-- partner `RR73/73` handling no longer skips the local final `73` in FT2 AutoCQ/auto-sequence flows.
-- FT2 async duplicate suppression now rejects repeated same-payload hypotheses across near audio bins, so duplicated exchanges no longer appear in the decode flow.
-- Remote Web / dashboard security hardening:
-- RemoteCommandServer is now blocked on non-loopback bind unless an access token is configured.
-- non-loopback token length must be at least `12` characters.
-- wildcard HTTP CORS headers were removed from the remote API.
-- WebSocket connections now require an allowed same-origin `Origin` instead of accepting arbitrary browser origins.
-- String/buffer safety cleanup:
-- fixed the concrete COM-port formatting overflow risk in `lib/ptt.c`.
-- applied bounded formatting to related PTT code in `lib/ft2` and `map65`.
-- hardened `map65` device-info, status-label, and astronomical text formatting paths.
-- Release/build pipeline:
-- macOS release packaging now tolerates leftover CPack mounted DMG images instead of failing the whole release if staged output is already valid.
+- FT2 decoder improvements:
+- increased FT2 triggered-decode LLR scaling from `2.83` to `3.2` and normalized all three FT2 LLR paths before LDPC decoding.
+- imported adaptive FT2 channel estimation with MMSE-equalized bit metrics for selective-fading HF paths.
+- added the new `lib/ft2/ft2_channel_est.f90` decoder stage and wired it into the FT2 Fortran build.
+- FT2 async runtime / operator feedback:
+- added the new FT2 async visualizer widget with live RX/TX state and S-meter updates from the actual FT2 decode path.
+- reduced FT2 async polling from `750 ms` to `100 ms` and deferred UI/log fan-out with `QTimer::singleShot(0)` to keep the decode path responsive.
+- preserved FT2 async line formatting/timestamps instead of trimming away the original fixed-column structure.
+- FT2 workflow correctness:
+- the application no longer forces `FT2` at startup; saved mode/frequency is respected again.
+- FT2 can now react immediately to a first directed reply while CQ is active instead of missing the first caller.
+- fresh AutoCQ partner lock now clears stale retry/miss counters before a new QSO starts, preventing premature partner switches.
+- Language/UI improvements:
+- added a `Language` menu in the main menu bar.
+- selected UI language is now stored in settings and reused on next startup when no CLI language override is passed.
+- DX Cluster window columns are now manually resizable and persisted between sessions.
+- Linux / Astronomical Data:
+- `JPLEPH` lookup now covers AppImage paths, standard Linux install paths, current working directory, and out-of-source builds via `CMAKE_SOURCE_DIR`.
+- Linux AppImage workflows now bundle `contrib/Ephemeris/JPLEPH` into `usr/share/wsjtx`.
 
 ## Release Targets
 
@@ -83,9 +82,9 @@ cmake --build build -j6
 - English README: [README.en-GB.md](README.en-GB.md)
 - Italian README: [README.it.md](README.it.md)
 - Spanish README: [README.es.md](README.es.md)
-- Release notes (EN/IT/ES): [RELEASE_NOTES_v1.4.8.md](RELEASE_NOTES_v1.4.8.md)
+- Release notes (EN/IT/ES): [RELEASE_NOTES_v1.4.9.md](RELEASE_NOTES_v1.4.9.md)
 - Changelog (EN/IT/ES): [CHANGELOG.md](CHANGELOG.md)
-- GitHub release template (EN/IT/ES): [doc/GITHUB_RELEASE_BODY_v1.4.8.md](doc/GITHUB_RELEASE_BODY_v1.4.8.md)
+- GitHub release template (EN/IT/ES): [doc/GITHUB_RELEASE_BODY_v1.4.9.md](doc/GITHUB_RELEASE_BODY_v1.4.9.md)
 - Docs index (EN): [doc/README.en-GB.md](doc/README.en-GB.md)
 - Docs index (IT): [doc/README.it.md](doc/README.it.md)
 - Docs index (ES): [doc/README.es.md](doc/README.es.md)

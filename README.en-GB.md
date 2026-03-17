@@ -1,59 +1,68 @@
-# Decodium 3 FT2 (macOS Fork) - v1.4.8
+# Decodium 3 FT2 (macOS Fork) - v1.4.9
 
-Fork maintained by **Salvatore Raccampo 9H1SR**.
+This fork packages Decodium 3 FT2 for macOS and Linux AppImage, with additional FT2 runtime fixes, decoder updates, and release automation maintained in this repository.
 
-## Project Description
+Latest stable release: `v1.4.9`.
 
-This repository is a Decodium/WSJT-X fork focused on macOS and Linux packaging, FT2 operator/runtime stability, AutoCQ correctness, and hardened remote/DX-cluster workflows.
+## Changes in v1.4.9 (`v1.4.8 -> v1.4.9`)
 
-Latest stable release: `v1.4.8`.
+- FT2 decoder:
+- raised FT2 triggered-decode LLR scaling from `2.83` to `3.2`.
+- normalized all three FT2 LLR metric streams before LDPC decode.
+- added adaptive channel estimation with MMSE-equalized FT2 bit metrics for fading channels.
+- introduced `ft2_channel_est.f90` and linked it into the FT2 Fortran build.
+- FT2 async/runtime:
+- added a dedicated FT2 async visualizer widget.
+- FT2 async S-meter is now fed from the real FT2 decode path.
+- FT2 async polling reduced to `100 ms`.
+- deferred `postDecode()` / `write_all()` fan-out to keep the async decode path responsive.
+- FT2 startup and AutoCQ behavior:
+- startup no longer forces `FT2`; saved mode/frequency is respected again.
+- FT2 now handles the first immediate directed reply while CQ is active.
+- fresh AutoCQ partner acquisition now resets stale retry/miss counters to avoid premature partner switching.
+- UI / usability:
+- added a `Language` menu to the main menu bar.
+- UI language is now persisted in settings and restored on next start when no CLI override is provided.
+- DX Cluster columns are now user-resizable and their widths are persisted.
+- Linux / astronomical data:
+- `JPLEPH` lookup now covers AppImage paths, Linux share paths, current working directory, and out-of-source builds using `CMAKE_SOURCE_DIR`.
+- Linux AppImage packaging now ships `JPLEPH` inside `usr/share/wsjtx`.
 
-## Changes in v1.4.8 (`v1.4.7 -> v1.4.8`)
+## Release Artifacts
 
-- FT2 timing and operator workflow:
-- aligned `NUM_FT2_SYMBOLS` from `105` to `103` and reduced the FT2 Tx timing margin from `0.5 s` to `0.2 s` above waveform duration.
-- added FT2 `Speedy`, `D-CW`, and `TX NOW` workflow support for immediate or preloaded transmit handling.
-- FT2 auto-sequence logic now stays coherent even when the standard AutoSeq checkbox is hidden in FT2 mode.
-- FT2 QSO/signoff correctness:
-- FT2 no longer logs a QSO before the local final signoff has been sent and the partner final acknowledgment has actually arrived.
-- if FT2 exhausts the RR73/73 retry budget without partner acknowledgment, transmission stops without auto-log.
-- partner `RR73/73` handling no longer skips the local final `73` in FT2 AutoCQ/auto-sequence flows.
-- FT2 async duplicate suppression now removes repeated same-payload hypotheses across nearby audio bins, so split duplicate exchanges no longer reach the decode flow.
-- Remote Web / dashboard hardening:
-- RemoteCommandServer is now blocked on non-loopback bind when no access token is configured.
-- non-loopback token length must be at least `12` characters.
-- wildcard CORS headers were removed from the remote HTTP API.
-- WebSocket connections now require an allowed same-origin `Origin` instead of accepting arbitrary browser origins.
-- String/buffer safety:
-- fixed the concrete COM-port formatting overflow risk in `lib/ptt.c`.
-- applied bounded formatting to related PTT code in `lib/ft2` and `map65`.
-- hardened `map65` device-info, status-label, and astronomical text formatting.
-- Release/build pipeline:
-- macOS packaging now tolerates leftover CPack mounted DMG images instead of failing the whole release when staged output is already valid.
-
-## Release Targets
-
-- Apple Silicon Tahoe
-- Apple Silicon Sequoia
-- Apple Intel Sequoia
-- Apple Intel Monterey (experimental / best effort)
-- Linux x86_64 AppImage
+- `decodium3-ft2-v1.4.9-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-v1.4.9-macos-tahoe-arm64.zip`
+- `decodium3-ft2-v1.4.9-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-v1.4.9-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-v1.4.9-macos-sequoia-arm64.zip`
+- `decodium3-ft2-v1.4.9-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-v1.4.9-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-v1.4.9-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-v1.4.9-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-v1.4.9-macos-monterey-x86_64.dmg` *(best effort/experimental, if generated)*
+- `decodium3-ft2-v1.4.9-macos-monterey-x86_64.zip` *(best effort/experimental, if generated)*
+- `decodium3-ft2-v1.4.9-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, if generated)*
+- `decodium3-ft2-v1.4.9-linux-x86_64.AppImage`
+- `decodium3-ft2-v1.4.9-linux-x86_64.AppImage.sha256.txt`
 
 ## Linux Minimum Requirements
 
-- Architecture: `x86_64` (64-bit)
-- CPU: dual-core 2.0 GHz or better
-- RAM: 4 GB minimum (8 GB recommended)
-- Storage: at least 500 MB free for AppImage + logs/settings
-- Runtime/software:
-- Linux with `glibc >= 2.35` (Ubuntu 22.04 class or newer)
-- `libfuse2` / FUSE2 support
-- ALSA, PulseAudio, or PipeWire audio stack
-- Station integration: CAT/audio hardware according to radio setup
+- `x86_64` CPU, dual-core 2.0 GHz+
+- 4 GB RAM minimum (8 GB recommended)
+- at least 500 MB free disk space
+- `glibc >= 2.35`
+- `libfuse2` / FUSE2
+- ALSA, PulseAudio, or PipeWire
 
-## Linux AppImage Launch Recommendation
+## Startup Guidance
 
-To avoid issues caused by the AppImage read-only filesystem, Decodium should be started by extracting the AppImage first and then running the program from the extracted directory.
+If macOS blocks startup:
+
+```bash
+sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
+```
+
+To avoid issues caused by the AppImage read-only filesystem, start Decodium by extracting the AppImage first and then running the program from the extracted directory.
 
 Run the following commands in a terminal:
 
@@ -64,33 +73,11 @@ cd squashfs-root
 ./AppRun
 ```
 
-## macOS Quarantine Command
-
-If Gatekeeper blocks startup, run:
-
-```bash
-sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
-```
-
-## Build and Run (local)
-
-```bash
-cmake --build build -j6
-./build/ft2.app/Contents/MacOS/ft2
-```
-
-## Documentation
+## Related Files
 
 - [README.md](README.md)
 - [README.it.md](README.it.md)
 - [README.es.md](README.es.md)
-- [RELEASE_NOTES_v1.4.8.md](RELEASE_NOTES_v1.4.8.md)
+- [RELEASE_NOTES_v1.4.9.md](RELEASE_NOTES_v1.4.9.md)
+- [doc/GITHUB_RELEASE_BODY_v1.4.9.md](doc/GITHUB_RELEASE_BODY_v1.4.9.md)
 - [CHANGELOG.md](CHANGELOG.md)
-- [doc/GITHUB_RELEASE_BODY_v1.4.8.md](doc/GITHUB_RELEASE_BODY_v1.4.8.md)
-- [doc/README.en-GB.md](doc/README.en-GB.md)
-- [doc/README.it.md](doc/README.it.md)
-- [doc/README.es.md](doc/README.es.md)
-
-## Licence
-
-GPLv3 inherited from upstream WSJT-X/Decodium codebase.

@@ -77,7 +77,7 @@ include (set_build_type)
 # RC 0 or omitted is a development build, GA is a General Availability release build
 set_build_type (RC 1)
 set (wsjtx_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}${BUILD_TYPE_REVISION}")
-set (FORK_RELEASE_VERSION "v1.4.8" CACHE STRING "Fork release version shown in UI title" FORCE)
+set (FORK_RELEASE_VERSION "v1.4.9" CACHE STRING "Fork release version shown in UI title" FORCE)
 add_definitions (-DFORK_RELEASE_VERSION=\"${FORK_RELEASE_VERSION}\")
 
 #
@@ -294,6 +294,7 @@ set (wsjtx_CXXSRCS
   widgets/fastgraph.cpp
   widgets/fastplot.cpp
   widgets/about.cpp
+  widgets/asyncmodewidget.cpp
   widgets/astro.cpp
   widgets/messageaveraging.cpp
   widgets/activeStations.cpp
@@ -593,6 +594,7 @@ set (wsjt_FSRCS
   lib/sync65.f90
   lib/ft2/getcandidates2.f90
   lib/ft2/get_ft2_bitmetrics.f90
+  lib/ft2/ft2_channel_est.f90
   lib/ft4/getcandidates4.f90
   lib/ft4/get_ft4_bitmetrics.f90
   lib/ft8/sync8.f90
