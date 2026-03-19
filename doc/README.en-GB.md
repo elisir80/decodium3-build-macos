@@ -1,38 +1,36 @@
-# Documentation Notes (English) - v1.4.9
+# Documentation Notes (English) - 1.5.0
 
 This index groups the release-facing documentation for the current fork cycle.
 
-- Current release: `v1.4.9`
-- Update cycle: `v1.4.8 -> v1.4.9`
-- Primary focus: FT2 decoder improvements, FT2 async visual feedback, FT2 startup/AutoCQ correctness, Linux astronomical data packaging, and UI language/cluster usability improvements.
+- Current release: `1.5.0`
+- Update cycle: `1.4.9 -> 1.5.0`
+- Primary focus: startup audio recovery, FT8/FT4/FT2 QSO correctness, AutoCQ stability, FT2 Quick QSO, decoder sync, and certificate tooling.
 
-## Key Technical Changes (`v1.4.8 -> v1.4.9`)
+## Key Technical Changes (`1.4.9 -> 1.5.0`)
 
-- FT2 triggered decode now uses stronger `3.2` LLR scaling and explicit normalization on all three FT2 LLR branches.
-- adaptive FT2 channel estimation with MMSE-equalized bit metrics added through `ft2_channel_est.f90`.
-- new FT2 async visualizer widget added, with real decode-path S-meter updates and `100 ms` polling cadence.
-- FT2 startup no longer forces FT2 mode; saved mode/frequency is respected.
-- FT2 immediate directed reply handling and stale AutoCQ retry counter reset reduce missed first callers and premature partner switching.
-- new `Language` menu persists UI language in settings and `main.cpp` now reloads that stored language.
-- DX Cluster columns are resizable and their header state is persisted.
-- `JPLEPH` lookup now covers AppImage, Linux share paths, working directory, and `CMAKE_SOURCE_DIR`, and Linux AppImage packaging now bundles the file.
+- automatic RX audio recovery at startup when saved devices are present but RX remains silent.
+- final `73` correctness fixes for FT8, FT4, and FT2 standard flows.
+- FT2 Quick QSO refactor plus `Quick QSO` button mapped to FT2 `2 msg`.
+- AutoCQ duplicate-rework prevention, queue-state resets, and real-period retry accounting.
+- dedicated FT2 LDPC decoder path plus shared Normalized Min-Sum decoder alignment.
+- Decodium certificate loader/status support and `tools/generate_cert.py`.
 
 ## Release Artifacts
 
-- `decodium3-ft2-v1.4.9-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-v1.4.9-macos-tahoe-arm64.zip`
-- `decodium3-ft2-v1.4.9-macos-tahoe-arm64-sha256.txt`
-- `decodium3-ft2-v1.4.9-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-v1.4.9-macos-sequoia-arm64.zip`
-- `decodium3-ft2-v1.4.9-macos-sequoia-arm64-sha256.txt`
-- `decodium3-ft2-v1.4.9-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-v1.4.9-macos-sequoia-x86_64.zip`
-- `decodium3-ft2-v1.4.9-macos-sequoia-x86_64-sha256.txt`
-- `decodium3-ft2-v1.4.9-macos-monterey-x86_64.dmg` *(best effort/experimental, if generated)*
-- `decodium3-ft2-v1.4.9-macos-monterey-x86_64.zip` *(best effort/experimental, if generated)*
-- `decodium3-ft2-v1.4.9-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, if generated)*
-- `decodium3-ft2-v1.4.9-linux-x86_64.AppImage`
-- `decodium3-ft2-v1.4.9-linux-x86_64.AppImage.sha256.txt`
+- `decodium3-ft2-1.5.0-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-1.5.0-macos-tahoe-arm64.zip`
+- `decodium3-ft2-1.5.0-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-1.5.0-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-1.5.0-macos-sequoia-arm64.zip`
+- `decodium3-ft2-1.5.0-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-1.5.0-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-1.5.0-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-1.5.0-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-1.5.0-macos-monterey-x86_64.dmg` *(best effort/experimental, if generated)*
+- `decodium3-ft2-1.5.0-macos-monterey-x86_64.zip` *(best effort/experimental, if generated)*
+- `decodium3-ft2-1.5.0-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, if generated)*
+- `decodium3-ft2-1.5.0-linux-x86_64.AppImage`
+- `decodium3-ft2-1.5.0-linux-x86_64.AppImage.sha256.txt`
 
 ## Linux Minimum Requirements
 
@@ -66,6 +64,6 @@ cd squashfs-root
 - [README.en-GB.md](../README.en-GB.md)
 - [README.it.md](../README.it.md)
 - [README.es.md](../README.es.md)
-- [RELEASE_NOTES_v1.4.9.md](../RELEASE_NOTES_v1.4.9.md)
-- [doc/GITHUB_RELEASE_BODY_v1.4.9.md](./GITHUB_RELEASE_BODY_v1.4.9.md)
+- [RELEASE_NOTES_1.5.0.md](../RELEASE_NOTES_1.5.0.md)
+- [doc/GITHUB_RELEASE_BODY_1.5.0.md](./GITHUB_RELEASE_BODY_1.5.0.md)
 - [CHANGELOG.md](../CHANGELOG.md)

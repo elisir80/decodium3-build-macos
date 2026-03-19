@@ -1,60 +1,70 @@
-# Decodium 3 FT2 (Fork macOS) - v1.4.9
+# Decodium 3 FT2 (Fork macOS/Linux) - 1.5.0
 
-Este fork empaqueta Decodium 3 FT2 para macOS y Linux AppImage, con fixes adicionales de runtime FT2, actualizaciones del decoder y automatizacion release mantenidos en este repositorio.
+Este fork empaqueta Decodium 3 FT2 para macOS y Linux AppImage, con trabajo especifico en Quick QSO FT2, fixes de secuenciacion de QSO, endurecimiento de AutoCQ, actualizaciones del decoder y tooling de certificados Decodium mantenidos en este repositorio.
 
-Release estable actual: `v1.4.9`.
+Release estable actual: `1.5.0`.
 
-## Cambios en v1.4.9 (`v1.4.8 -> v1.4.9`)
+## Cambios en 1.5.0 (`1.4.9 -> 1.5.0`)
 
-- Decoder FT2:
-- escala LLR del triggered decode FT2 subida de `2.83` a `3.2`.
-- normalizacion de los tres flujos LLR FT2 antes del decode LDPC.
-- anadida channel estimation adaptativa con metricas FT2 MMSE-equalized para canales con fading.
-- introducido `ft2_channel_est.f90` y enlazado al build Fortran FT2.
-- Runtime / async FT2:
-- anadido el nuevo visualizador dedicado FT2 async.
-- S-meter async FT2 alimentado desde el path real de decode FT2.
-- polling async FT2 reducido a `100 ms`.
-- fan-out `postDecode()` / `write_all()` diferido para mantener reactivo el path async.
-- Startup y AutoCQ FT2:
-- el arranque ya no fuerza `FT2`; se respetan otra vez modo/frecuencia guardados.
-- FT2 ahora engancha de inmediato la primera respuesta dirigida mientras estas llamando CQ.
-- la adquisicion de un nuevo partner AutoCQ resetea correctamente contadores retry/miss sucios, evitando cambios prematuros de partner.
-- UI / usabilidad:
-- anadido menu `Language` en la barra principal.
-- el idioma UI se guarda en settings y se reaplica al reinicio si no pasas un override CLI.
-- las columnas de la ventana DX Cluster ahora son redimensionables por el usuario y persistentes entre sesiones.
-- Linux / datos astronomicos:
-- el lookup de `JPLEPH` cubre ahora paths AppImage, paths share Linux, directorio de trabajo actual y builds out-of-source mediante `CMAKE_SOURCE_DIR`.
-- el packaging Linux AppImage ahora incluye `JPLEPH` dentro de `usr/share/wsjtx`.
+- Startup audio:
+- anadida recuperacion automatica RX cuando los dispositivos estan seleccionados correctamente pero el audio sigue mudo al arrancar.
+- la reapertura de streams y el rearme del monitor replican el flujo manual "Preferencias Audio -> OK".
+- Flujo QSO y log:
+- corregido el `73` final en FT8, FT4 y FT2 estandar de 5 mensajes cuando la otra estacion envia antes `RR73` o `73`.
+- corregidos varios paths de log en FT2 Quick QSO, incluido el fallback "log despues de mi 73".
+- el mapa DX y los campos DX activos ahora se limpian correctamente cuando la app vuelve a CQ con el QSO cerrado.
+- AutoCQ:
+- la proteccion recent-worked bloquea ahora los retrabajos inmediatos del mismo callsign en todos los paths de seleccion.
+- el cambio al siguiente caller reinicia retry, reportes y estado QSO antes de arrancar el nuevo contacto.
+- en FT8 el timeout de retry cuenta ahora solo periodos realmente perdidos.
+- `debug.txt` registra ahora cambios de partner, inicio de cola, handoff, progreso de retry y saltos de callsigns recien trabajados.
+- Protocolo/runtime FT2:
+- importado el fix upstream del watchdog rescue.
+- anadido el decoder LDPC dedicado FT2 y conectado el triggered decode FT2 a ese path.
+- alineados los decoders LDPC compartidos al refresh upstream Normalized Min-Sum.
+- Quick QSO:
+- anadido el boton `Quick QSO` como alias UI del perfil FT2 `2 msg`.
+- el flow Quick QSO actual se ha alineado al esquema corto pedido para FT2 manteniendo backward compatibility para variantes `TU` antiguas.
+- Certificados/tooling:
+- anadidos loader/autoload de certificados Decodium e indicador de estado en la ventana principal.
+- anadido `tools/generate_cert.py` para generar ficheros `.decodium`.
 
-## Artefactos de Release
+## Artefactos Release
 
-- `decodium3-ft2-v1.4.9-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-v1.4.9-macos-tahoe-arm64.zip`
-- `decodium3-ft2-v1.4.9-macos-tahoe-arm64-sha256.txt`
-- `decodium3-ft2-v1.4.9-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-v1.4.9-macos-sequoia-arm64.zip`
-- `decodium3-ft2-v1.4.9-macos-sequoia-arm64-sha256.txt`
-- `decodium3-ft2-v1.4.9-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-v1.4.9-macos-sequoia-x86_64.zip`
-- `decodium3-ft2-v1.4.9-macos-sequoia-x86_64-sha256.txt`
-- `decodium3-ft2-v1.4.9-macos-monterey-x86_64.dmg` *(best effort/experimental, si se genera)*
-- `decodium3-ft2-v1.4.9-macos-monterey-x86_64.zip` *(best effort/experimental, si se genera)*
-- `decodium3-ft2-v1.4.9-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, si se genera)*
-- `decodium3-ft2-v1.4.9-linux-x86_64.AppImage`
-- `decodium3-ft2-v1.4.9-linux-x86_64.AppImage.sha256.txt`
+- `decodium3-ft2-1.5.0-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-1.5.0-macos-tahoe-arm64.zip`
+- `decodium3-ft2-1.5.0-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-1.5.0-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-1.5.0-macos-sequoia-arm64.zip`
+- `decodium3-ft2-1.5.0-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-1.5.0-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-1.5.0-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-1.5.0-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-1.5.0-macos-monterey-x86_64.dmg` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-1.5.0-macos-monterey-x86_64.zip` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-1.5.0-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-1.5.0-linux-x86_64.AppImage`
+- `decodium3-ft2-1.5.0-linux-x86_64.AppImage.sha256.txt`
 
 ## Requisitos Minimos Linux
+
+Hardware:
 
 - CPU `x86_64`, dual-core 2.0 GHz+
 - RAM 4 GB minimo (8 GB recomendado)
 - al menos 500 MB libres en disco
-- `glibc >= 2.35`
+- pantalla 1280x800 o superior recomendada
+- hardware radio/CAT/audio segun la estacion
+
+Software:
+
+- Linux `x86_64` con `glibc >= 2.35`
 - `libfuse2` / FUSE2
 - ALSA, PulseAudio o PipeWire
+- entorno de escritorio capaz de ejecutar AppImage Qt5
+- acceso a red recomendado para NTP, DX Cluster y workflows online
 
-## Guia de Inicio
+## Guia de Arranque
 
 Si macOS bloquea el inicio:
 
@@ -73,11 +83,11 @@ cd squashfs-root
 ./AppRun
 ```
 
-## Archivos Relacionados
+## Ficheros Relacionados
 
 - [README.md](README.md)
 - [README.en-GB.md](README.en-GB.md)
 - [README.it.md](README.it.md)
-- [RELEASE_NOTES_v1.4.9.md](RELEASE_NOTES_v1.4.9.md)
-- [doc/GITHUB_RELEASE_BODY_v1.4.9.md](doc/GITHUB_RELEASE_BODY_v1.4.9.md)
+- [RELEASE_NOTES_1.5.0.md](RELEASE_NOTES_1.5.0.md)
+- [doc/GITHUB_RELEASE_BODY_1.5.0.md](doc/GITHUB_RELEASE_BODY_1.5.0.md)
 - [CHANGELOG.md](CHANGELOG.md)

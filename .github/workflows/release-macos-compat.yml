@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. v1.4.9)"
+        description: "Release version (e.g. 1.5.0)"
         required: true
-        default: "v1.4.9"
+        default: "1.5.0"
       publish_release:
         description: "Publish GitHub release"
         required: true
@@ -58,11 +58,9 @@ jobs:
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
             VERSION="${{ github.event.inputs.version }}"
           else
-            VERSION="v0.0.0-ci-${GITHUB_SHA::7}"
+            VERSION="0.0.0-ci-${GITHUB_SHA::7}"
           fi
-          if [[ "$VERSION" != v* ]]; then
-            VERSION="v${VERSION}"
-          fi
+          VERSION="${VERSION#v}"
           echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
           echo "Using version: ${VERSION}"
 
@@ -121,9 +119,7 @@ jobs:
         id: version
         run: |
           VERSION="${{ github.event.inputs.version }}"
-          if [[ "$VERSION" != v* ]]; then
-            VERSION="v${VERSION}"
-          fi
+          VERSION="${VERSION#v}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Using version: ${VERSION}"
 
@@ -166,8 +162,8 @@ jobs:
           NOTES_TEMPLATE="doc/GITHUB_RELEASE_BODY_${VERSION}.md"
           if [[ -f "${NOTES_TEMPLATE}" ]]; then
             cp "${NOTES_TEMPLATE}" "${NOTES_FILE}"
-          elif [[ -f "doc/GITHUB_RELEASE_BODY_v1.4.9.md" ]]; then
-            cp "doc/GITHUB_RELEASE_BODY_v1.4.9.md" "${NOTES_FILE}"
+          elif [[ -f "doc/GITHUB_RELEASE_BODY_v${VERSION}.md" ]]; then
+            cp "doc/GITHUB_RELEASE_BODY_v${VERSION}.md" "${NOTES_FILE}"
           else
             printf "# Decodium 3 FT2 %s\n\nSee CHANGELOG.md for details.\n" "${VERSION}" > "${NOTES_FILE}"
           fi

@@ -336,6 +336,57 @@ void WorldMapWidget::setTransmitState(bool transmitting, QString const& targetCa
   update();
 }
 
+void WorldMapWidget::downgradeContactToBand(QString const& call)
+{
+  auto normalizedCall = call.trimmed().toUpper();
+  normalizedCall.remove('<');
+  normalizedCall.remove('>');
+  if (normalizedCall.isEmpty())
+    {
+      return;
+    }
+
+  auto sameStation = [&normalizedCall] (QString contactCall) {
+      contactCall = contactCall.trimmed().toUpper();
+      contactCall.remove('<');
+      contactCall.remove('>');
+      if (contactCall.isEmpty())
+        {
+          return false;
+        }
+      if (contactCall == normalizedCall
+          || contactCall.startsWith(normalizedCall + "/")
+          || normalizedCall.startsWith(contactCall + "/"))
+        {
+          return true;
+        }
+      return false;
+    };
+
+  bool changed = false;
+  auto const nowMs = monotonicNowMs();
+  for (auto it = m_contacts.begin(); it != m_contacts.end(); ++it)
+    {
+      if (!sameStation(it.value().call))
+        {
+          continue;
+        }
+      if (it.value().role != PathRole::BandOnly)
+        {
+          it.value().role = PathRole::BandOnly;
+          it.value().queuedDuringTx = false;
+          it.value().lastSeenMonotonicMs = nowMs;
+          changed = true;
+        }
+    }
+
+  if (changed)
+    {
+      updateViewportTargets();
+      update();
+    }
+}
+
 void WorldMapWidget::addContact(QString const& call, QString const& sourceGrid, QString const& destinationGrid, PathRole role)
 {
   QPointF sourceLonLat;

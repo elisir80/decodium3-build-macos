@@ -6,9 +6,10 @@ set ISCC="C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
 set PFX=C:\Users\IU8LMC\decodium_codesign.pfx
 set PASS=Decodium3!
 set SRC=C:\Users\IU8LMC\Downloads\WSJTX_3.0_Source
+set BUILD=2603182239
 
 echo ============================================
-echo  Decodium 3.0 FT2 Raptor - Build Installers
+echo  Decodium 3.0 FT2 Raptor - Build %BUILD% Installers
 echo ============================================
 echo.
 
@@ -53,7 +54,7 @@ if errorlevel 1 (
 echo.
 
 echo === Step 5: Signing installers ===
-for %%f in (Decodium_3.0_2602260045_FT2_x64_Setup.exe Decodium_3.0_2602260045_FT2_x86_Setup.exe) do (
+for %%f in (Decodium_3.0_%BUILD%_FT2_x64_Setup.exe Decodium_3.0_%BUILD%_FT2_x86_Setup.exe) do (
     if exist "%SRC%\%%f" (
         echo   Signing %%f...
         %SIGNTOOL% sign /f %PFX% /p %PASS% /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 "%SRC%\%%f"
@@ -67,8 +68,8 @@ echo.
 echo ============================================
 echo  BUILD COMPLETE!
 echo  Installers:
-echo    %SRC%\Decodium_3.0_2602260045_FT2_x64_Setup.exe
-echo    %SRC%\Decodium_3.0_2602260045_FT2_x86_Setup.exe
+echo    %SRC%\Decodium_3.0_%BUILD%_FT2_x64_Setup.exe
+echo    %SRC%\Decodium_3.0_%BUILD%_FT2_x86_Setup.exe
 echo ============================================
 goto :end
 

@@ -28,6 +28,7 @@
 #include <QVector>
 #include <QScrollBar>
 #include <QQueue>
+#include <QMap>
 #include <QFuture>
 #include <QFutureWatcher>
 #include <QThreadPool>
@@ -37,6 +38,7 @@
 #include <QNetworkReply>
 
 #include "DXpedCertificate.hpp"
+#include "DecodiumCertificate.hpp"
 #include "MultiGeometryWidget.hpp"
 #include "NonInheritingProcess.hpp"
 #include "Audio/AudioDevice.hpp"
@@ -56,6 +58,7 @@
 #include "widgets/QSYMessage.h"
 #include "widgets/qsymonitor.h"
 #include "widgets/TimeSyncPanel.h"
+#include "widgets/FT2QsoFlowPolicy.h"
 #include "MessageBox.hpp"
 #include "Network/NetworkAccessManager.hpp"
 #include "Network/NtpClient.hpp"
@@ -179,6 +182,7 @@ private:
   void closeEvent(QCloseEvent *) override;
   void childEvent(QChildEvent *) override;
   bool eventFilter(QObject *, QEvent *) override;
+  void restartConfiguredAudioStreams (bool resume_monitor);
   void showQSYMessage(QString message);
   void handleDoubleClickOnCall (Qt::KeyboardModifiers modifiers, bool fromBandActivityWindow);
   bool singleDecodeColumnFlowEnabled () const { return false; }
@@ -296,6 +300,7 @@ private slots:
   void on_actionKeyboard_shortcuts_triggered();
   void on_actionSpecial_mouse_commands_triggered();
   void on_actionSolve_FreqCal_triggered();
+  void on_actionLoad_Decodium_Certificate_triggered();
   void on_actionLoad_DXped_Certificate_triggered();
   void on_actionDXped_Certificate_Manager_triggered();
   void on_actionCopyright_Notice_triggered();
@@ -650,6 +655,7 @@ private:
   SoundOutput * m_soundOutput;
   int m_rx_audio_buffer_frames;
   int m_tx_audio_buffer_frames;
+  qint64 m_last_audio_frame_ms;
   qint64 m_last_tx_audio_rebind_ms;
   qint64 m_last_wake_audio_rebind_ms;
   Qt::ApplicationState m_last_application_state;
@@ -849,6 +855,7 @@ private:
   bool    m_bCallingCQ;
   bool    m_autoCQ;
   bool    m_ft2DeferredLogPending {false};   // AutoCQ: delay log/CQ restart while repeating RR73/73
+  bool    m_logAfterOwn73 {false};           // Partner already closed; send our final 73 once, then log immediately
   QString m_autoCqLockedCall;
   QString m_autoCqLockedGrid;
   int     m_autoCqLockedNtx {6};
@@ -857,6 +864,9 @@ private:
   void enqueueCaller (QString const& call, int freq, int snr = -99, float dt = 0.0f);
   void processNextInQueue ();
   void refreshCallerQueueDisplay ();
+  bool isRecentAutoCqDuplicate (QString const& call) const;
+  void rememberRecentAutoCqWorked (QString const& call, Frequency dialFreq, QString const& mode);
+  void removeCallerFromQueue (QString const& call);
   void capturePendingAutoLogSnapshot ();
   void clearPendingAutoLogSnapshot ();
   void clearAutoCqPartnerLock ();
@@ -889,6 +899,9 @@ private:
   int       m_dxpedCQcounter  {0};   // piggyback CQ ogni N periodi TX
   DXpedSlot m_dxpedSlots[3];
   void dxpedFillEmptySlots ();
+  bool loadDecodiumCertificateFile (QString const& path, bool rememberPath, bool interactive);
+  void autoLoadDecodiumCertificate ();
+  void updateDecodiumCertificateStatus ();
   void dxpedLoadCertificate ();
   void dxpedLoadSlot   (int slot);
   int  dxpedTxSequencer();
@@ -897,9 +910,12 @@ private:
   void dxpedLogQSO       (int slot);
   DXpedCertificate m_dxpedCert;
   bool      m_bDXpedCertified {false};
+  DecodiumCertificate m_decodiumCert;
+  QString   m_decodiumCertPath;
 
   bool    m_bAutoReply;
   QString m_lastloggedcall; //ft8md
+  QHash<QString, QDateTime> m_recentAutoCqWorkedUtcByKey;
   QHash<QString, QDateTime> m_recentQsoLogUtcByKey;
   bool    m_autoSpotEnabled {false};
   bool    m_bCheckedContest;
@@ -973,6 +989,7 @@ private:
   QLabel band_hopping_label;
   QLabel ndecodes_label;
   QLabel dt_correction_label;
+  QLabel decodium_cert_label;
   QProgressBar progressBar;
   QLabel watchdog_label;
 
@@ -1008,6 +1025,9 @@ private:
   bool m_bSpeedyContest {false};      // FT2: bypass guard/period wait for instant TX
   bool m_bDigitalMorse {false};       // FT2: preload on click, fire on Space/TX NOW
   bool m_bTxPreloaded {false};        // FT2 D-CW message prepared, awaiting manual fire
+  Ft2QsoMessageProfile m_ft2QsoMessageProfile {Ft2QsoMessageProfile::Full5};
+  bool m_ft2QuickPeerSignaled {false};
+  QMap<QString, qint64> m_qsoCooldown;
   AsyncModeWidget * m_asyncVis {nullptr};
 
   struct DecodeDedupeEntry
@@ -1358,6 +1378,7 @@ private:
   void initExternalCtrl();     //avt 12/5/20
   void externalCtrlDisconnected();  //avt 12/16/21
   void debugToFile(QString str);        //avt 12/6/23
+  void debugAutoCq(QString const& event, QString const& details = QString {});
   bool ft2AutoSeqEnabled() const;
   void setCallPriority(QString call, int txFirst);   //avt 12/7/23
   void download (QUrl);     //avt 9/23/25

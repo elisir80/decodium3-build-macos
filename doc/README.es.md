@@ -1,38 +1,36 @@
-# Notas de Documentacion (Espanol) - v1.4.9
+# Notas de Documentacion (Espanol) - 1.5.0
 
 Este indice agrupa la documentacion orientada a release del ciclo actual del fork.
 
-- Release actual: `v1.4.9`
-- Ciclo de actualizacion: `v1.4.8 -> v1.4.9`
-- Foco principal: mejoras del decoder FT2, feedback visual async FT2, correccion startup/AutoCQ FT2, packaging de datos astronomicos Linux y mejoras UI de idioma/cluster.
+- Release actual: `1.5.0`
+- Ciclo de actualizacion: `1.4.9 -> 1.5.0`
+- Foco principal: recuperacion audio al arrancar, correccion QSO FT8/FT4/FT2, estabilidad AutoCQ, Quick QSO FT2, sync de decoders y tooling de certificados.
 
-## Cambios Tecnicos Principales (`v1.4.8 -> v1.4.9`)
+## Cambios Tecnicos Principales (`1.4.9 -> 1.5.0`)
 
-- El triggered decode FT2 usa ahora escalado LLR `3.2` y normalizacion explicita de las tres ramas LLR FT2.
-- anadida channel estimation adaptativa FT2 con metricas MMSE-equalized mediante `ft2_channel_est.f90`.
-- nuevo visualizador dedicado FT2 async, con S-meter actualizado desde el decode real y polling a `100 ms`.
-- el arranque FT2 ya no se fuerza; se respetan modo/frecuencia guardados.
-- la respuesta dirigida inmediata FT2 y el reset de contadores retry AutoCQ reducen primeros callers perdidos y cambios prematuros de partner.
-- nuevo menu `Language` persistente en settings y recargado desde `main.cpp`.
-- columnas DX Cluster redimensionables y estado del header persistente.
-- lookup `JPLEPH` extendido a AppImage, paths share Linux, directorio de trabajo y `CMAKE_SOURCE_DIR`, con packaging AppImage que ahora incluye el fichero.
+- recuperacion automatica RX audio al arranque cuando los dispositivos guardados estan presentes pero RX sigue mudo.
+- fixes del `73` final en FT8, FT4 y FT2 estandar.
+- refactor FT2 Quick QSO y boton `Quick QSO` conectado a FT2 `2 msg`.
+- prevencion duplicate-rework AutoCQ, reset de estado de cola y conteo retry sobre periodos reales.
+- path LDPC dedicado FT2 y alineacion de decoders compartidos Normalized Min-Sum.
+- soporte certificados Decodium y herramienta `tools/generate_cert.py`.
 
-## Artefactos de Release
+## Artefactos Release
 
-- `decodium3-ft2-v1.4.9-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-v1.4.9-macos-tahoe-arm64.zip`
-- `decodium3-ft2-v1.4.9-macos-tahoe-arm64-sha256.txt`
-- `decodium3-ft2-v1.4.9-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-v1.4.9-macos-sequoia-arm64.zip`
-- `decodium3-ft2-v1.4.9-macos-sequoia-arm64-sha256.txt`
-- `decodium3-ft2-v1.4.9-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-v1.4.9-macos-sequoia-x86_64.zip`
-- `decodium3-ft2-v1.4.9-macos-sequoia-x86_64-sha256.txt`
-- `decodium3-ft2-v1.4.9-macos-monterey-x86_64.dmg` *(best effort/experimental, si se genera)*
-- `decodium3-ft2-v1.4.9-macos-monterey-x86_64.zip` *(best effort/experimental, si se genera)*
-- `decodium3-ft2-v1.4.9-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, si se genera)*
-- `decodium3-ft2-v1.4.9-linux-x86_64.AppImage`
-- `decodium3-ft2-v1.4.9-linux-x86_64.AppImage.sha256.txt`
+- `decodium3-ft2-1.5.0-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-1.5.0-macos-tahoe-arm64.zip`
+- `decodium3-ft2-1.5.0-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-1.5.0-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-1.5.0-macos-sequoia-arm64.zip`
+- `decodium3-ft2-1.5.0-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-1.5.0-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-1.5.0-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-1.5.0-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-1.5.0-macos-monterey-x86_64.dmg` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-1.5.0-macos-monterey-x86_64.zip` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-1.5.0-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-1.5.0-linux-x86_64.AppImage`
+- `decodium3-ft2-1.5.0-linux-x86_64.AppImage.sha256.txt`
 
 ## Requisitos Minimos Linux
 
@@ -43,15 +41,15 @@ Este indice agrupa la documentacion orientada a release del ciclo actual del for
 - `libfuse2` / FUSE2
 - ALSA, PulseAudio o PipeWire
 
-## Guia de Inicio
+## Guia de Arranque
 
-macOS cuarentena:
+macOS quarantine:
 
 ```bash
 sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 ```
 
-Linux AppImage extraer-y-ejecutar:
+Linux AppImage extract-run:
 
 ```bash
 chmod +x /path/to/Decodium.AppImage
@@ -60,12 +58,12 @@ cd squashfs-root
 ./AppRun
 ```
 
-## Archivos Relacionados
+## Ficheros Relacionados
 
 - [README.md](../README.md)
 - [README.en-GB.md](../README.en-GB.md)
 - [README.it.md](../README.it.md)
 - [README.es.md](../README.es.md)
-- [RELEASE_NOTES_v1.4.9.md](../RELEASE_NOTES_v1.4.9.md)
-- [doc/GITHUB_RELEASE_BODY_v1.4.9.md](./GITHUB_RELEASE_BODY_v1.4.9.md)
+- [RELEASE_NOTES_1.5.0.md](../RELEASE_NOTES_1.5.0.md)
+- [doc/GITHUB_RELEASE_BODY_1.5.0.md](./GITHUB_RELEASE_BODY_1.5.0.md)
 - [CHANGELOG.md](../CHANGELOG.md)
