@@ -586,8 +586,9 @@ void WorldMapWidget::paintEvent(QPaintEvent * event)
       auto const nowMs = monotonicNowMs();
       QString targetCall = normalizeCall(m_txTargetCall);
       QString targetGrid = m_txTargetGrid.trimmed().toUpper();
+      bool const hasExplicitTxTarget = !targetCall.isEmpty() || !targetGrid.isEmpty();
 
-      for (int i = 0; i < contacts.size(); ++i)
+      for (int i = 0; hasExplicitTxTarget && i < contacts.size(); ++i)
         {
           auto const& c = contacts[i];
           if (c.role != PathRole::OutgoingFromMe)

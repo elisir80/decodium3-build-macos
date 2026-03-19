@@ -51,9 +51,15 @@
 #include <QCursor>
 #include <QToolTip>
 #include <QAction>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonParseError>
+#include <QOperatingSystemVersion>
 #include <QButtonGroup>
 #include <QActionGroup>
 #include <QComboBox>
+#include <QMessageBox>
 #include <QMenu>
 #include <QSplashScreen>
 #include <QUdpSocket>
@@ -64,9 +70,11 @@
 #include <QtMath> // TCI
 #include <QSignalBlocker>
 #include <QGridLayout>
+#include <QVersionNumber>
 #include <QVBoxLayout>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QSysInfo>
 #include <QWriteLocker>
 #include <QHash>
 #if QT_VERSION >= QT_VERSION_CHECK (5, 15, 0)
@@ -118,6 +126,46 @@
 #include "MultiSettings.hpp"
 #include "validators/MaidenheadLocatorValidator.hpp"
 #include "validators/CallsignValidator.hpp"
+
+namespace
+{
+char const * update_settings_group = "MainWindow";
+char const * update_check_enabled_key = "UpdateCheckEnabled";
+char const * update_skip_version_key = "UpdateSkipVersion";
+char const * update_remind_after_key = "UpdateRemindAfterUtc";
+char const * update_api_url = "https://api.github.com/repos/elisir80/decodium3-build-macos/releases/latest";
+int constexpr update_startup_delay_ms = 3500;
+int constexpr update_remind_later_hours = 24;
+
+QString normalized_release_version (QString version)
+{
+  version = version.trimmed ();
+  if (version.startsWith ('v', Qt::CaseInsensitive))
+    {
+      version.remove (0, 1);
+    }
+
+  QRegularExpression const re {R"(^(\d+(?:\.\d+)+))"};
+  auto const match = re.match (version);
+  if (match.hasMatch ())
+    {
+      return match.captured (1);
+    }
+
+  return version;
+}
+
+QVersionNumber parsed_release_version (QString const& version, bool * ok = nullptr)
+{
+  auto const normalized = normalized_release_version (version);
+  auto const parsed = QVersionNumber::fromString (normalized);
+  if (ok)
+    {
+      *ok = !normalized.isEmpty () && !parsed.isNull ();
+    }
+  return parsed;
+}
+}
 #include "EqualizationToolsDialog.hpp"
 #include "Network/LotWUsers.hpp"
 #include "logbook/AD1CCty.hpp"
@@ -776,6 +824,7 @@ namespace
   constexpr int kRecentDuplicateLogWindowSeconds {90};
   // In AutoCQ, keep RR73/73 on air up to 5 cycles before forced close.
   constexpr int kAutoCqSignoffRetryCount {5};
+  constexpr int kLateAutoLogGraceWindowSeconds {45};
   constexpr int kDecDataSampleCount {static_cast<int> (sizeof (dec_data.d2) / sizeof (dec_data.d2[0]))};
   constexpr int kMaxCwSymbols {static_cast<int> (sizeof (icw) / sizeof (icw[0]))};
   constexpr int kFoxWaveSampleCount {static_cast<int> (sizeof (foxcom_.wave) / sizeof (foxcom_.wave[0]))};
@@ -1393,7 +1442,7 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
         m_config.udp_server_name (), m_config.udp_server_port (),
         m_config.udp_interface_names (), m_config.udp_TTL (),
         this}},
-  m_psk_Reporter {&m_config, QString {"Decodium v3.0 FT2 Raptor v" + version () + " " + m_revision}.simplified ()},
+  m_psk_Reporter {&m_config, program_title ().simplified ()},
   m_manual {&m_network_manager},
   m_block_udp_status_updates {false},
   m_useDarkStyle {false},
@@ -1409,6 +1458,7 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   }
   setUnifiedTitleAndToolBarOnMac (true);
   createStatusBar();
+  ensureUpdateCheckAction ();
 
   connect (qApp, &QGuiApplication::applicationStateChanged,
            this, &MainWindow::onApplicationStateChanged);
@@ -2479,6 +2529,7 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   ui->lh_decodes_headings_label->setText(t);
   ui->rh_decodes_headings_label->setText(t);
   readSettings();            //Restore user's setup parameters
+  scheduleStartupUpdateCheck ();
 
   // Start NTP sync after settings are loaded
   if (!m_ntpCustomServer.isEmpty()) {
@@ -5658,9 +5709,500 @@ void MainWindow::on_actionAbout_triggered()                  //Display "About"
   CAboutDlg {this}.exec ();
 }
 
+void MainWindow::ensureUpdateCheckAction ()
+{
+  if (!ui->menuHelp || findChild<QAction *> ("actionCheck_for_Updates"))
+    {
+      return;
+    }
+
+  auto * action = new QAction {tr ("Check for updates..."), this};
+  action->setObjectName ("actionCheck_for_Updates");
+  connect (action, &QAction::triggered, this, &MainWindow::on_actionCheck_for_Updates_triggered);
+
+  if (ui->actionAbout)
+    {
+      ui->menuHelp->insertAction (ui->actionAbout, action);
+    }
+  else
+    {
+      ui->menuHelp->addAction (action);
+    }
+}
+
+void MainWindow::scheduleStartupUpdateCheck ()
+{
+    if (!m_settings)
+      {
+        return;
+      }
+
+  m_settings->beginGroup (update_settings_group);
+  auto const enabled = m_settings->value (update_check_enabled_key, true).toBool ();
+  m_settings->endGroup ();
+  if (!enabled)
+    {
+      return;
+    }
+
+  QTimer::singleShot (update_startup_delay_ms, this, [this] {
+    startUpdateCheck (false);
+  });
+}
+
+bool MainWindow::shouldPromptForUpdate (QString const& latestVersion) const
+{
+  if (!m_settings)
+    {
+      return true;
+    }
+
+  auto const normalized = normalized_release_version (latestVersion);
+  auto const now = QDateTime::currentDateTimeUtc ();
+
+  m_settings->beginGroup (update_settings_group);
+  auto const enabled = m_settings->value (update_check_enabled_key, true).toBool ();
+  auto const skipped = normalized_release_version (m_settings->value (update_skip_version_key).toString ());
+  auto const remind_after_text = m_settings->value (update_remind_after_key).toString ();
+  m_settings->endGroup ();
+
+  auto const remind_after = QDateTime::fromString (remind_after_text, Qt::ISODate);
+  if (!enabled)
+    {
+      return false;
+    }
+  if (!normalized.isEmpty () && skipped == normalized)
+    {
+      return false;
+    }
+  if (remind_after.isValid () && remind_after > now)
+    {
+      return false;
+    }
+
+  return true;
+}
+
+void MainWindow::startUpdateCheck (bool manual)
+{
+  if (!m_settings)
+    {
+      return;
+    }
+
+  if (manual)
+    {
+      m_updateCheckInteractivePending = true;
+    }
+
+  if (m_updateCheckReply)
+    {
+      if (manual)
+        {
+          showStatusMessage (tr ("An update check is already in progress."));
+        }
+      return;
+    }
+
+  QNetworkRequest request {QUrl {QString::fromLatin1 (update_api_url)}};
+  request.setRawHeader ("Accept", "application/vnd.github+json");
+  request.setRawHeader ("X-GitHub-Api-Version", "2022-11-28");
+  request.setRawHeader ("User-Agent", userAgent ().toUtf8 ());
+  request.setOriginatingObject (this);
+
+  m_updateCheckReply = m_network_manager.get (request);
+  if (manual)
+    {
+      showStatusMessage (tr ("Checking for updates..."));
+    }
+
+  auto reply = m_updateCheckReply;
+  connect (reply, &QNetworkReply::finished, this, [this, reply] {
+    bool const manual = m_updateCheckInteractivePending;
+    m_updateCheckInteractivePending = false;
+    if (m_updateCheckReply == reply)
+      {
+        m_updateCheckReply.clear ();
+      }
+    handleUpdateCheckReply (reply, manual);
+    if (reply)
+      {
+        reply->deleteLater ();
+      }
+  });
+}
+
+QUrl MainWindow::bestReleaseDownloadUrl (QJsonObject const& release, QString * assetName) const
+{
+  if (assetName)
+    {
+      assetName->clear ();
+    }
+
+  auto const assets_value = release.value (QStringLiteral ("assets"));
+  if (!assets_value.isArray ())
+    {
+      return {};
+    }
+
+  auto const current_arch = QSysInfo::currentCpuArchitecture ().toLower ();
+  auto const assets = assets_value.toArray ();
+  auto const is_text_or_checksum_asset = [] (QString const& name) {
+    auto const lower = name.toLower ();
+    return lower.endsWith (QStringLiteral (".txt"))
+           || lower.contains (QStringLiteral ("sha256"))
+           || lower.contains (QStringLiteral ("checksum"));
+  };
+  auto const mentions_any = [] (QString const& text, QStringList const& needles) {
+    for (auto const& needle : needles)
+      {
+        if (text.contains (needle))
+          {
+            return true;
+          }
+      }
+    return false;
+  };
+
+  struct Candidate
+  {
+    int score {-1};
+    QString name;
+    QUrl url;
+  };
+
+  Candidate best;
+
+#if defined (Q_OS_MACOS) || defined (Q_OS_MAC)
+  auto const current_major = QOperatingSystemVersion::current ().majorVersion ();
+  QStringList arch_tokens;
+  if (current_arch.contains (QStringLiteral ("arm")))
+    {
+      arch_tokens << QStringLiteral ("arm64") << QStringLiteral ("aarch64");
+    }
+  else
+    {
+      arch_tokens << QStringLiteral ("x86_64") << QStringLiteral ("amd64");
+    }
+  QStringList all_arch_tokens {
+    QStringLiteral ("arm64"), QStringLiteral ("aarch64"),
+    QStringLiteral ("x86_64"), QStringLiteral ("amd64")
+  };
+  QStringList preferred_os_tokens;
+  if (current_major >= 26)
+    {
+      preferred_os_tokens << QStringLiteral ("tahoe") << QStringLiteral ("sequoia") << QStringLiteral ("monterey");
+    }
+  else if (current_major >= 15)
+    {
+      preferred_os_tokens << QStringLiteral ("sequoia") << QStringLiteral ("monterey");
+    }
+  else
+    {
+      preferred_os_tokens << QStringLiteral ("monterey");
+    }
+
+  for (auto const& asset_value : assets)
+    {
+      if (!asset_value.isObject ())
+        {
+          continue;
+        }
+
+      auto const asset = asset_value.toObject ();
+      auto const name = asset.value (QStringLiteral ("name")).toString ().trimmed ();
+      auto const lower = name.toLower ();
+      auto const url = QUrl {asset.value (QStringLiteral ("browser_download_url")).toString ()};
+      if (name.isEmpty () || !url.isValid () || is_text_or_checksum_asset (name))
+        {
+          continue;
+        }
+      if (!lower.contains (QStringLiteral ("macos")))
+        {
+          continue;
+        }
+      if (!lower.endsWith (QStringLiteral (".dmg")) && !lower.endsWith (QStringLiteral (".zip")))
+        {
+          continue;
+        }
+      if (mentions_any (lower, all_arch_tokens) && !mentions_any (lower, arch_tokens))
+        {
+          continue;
+        }
+      if (lower.contains (QStringLiteral ("tahoe")) && current_major < 26)
+        {
+          continue;
+        }
+      if (lower.contains (QStringLiteral ("sequoia")) && current_major < 15)
+        {
+          continue;
+        }
+      if (lower.contains (QStringLiteral ("monterey")) && current_major < 12)
+        {
+          continue;
+        }
+
+      int score = lower.endsWith (QStringLiteral (".dmg")) ? 100 : 80;
+      if (mentions_any (lower, arch_tokens))
+        {
+          score += 30;
+        }
+
+      bool matched_os = false;
+      for (int i = 0; i < preferred_os_tokens.size (); ++i)
+        {
+          if (lower.contains (preferred_os_tokens.at (i)))
+            {
+              score += 25 - (i * 5);
+              matched_os = true;
+              break;
+            }
+        }
+      if (!matched_os)
+        {
+          score += 5;
+        }
+
+      if (score > best.score)
+        {
+          best.score = score;
+          best.name = name;
+          best.url = url;
+        }
+    }
+#elif defined (Q_OS_LINUX)
+  QStringList arch_tokens;
+  if (current_arch.contains (QStringLiteral ("arm")))
+    {
+      arch_tokens << QStringLiteral ("arm64") << QStringLiteral ("aarch64");
+    }
+  else
+    {
+      arch_tokens << QStringLiteral ("x86_64") << QStringLiteral ("amd64");
+    }
+  QStringList all_arch_tokens {
+    QStringLiteral ("arm64"), QStringLiteral ("aarch64"),
+    QStringLiteral ("x86_64"), QStringLiteral ("amd64")
+  };
+
+  for (auto const& asset_value : assets)
+    {
+      if (!asset_value.isObject ())
+        {
+          continue;
+        }
+
+      auto const asset = asset_value.toObject ();
+      auto const name = asset.value (QStringLiteral ("name")).toString ().trimmed ();
+      auto const lower = name.toLower ();
+      auto const url = QUrl {asset.value (QStringLiteral ("browser_download_url")).toString ()};
+      if (name.isEmpty () || !url.isValid () || is_text_or_checksum_asset (name))
+        {
+          continue;
+        }
+      if (!lower.contains (QStringLiteral ("linux")) || !lower.endsWith (QStringLiteral (".appimage")))
+        {
+          continue;
+        }
+      if (mentions_any (lower, all_arch_tokens) && !mentions_any (lower, arch_tokens))
+        {
+          continue;
+        }
+
+      int score = 100;
+      if (mentions_any (lower, arch_tokens))
+        {
+          score += 30;
+        }
+
+      if (score > best.score)
+        {
+          best.score = score;
+          best.name = name;
+          best.url = url;
+        }
+    }
+#else
+  Q_UNUSED (release);
+#endif
+
+  if (best.score < 0)
+    {
+      return {};
+    }
+
+  if (assetName)
+    {
+      *assetName = best.name;
+    }
+  return best.url;
+}
+
+void MainWindow::showUpdateAvailableDialog (QString const& latestVersion,
+                                            QUrl const& downloadUrl,
+                                            QString const& downloadLabel,
+                                            QUrl const& releaseUrl,
+                                            QString const& releaseName,
+                                            QString const& releaseNotes)
+{
+  MessageBox box {this};
+  box.setIcon (QMessageBox::Information);
+  box.setText (tr ("A new Decodium release is available."));
+  box.setInformativeText (
+    tr ("Installed version: %1\nLatest version: %2%3")
+      .arg (fork_release_version ())
+      .arg (latestVersion)
+      .arg (releaseName.isEmpty () ? QString {} : QString {"\n%1"}.arg (releaseName)));
+
+  auto const effective_download_url = downloadUrl.isValid () ? downloadUrl : releaseUrl;
+  QString detail;
+  if (effective_download_url.isValid () && effective_download_url != releaseUrl)
+    {
+      detail = tr ("Direct download: %1")
+                 .arg (effective_download_url.toDisplayString ());
+      if (!downloadLabel.trimmed ().isEmpty ())
+        {
+          detail.prepend (tr ("Selected asset: %1\n").arg (downloadLabel.trimmed ()));
+        }
+      if (releaseUrl.isValid ())
+        {
+          detail += QStringLiteral ("\n") + tr ("Release page: %1").arg (releaseUrl.toDisplayString ());
+        }
+    }
+  else
+    {
+      detail = tr ("Download page: %1").arg (effective_download_url.toDisplayString ());
+    }
+  if (!releaseNotes.trimmed ().isEmpty ())
+    {
+      detail += QStringLiteral ("\n\n") + releaseNotes.trimmed ();
+    }
+  box.setDetailedText (detail);
+
+  auto * download_button = box.addButton (tr ("Download"), QMessageBox::AcceptRole);
+  auto * later_button = box.addButton (tr ("Remind me later"), QMessageBox::RejectRole);
+  auto * skip_button = box.addButton (tr ("Skip this version"), QMessageBox::DestructiveRole);
+  box.setDefaultButton (download_button);
+  box.exec ();
+
+  auto const normalized = normalized_release_version (latestVersion);
+  m_settings->beginGroup (update_settings_group);
+  if (box.clickedButton () == download_button)
+    {
+      m_settings->remove (update_skip_version_key);
+      m_settings->remove (update_remind_after_key);
+      m_settings->endGroup ();
+      QDesktopServices::openUrl (effective_download_url);
+      return;
+    }
+
+  if (box.clickedButton () == skip_button)
+    {
+      m_settings->setValue (update_skip_version_key, normalized);
+      m_settings->remove (update_remind_after_key);
+      m_settings->endGroup ();
+      return;
+    }
+
+  Q_UNUSED (later_button);
+  m_settings->remove (update_skip_version_key);
+  m_settings->setValue (update_remind_after_key,
+                        QDateTime::currentDateTimeUtc ().addSecs (update_remind_later_hours * 3600).toString (Qt::ISODate));
+  m_settings->endGroup ();
+}
+
+void MainWindow::handleUpdateCheckReply (QPointer<QNetworkReply> reply, bool manual)
+{
+  if (!reply)
+    {
+      return;
+    }
+
+  auto const fallback_release_url = QUrl {QStringLiteral ("https://github.com/elisir80/decodium3-build-macos/releases")};
+
+  if (reply->error () != QNetworkReply::NoError)
+    {
+      if (manual)
+        {
+          MessageBox::warning_message (this,
+                                       tr ("Update check failed."),
+                                       reply->errorString ());
+        }
+      return;
+    }
+
+  auto const payload = reply->readAll ();
+  QJsonParseError parse_error;
+  auto const doc = QJsonDocument::fromJson (payload, &parse_error);
+  if (parse_error.error != QJsonParseError::NoError || !doc.isObject ())
+    {
+      if (manual)
+        {
+          MessageBox::warning_message (this,
+                                       tr ("Update check failed."),
+                                       tr ("The release metadata returned by GitHub could not be parsed."),
+                                       QString::fromUtf8 (payload));
+        }
+      return;
+    }
+
+  auto const obj = doc.object ();
+  auto const latest_version = normalized_release_version (obj.value (QStringLiteral ("tag_name")).toString ());
+  auto const release_name = obj.value (QStringLiteral ("name")).toString ().trimmed ();
+  auto const release_url = QUrl {obj.value (QStringLiteral ("html_url")).toString ()};
+  auto const release_notes = obj.value (QStringLiteral ("body")).toString ();
+  QString asset_name;
+  auto const direct_download_url = bestReleaseDownloadUrl (obj, &asset_name);
+  auto const effective_release_url = release_url.isValid () ? release_url : fallback_release_url;
+  auto const effective_download_url = direct_download_url.isValid () ? direct_download_url : effective_release_url;
+
+  bool remote_ok = false;
+  bool local_ok = false;
+  auto const remote_version = parsed_release_version (latest_version, &remote_ok);
+  auto const local_version = parsed_release_version (fork_release_version (), &local_ok);
+  if (!remote_ok || !local_ok)
+    {
+      if (manual)
+        {
+          MessageBox::warning_message (this,
+                                       tr ("Update check failed."),
+                                       tr ("Unable to compare version numbers."),
+                                       tr ("Installed: %1\nRemote tag: %2")
+                                         .arg (fork_release_version ())
+                                         .arg (obj.value (QStringLiteral ("tag_name")).toString ()));
+        }
+      return;
+    }
+
+  auto const newer_available = QVersionNumber::compare (remote_version, local_version) > 0;
+  if (!newer_available)
+    {
+      if (manual)
+        {
+          MessageBox::information_message (this,
+                                           tr ("You are up to date."),
+                                           tr ("Installed version: %1").arg (fork_release_version ()));
+        }
+      return;
+    }
+
+  if (!manual && !shouldPromptForUpdate (latest_version))
+    {
+      return;
+    }
+
+  showStatusMessage (tr ("Update available: %1").arg (latest_version));
+  showUpdateAvailableDialog (latest_version,
+                             effective_download_url,
+                             asset_name,
+                             effective_release_url,
+                             release_name,
+                             release_notes);
+}
+
 void MainWindow::on_actionCheck_for_Updates_triggered ()
 {
-  showStatusMessage (tr ("Update check is not available in this build."));
+  startUpdateCheck (true);
 }
 
 void MainWindow::on_autoButton_clicked (bool checked)       //avt 10/2/25 manually or as result of controller command
@@ -10654,10 +11196,55 @@ void MainWindow::auto_sequence (DecodedText const& message, unsigned start_toler
     bool const calling_reply_eligible = addressed_to_me && (caller_selection_open || from_active_partner_effective);
     bool const signoffRetryWindowOpen =
         m_autoCQ && m_ft2DeferredLogPending && from_active_partner_effective;
+    bool const waitingFinalAckAfterOwnSignoff =
+        m_sentFirst73
+        && from_active_partner_effective
+        && acceptable_73;
     QString directedCaller;
     QString directedGrid;
     message.deCallAndGrid (directedCaller, directedGrid);
     auto const directedCallerBase = Radio::base_callsign (normalize_call_token (directedCaller)).trimmed ().toUpper ();
+    auto const latePartnerBase = Radio::base_callsign (m_lateAutoLogCall).trimmed ().toUpper ();
+    bool const latePartnerWindowOpen =
+        m_lateAutoLogValid
+        && m_lateAutoLogExpires.isValid ()
+        && QDateTime::currentDateTimeUtc () <= m_lateAutoLogExpires
+        && !latePartnerBase.isEmpty ();
+    bool const fromLatePartner =
+        latePartnerWindowOpen
+        && !directedCallerBase.isEmpty ()
+        && directedCallerBase == latePartnerBase;
+    bool const latePartnerFinalAck = fromLatePartner && is_73;
+    if (latePartnerFinalAck) {
+      m_pendingAutoLogValid = true;
+      m_pendingAutoLogCall = m_lateAutoLogCall;
+      m_pendingAutoLogGrid = m_lateAutoLogGrid;
+      m_pendingAutoLogRptSent = m_lateAutoLogRptSent;
+      m_pendingAutoLogRptRcvd = m_lateAutoLogRptRcvd;
+      m_pendingAutoLogXSent = m_lateAutoLogXSent;
+      m_pendingAutoLogXRcvd = m_lateAutoLogXRcvd;
+      m_pendingAutoLogOn = m_lateAutoLogOn;
+      m_pendingAutoLogDialFreq = m_lateAutoLogDialFreq;
+      removeCallerFromQueue (latePartnerBase);
+      debugAutoCq ("late-signoff-log",
+                   QString {"call:%1 msg:%2"}
+                       .arg (latePartnerBase, msg_no_hash.trimmed ()));
+      clearLateAutoLogSnapshot ();
+      if (!is_externalCtrlMode()
+          && (m_config.prompt_to_log() || m_config.autoLog() || m_autoCQ)
+          && !m_tune
+          && !logQSOTimer.isActive ()) {
+        logQSOTimer.start (0);
+      }
+      return;
+    }
+    if (fromLatePartner) {
+      removeCallerFromQueue (latePartnerBase);
+      debugAutoCq ("late-signoff-skip",
+                   QString {"call:%1 msg:%2"}
+                       .arg (latePartnerBase, msg_no_hash.trimmed ()));
+      return;
+    }
     bool const recentAutoCqDuplicateCaller =
         m_autoCQ
         && !m_bDXpedMode
@@ -10695,7 +11282,7 @@ void MainWindow::auto_sequence (DecodedText const& message, unsigned start_toler
 
     bool const activeQsoReplyMatch =
         !m_bCallingCQ
-        && (!m_sentFirst73 || signoffRetryWindowOpen)
+        && (!m_sentFirst73 || signoffRetryWindowOpen || waitingFinalAckAfterOwnSignoff)
         && (((!myBaseEffective.isEmpty () && message_words.at (2).contains (myBaseEffective))
              && (message_words.at (3).contains (Radio::base_callsign (ui->dxCallEntry->text ()))
                  || bEU_VHF))
@@ -11703,6 +12290,11 @@ void MainWindow::guiUpdate()
             qDebug () << "AutoCQ: Tx" << m_ntx << "sent" << MAX_TX_RETRIES << "times without response, returning to CQ";
             debugAutoCq ("retry-hit-limit",
                          QString {"tx:%1 count:%2/%3 -> clearDX"}.arg (m_ntx).arg (m_txRetryCount).arg (MAX_TX_RETRIES));
+            // If AutoCQ gives up after we already sent Tx3 (R+report) or later,
+            // keep a short recovery window so a late RR73/73 still logs the QSO.
+            if (m_autoCQ && m_QSOProgress >= ROGER_REPORT && m_ntx >= 3) {
+              armLateAutoLogSnapshot ();
+            }
             m_txRetryCount = 0;
             m_lastNtx = -1;
             m_cqRetryCount = 0;
@@ -12888,6 +13480,46 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
     m_cqRetryCount = 0;
     m_autoCQPeriodsMissed = 0;
     m_receivedReplyThisPeriod = true;
+    clearAutoCqPartnerLock ();
+    if (Radio::is_callsign (hiscall)) {
+      auto const incomingBase = Radio::base_callsign (hiscall).trimmed ().toUpper ();
+      if (!qso_partner_base_call.isEmpty () && incomingBase != qso_partner_base_call) {
+        QSignalBlocker const gridBlocker {ui->dxGridEntry};
+        ui->dxGridEntry->clear ();
+        m_hisGrid.clear ();
+      }
+      {
+        QSignalBlocker const callBlocker {ui->dxCallEntry};
+        ui->dxCallEntry->setText (hiscall);
+      }
+      m_hisCall = hiscall;
+      m_hisCall0 = hiscall;
+      if (hisgrid.contains (grid_regexp)) {
+        QSignalBlocker const gridBlocker {ui->dxGridEntry};
+        ui->dxGridEntry->setText (hisgrid);
+        m_hisGrid = hisgrid;
+      }
+      statusUpdate ();
+    }
+    if (!is_73
+        && !ft2QuickTu
+        && hisgrid.contains (grid_regexp)
+        && (m_QSOProgress == CALLING || m_bCallingCQ)) {
+      int const directReplySnr = qBound (-50, message.snr (), 49);
+      ui->rptSpinBox->setValue (directReplySnr);
+      genStdMsgs (QString::number (directReplySnr));
+      setTxMsg (2);
+      m_ntx = 2;
+      m_QSOProgress = REPORT;
+      m_bCallingCQ = false;
+      m_bAutoReply = true;
+      ui->txrb2->setChecked (true);
+      debugAutoCq ("start-direct-arm-tx2",
+                   QString {"call:%1 grid:%2 snr:%3 rpt:%4"}
+                       .arg (Radio::base_callsign (hiscall).trimmed ().toUpper (), hisgrid)
+                       .arg (message.snr ())
+                       .arg (directReplySnr));
+    }
     debugAutoCq ("start-direct",
                  QString {"call:%1 msg:%2"}.arg (base_call, udp_decode_message_text (message.string ()).trimmed ()));
   }
@@ -13067,16 +13699,24 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
                               m_lastMessageSent.split (' ', SkipEmptyParts));
         bool const partnerSignoff73 =
             (word_3_as_number == 73
-             && (m_QSOProgress >= ROGER_REPORT)
-             && !(m_mode == "FT2" && m_autoCQ && !localSignoffAlreadySent));
+             && (m_QSOProgress >= ROGER_REPORT));
         bool const partnerSignoffRR73 =
             (word_3 == "RR73"
-             && (m_QSOProgress >= ROGER_REPORT)
-             && !(m_mode == "FT2" && m_autoCQ && !localSignoffAlreadySent));
-        bool const partnerFinalAck = partnerSignoff73 || partnerSignoffRR73;
+             && (m_QSOProgress >= ROGER_REPORT));
+        bool const partnerAnySignoff = partnerSignoff73 || partnerSignoffRR73;
+        bool const profileNeedsOwn73BeforeLog =
+            ((m_mode == "FT2"
+              && m_ft2QsoMessageProfile == Ft2QsoMessageProfile::Full5)
+             || ((m_mode == "FT8" || m_mode == "FT4")
+                 && m_specOp == SpecOp::NONE));
+        bool const partnerSignoffNeedsOwn73 =
+            partnerAnySignoff
+            && !localSignoffAlreadySent
+            && profileNeedsOwn73BeforeLog;
+        bool const partnerFinalAck =
+            partnerAnySignoff && !partnerSignoffNeedsOwn73;
         if (("RRR" == word_3
-             || partnerFinalAck
-             || "RR73" == word_3
+             || partnerAnySignoff
              || ("R" == word_3 && m_QSOProgress != REPORT))) {
           if((m_mode=="FT2" or m_mode=="FT4") and "RR73" == word_3) m_dateTimeRcvdRR73=QDateTime::currentDateTimeUtc();
           m_txRetryCount = 0; m_lastNtx = -1; m_cqRetryCount = 0;  // Reset Tx retry counter on valid response
@@ -13114,12 +13754,7 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
                 m_ntx=4;
                 ui->txrb4->setChecked(true);
               }
-            else if (partnerFinalAck
-                     && !localSignoffAlreadySent
-                     && ((m_mode == "FT2"
-                          && m_ft2QsoMessageProfile == Ft2QsoMessageProfile::Full5)
-                         || ((m_mode == "FT8" || m_mode == "FT4")
-                             && m_specOp == SpecOp::NONE)))
+            else if (partnerSignoffNeedsOwn73)
               {
                 m_ft2DeferredLogPending = false;
                 m_nTx73 = 0;
@@ -13346,6 +13981,27 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
       m_QSOProgress = REPORT;
       ui->txrb2->setChecked (true);
     }
+  }
+  if (starting_auto_cq_partner
+      && m_autoCQ
+      && m_QSOProgress == CALLING
+      && hisgrid.contains (grid_regexp)
+      && !is_73
+      && !ft2QuickTu) {
+    // Guard against packed/late replies that set the partner call but fail to move
+    // the FSM out of CQ. If a caller sends a valid grid while we're in CALLING,
+    // answer with Tx2 immediately instead of repeating CQ for more cycles.
+    int const directReplySnr = qBound (-50, message.snr (), 49);
+    ui->rptSpinBox->setValue (directReplySnr);
+    genStdMsgs (QString::number (directReplySnr));
+    setTxMsg (2);
+    m_QSOProgress = REPORT;
+    ui->txrb2->setChecked (true);
+    debugAutoCq ("start-direct-fallback-grid",
+                 QString {"call:%1 grid:%2 snr:%3 rpt:%4"}
+                     .arg (Radio::base_callsign (hiscall).trimmed ().toUpper (), hisgrid)
+                     .arg (message.snr ())
+                     .arg (directReplySnr));
   }
   if (m_mode == "FT2") {
     Ft2QsoFlowDecision const flowDecision =
@@ -13904,6 +14560,52 @@ void MainWindow::clearPendingAutoLogSnapshot ()
   m_pendingAutoLogDialFreq = 0;
 }
 
+void MainWindow::armLateAutoLogSnapshot ()
+{
+  QString snapshotCall = m_hisCall.trimmed ();
+  if (snapshotCall.isEmpty ()) {
+    snapshotCall = ui->dxCallEntry->text ().trimmed ();
+  }
+  if (snapshotCall.isEmpty ()) {
+    snapshotCall = infer_partner_from_directed_message (m_currentMessage, m_config.my_callsign (), m_baseCall);
+  }
+  if (snapshotCall.isEmpty ()) {
+    snapshotCall = infer_partner_from_directed_message (m_lastMessageSent, m_config.my_callsign (), m_baseCall);
+  }
+  if (snapshotCall.isEmpty ()) return;
+
+  m_lateAutoLogValid = true;
+  m_lateAutoLogCall = snapshotCall;
+  m_lateAutoLogGrid = m_hisGrid;
+  m_lateAutoLogRptSent = m_rptSent;
+  m_lateAutoLogRptRcvd = m_rptRcvd;
+  m_lateAutoLogXSent = m_xSent;
+  m_lateAutoLogXRcvd = m_xRcvd;
+  m_lateAutoLogOn = m_dateTimeQSOOn;
+  m_lateAutoLogDialFreq = m_freqNominal + ui->TxFreqSpinBox->value ();
+  m_lateAutoLogExpires = QDateTime::currentDateTimeUtc ().addSecs (kLateAutoLogGraceWindowSeconds);
+
+  rememberRecentAutoCqAbandoned (snapshotCall, m_lateAutoLogDialFreq, m_mode);
+  debugAutoCq ("late-signoff-arm",
+               QString {"call:%1 expires:%2"}
+                   .arg (Radio::base_callsign (snapshotCall).trimmed ().toUpper (),
+                         m_lateAutoLogExpires.toString (Qt::ISODate)));
+}
+
+void MainWindow::clearLateAutoLogSnapshot ()
+{
+  m_lateAutoLogValid = false;
+  m_lateAutoLogCall.clear ();
+  m_lateAutoLogGrid.clear ();
+  m_lateAutoLogRptSent.clear ();
+  m_lateAutoLogRptRcvd.clear ();
+  m_lateAutoLogXSent.clear ();
+  m_lateAutoLogXRcvd.clear ();
+  m_lateAutoLogOn = QDateTime {};
+  m_lateAutoLogDialFreq = 0;
+  m_lateAutoLogExpires = QDateTime {};
+}
+
 void MainWindow::clearAutoCqPartnerLock ()
 {
   m_autoCqLockedCall.clear ();
@@ -14005,6 +14707,11 @@ bool MainWindow::isRecentAutoCqDuplicate (QString const& call) const
   auto const dedupeKey = QString {"%1|%2|%3"}.arg (dedupeCall, dedupeBand, dedupeMode);
   auto const nowUtc = QDateTime::currentDateTimeUtc ();
 
+  auto const abandonedIt = m_recentAutoCqAbandonedUtcByKey.constFind (dedupeKey);
+  if (abandonedIt != m_recentAutoCqAbandonedUtcByKey.constEnd ()) {
+    return isWithinRecentDuplicateWindow (abandonedIt.value (), nowUtc);
+  }
+
   auto const workedIt = m_recentAutoCqWorkedUtcByKey.constFind (dedupeKey);
   if (workedIt != m_recentAutoCqWorkedUtcByKey.constEnd ()) {
     return isWithinRecentDuplicateWindow (workedIt.value (), nowUtc);
@@ -14014,6 +14721,20 @@ bool MainWindow::isRecentAutoCqDuplicate (QString const& call) const
   if (it == m_recentQsoLogUtcByKey.constEnd ()) return false;
 
   return isWithinRecentDuplicateWindow (it.value (), nowUtc);
+}
+
+void MainWindow::rememberRecentAutoCqAbandoned (QString const& call, Frequency dialFreq, QString const& mode)
+{
+  auto const dedupeCall = Radio::base_callsign (call).trimmed ().toUpper ();
+  auto const dedupeBand = m_config.bands ()->find (dialFreq).trimmed ().toUpper ();
+  auto const dedupeMode = mode.trimmed ().toUpper ();
+  if (dedupeCall.isEmpty () || dedupeBand.isEmpty () || dedupeMode.isEmpty ()) return;
+
+  auto const nowUtc = QDateTime::currentDateTimeUtc ();
+  auto const dedupeKey = QString {"%1|%2|%3"}.arg (dedupeCall, dedupeBand, dedupeMode);
+  m_recentAutoCqAbandonedUtcByKey.insert (dedupeKey, nowUtc);
+  pruneRecentDuplicateCache (m_recentAutoCqAbandonedUtcByKey, nowUtc);
+  debugAutoCq ("remember-abandoned", QString {"call:%1 band:%2 mode:%3"}.arg (dedupeCall, dedupeBand, dedupeMode));
 }
 
 void MainWindow::rememberRecentAutoCqWorked (QString const& call, Frequency dialFreq, QString const& mode)
@@ -14211,12 +14932,13 @@ void MainWindow::clearDX ()
     return;
   }
   // Auto CQ con coda vuota: torna a CQ (Tx6)
-  if ((kEnableAutoCqCallerQueue || m_bDXpedMode)
-      && m_autoCQ && m_callerQueue.isEmpty ()) {
-    setTxMsg (6);
-    m_QSOProgress = CALLING;
-    debugAutoCq ("cleardx-return-cq", QString {"previous:%1"}.arg (previousMapCall.trimmed ().toUpper ()));
-  }
+	  if ((kEnableAutoCqCallerQueue || m_bDXpedMode)
+	      && m_autoCQ && m_callerQueue.isEmpty ()) {
+	    setTxMsg (6);
+	    m_QSOProgress = CALLING;
+	    m_bCallingCQ = true;
+	    debugAutoCq ("cleardx-return-cq", QString {"previous:%1"}.arg (previousMapCall.trimmed ().toUpper ()));
+	  }
   if (m_QSOProgress != CALLING && !m_autoCQ) {
     auto_tx_mode (false);
   }
@@ -15485,6 +16207,10 @@ void MainWindow::on_logQSOButton_clicked()                 //Log QSO button
   auto const loggedBase = Radio::base_callsign (logHisCall).trimmed ().toUpper ();
   rememberRecentAutoCqWorked (logHisCall, logDialFreq, m_mode);
   removeCallerFromQueue (loggedBase);
+  if (m_lateAutoLogValid
+      && loggedBase == Radio::base_callsign (m_lateAutoLogCall).trimmed ().toUpper ()) {
+    clearLateAutoLogSnapshot ();
+  }
   if (m_worldMapWidget && !loggedBase.isEmpty ()) {
     m_worldMapWidget->downgradeContactToBand (loggedBase);
   }
@@ -16105,6 +16831,10 @@ void MainWindow::acceptQSO (QDateTime const& QSO_date_off, QString const& call, 
   auto const dedupeKey = QString {"%1|%2|%3"}.arg (dedupeCall, band, dedupeMode);
   auto const nowUtc = QDateTime::currentDateTimeUtc ();
   rememberRecentAutoCqWorked (call, dial_freq, mode);
+  if (m_lateAutoLogValid
+      && dedupeCall == Radio::base_callsign (m_lateAutoLogCall).trimmed ().toUpper ()) {
+    clearLateAutoLogSnapshot ();
+  }
   bool suppressDuplicateLog = false;
   if (!dedupeCall.isEmpty () && !band.isEmpty () && !dedupeMode.isEmpty ()) {
     auto it = m_recentQsoLogUtcByKey.constFind (dedupeKey);
@@ -18541,6 +19271,9 @@ void MainWindow::transmit (double snr)
   // do not auto-log. AutoCQ moves on; plain auto-sequence stops transmitting.
   if (!m_bDXpedMode && m_ft2DeferredLogPending && txIs73) {
     if (m_nTx73 >= kAutoCqSignoffRetryCount) {
+      if (m_autoCQ) {
+        armLateAutoLogSnapshot ();
+      }
       m_ft2DeferredLogPending = false;
       m_nTx73 = 0;
       if (m_autoCQ) {
@@ -18651,7 +19384,7 @@ void MainWindow::pskSetLocal ()
   if (rig_information.contains("OmniRig")) rig_information = "N/A (OmniRig)";
   if (rig_information == "FLRig") rig_information = "N/A (FLRig)";
   if (rig_information.contains("TCI Cli")) rig_information = "N/A (TCI)";
-  m_psk_Reporter.setLocalStation(m_config.my_callsign (), m_config.my_grid (), antenna_description, rig_information, QString {"Decodium v3.0 FT2 Raptor v" + version () + " " + m_revision}.simplified ());
+  m_psk_Reporter.setLocalStation(m_config.my_callsign (), m_config.my_grid (), antenna_description, rig_information, program_title ().simplified ());
 }
 
 void MainWindow::transmitDisplay (bool transmitting)
@@ -18717,6 +19450,14 @@ void MainWindow::transmitDisplay (bool transmitting)
       auto myGrid = m_config.my_grid().trimmed().toUpper();
       auto dxCall = normalizeCall(ui->dxCallEntry->text());
       auto dxGrid = ui->dxGridEntry->text().trimmed().toUpper();
+      auto const txWords = m_currentMessage.split(' ', SkipEmptyParts);
+      auto const txFirstWord = txWords.isEmpty() ? QString {} : txWords.first().trimmed().toUpper();
+      bool const txIsCqLike =
+          transmitting
+          && (m_ntx == 6
+              || txFirstWord == "CQ"
+              || txFirstWord == "QRZ"
+              || txFirstWord == "DE");
       if (dxCall.isEmpty())
         {
           dxCall = normalizeCall(m_hisCall);
@@ -18735,7 +19476,13 @@ void MainWindow::transmitDisplay (bool transmitting)
           dxGrid = m_worldMapGridByCall.value(callKey(dxCall));
         }
 
-      if (transmitting && myGrid.contains(grid_regexp) && dxGrid.contains(grid_regexp))
+      if (txIsCqLike)
+        {
+          dxCall.clear();
+          dxGrid.clear();
+        }
+
+      if (transmitting && !txIsCqLike && myGrid.contains(grid_regexp) && dxGrid.contains(grid_regexp))
         {
           m_worldMapWidget->addContact(dxCall, myGrid, dxGrid, WorldMapWidget::PathRole::OutgoingFromMe);
         }

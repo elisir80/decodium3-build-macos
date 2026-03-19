@@ -10,8 +10,8 @@ Usage:
                                  [--asset-suffix macos-sequoia-arm64]
 
 Examples:
-  scripts/release-macos.sh 1.5.0
-  scripts/release-macos.sh 1.5.0 --publish --repo iu8lmc/Decodium-3.0-Codename-Raptor
+  scripts/release-macos.sh 1.5.1
+  scripts/release-macos.sh 1.5.1 --publish --repo elisir80/decodium3-build-macos
 
 What it does:
   1) Configures the project in ./build
@@ -38,7 +38,7 @@ shift
 VERSION="${VERSION_RAW#v}"
 
 PUBLISH=0
-REPO="iu8lmc/Decodium-3.0-Codename-Raptor"
+REPO="elisir80/decodium3-build-macos"
 COMPAT_MACOS="15.0"
 SKIP_COMPAT_CHECK=0
 CODESIGN_IDENTITY="${CODESIGN_IDENTITY:--}"

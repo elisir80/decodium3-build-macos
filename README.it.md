@@ -1,50 +1,47 @@
-# Decodium 3 FT2 (Fork macOS/Linux) - 1.5.0
+# Decodium 3 FT2 (Fork macOS/Linux) - 1.5.1
 
-Questo fork confeziona Decodium 3 FT2 per macOS e Linux AppImage, con lavoro specifico su Quick QSO FT2, fix di sequenziamento QSO, hardening AutoCQ, aggiornamenti decoder e tooling certificati Decodium mantenuti in questo repository.
+Questo fork confeziona Decodium 3 FT2 per macOS e Linux AppImage, con fix di chiusura QSO FT2/FT4/FT8, hardening della state machine AutoCQ, controllo aggiornamenti interno, sync decoder da upstream e tooling certificati Decodium mantenuti in questo repository.
 
-Release stabile corrente: `1.5.0`.
+Release stabile corrente: `1.5.1`.
 
-## Novita' 1.5.0 (`1.4.9 -> 1.5.0`)
+## Novita' 1.5.1 (`1.5.0 -> 1.5.1`)
 
-- Startup audio:
-- aggiunto recovery automatico RX quando le periferiche sono selezionate correttamente ma all'avvio l'audio resta muto.
-- la riapertura stream e il riarmo del monitor replicano il percorso di recovery manuale "Preferenze Audio -> OK".
+- Aggiornamenti interni:
+- aggiunto controllo update interno contro GitHub Releases all'avvio.
+- aggiunta voce `Help > Check for updates...`.
+- l'updater apre ora direttamente l'asset corretto per la piattaforma corrente invece della sola pagina release generica.
 - Flusso QSO e log:
-- corretto il `73` finale in FT8, FT4 e FT2 standard a 5 messaggi quando il corrispondente manda prima `RR73` o `73`.
-- corretti diversi path di log in FT2 Quick QSO, compreso il fallback "log dopo il mio 73".
-- mappa DX e campi DX attivi vengono ora puliti correttamente quando l'app torna a CQ a QSO chiuso.
+- corretti piu' path tardivi FT2/FT4/FT8 in cui l'app poteva continuare a mandare `73/RR73`, perdere il log finale o non recuperare una chiusura ritardata.
+- corretto il caso in cui il `73/RR73` finale del partner arrivava dopo che la stazione locale aveva gia' inviato il proprio signoff.
+- migliorato il recovery del final-ack tardivo dopo timeout, cosi' un `73/RR73` ritardato puo' ancora essere messo a log correttamente.
 - AutoCQ:
-- il blocco dei recent-worked impedisce ora i doppi richiami immediati dello stesso nominativo su tutti i path di selezione.
-- il passaggio al caller successivo resetta retry, report e stato QSO prima di iniziare il nuovo contatto.
-- in FT8 il timeout dei retry conta ora solo i periodi realmente persi.
-- `debug.txt` traccia ora cambio partner, start queue, handoff, progress retry e skip dei nominativi appena lavorati.
-- Protocollo/runtime FT2:
-- importato il fix upstream del watchdog rescue.
-- aggiunto il decoder LDPC dedicato FT2 e agganciato il triggered decode FT2 a quel path.
-- allineati i decoder LDPC condivisi al refresh upstream Normalized Min-Sum.
-- Quick QSO:
-- aggiunto il bottone `Quick QSO` come alias UI del profilo FT2 `2 msg`.
-- il flow Quick QSO corrente e' stato allineato allo schema corto richiesto per FT2 mantenendo backward compatibility per le varianti `TU` piu' vecchie.
-- Certificati/tooling:
-- aggiunti loader/autoload certificati Decodium e indicatore stato nella finestra principale.
-- aggiunto `tools/generate_cert.py` per generare file certificato `.decodium`.
+- corretto il riuso di partner stantii dopo il ritorno a CQ.
+- corretti i casi di caller diretto decodificato ma con l'app che continuava a trasmettere CQ invece di armare `Tx2`.
+- corretto il primo reply FT2 diretto che poteva usare un report stantio del QSO precedente invece dell'SNR reale del caller corrente.
+- esteso il blocco recent-work e abandoned-partner per ridurre i richiami duplicati dopo chiusure differite.
+- Mappa e identita':
+- corretta la live world map che poteva mostrare un falso collegamento attivo mentre stavi trasmettendo solo CQ.
+- allineato l'identificativo software inviato a PSK Reporter esattamente alla stringa mostrata nella barra del titolo.
+- Diagnostica/processo:
+- esteso `debug.txt` con tracing piu' ricco per armo caller diretto, cleanup partner stantio, recovery late signoff e selezione asset updater.
+- versione UI locale, default workflow e documentazione release sono ora allineati alla semver `1.5.1`.
 
 ## Artifact Release
 
-- `decodium3-ft2-1.5.0-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-1.5.0-macos-tahoe-arm64.zip`
-- `decodium3-ft2-1.5.0-macos-tahoe-arm64-sha256.txt`
-- `decodium3-ft2-1.5.0-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-1.5.0-macos-sequoia-arm64.zip`
-- `decodium3-ft2-1.5.0-macos-sequoia-arm64-sha256.txt`
-- `decodium3-ft2-1.5.0-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-1.5.0-macos-sequoia-x86_64.zip`
-- `decodium3-ft2-1.5.0-macos-sequoia-x86_64-sha256.txt`
-- `decodium3-ft2-1.5.0-macos-monterey-x86_64.dmg` *(best effort/sperimentale, se generato)*
-- `decodium3-ft2-1.5.0-macos-monterey-x86_64.zip` *(best effort/sperimentale, se generato)*
-- `decodium3-ft2-1.5.0-macos-monterey-x86_64-sha256.txt` *(best effort/sperimentale, se generato)*
-- `decodium3-ft2-1.5.0-linux-x86_64.AppImage`
-- `decodium3-ft2-1.5.0-linux-x86_64.AppImage.sha256.txt`
+- `decodium3-ft2-1.5.1-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-1.5.1-macos-tahoe-arm64.zip`
+- `decodium3-ft2-1.5.1-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-1.5.1-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-1.5.1-macos-sequoia-arm64.zip`
+- `decodium3-ft2-1.5.1-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-1.5.1-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-1.5.1-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-1.5.1-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-1.5.1-macos-monterey-x86_64.dmg` *(best effort/sperimentale, se generato)*
+- `decodium3-ft2-1.5.1-macos-monterey-x86_64.zip` *(best effort/sperimentale, se generato)*
+- `decodium3-ft2-1.5.1-macos-monterey-x86_64-sha256.txt` *(best effort/sperimentale, se generato)*
+- `decodium3-ft2-1.5.1-linux-x86_64.AppImage`
+- `decodium3-ft2-1.5.1-linux-x86_64.AppImage.sha256.txt`
 
 ## Requisiti Minimi Linux
 
@@ -62,7 +59,7 @@ Software:
 - `libfuse2` / FUSE2
 - ALSA, PulseAudio o PipeWire
 - ambiente desktop capace di eseguire AppImage Qt5
-- accesso rete consigliato per NTP, DX Cluster e workflow online
+- accesso rete consigliato per NTP, DX Cluster e PSK Reporter
 
 ## Guida Avvio
 
@@ -88,6 +85,6 @@ cd squashfs-root
 - [README.md](README.md)
 - [README.en-GB.md](README.en-GB.md)
 - [README.es.md](README.es.md)
-- [RELEASE_NOTES_1.5.0.md](RELEASE_NOTES_1.5.0.md)
-- [doc/GITHUB_RELEASE_BODY_1.5.0.md](doc/GITHUB_RELEASE_BODY_1.5.0.md)
+- [RELEASE_NOTES_1.5.1.md](RELEASE_NOTES_1.5.1.md)
+- [doc/GITHUB_RELEASE_BODY_1.5.1.md](doc/GITHUB_RELEASE_BODY_1.5.1.md)
 - [CHANGELOG.md](CHANGELOG.md)

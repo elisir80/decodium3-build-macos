@@ -865,10 +865,13 @@ private:
   void processNextInQueue ();
   void refreshCallerQueueDisplay ();
   bool isRecentAutoCqDuplicate (QString const& call) const;
+  void rememberRecentAutoCqAbandoned (QString const& call, Frequency dialFreq, QString const& mode);
   void rememberRecentAutoCqWorked (QString const& call, Frequency dialFreq, QString const& mode);
   void removeCallerFromQueue (QString const& call);
   void capturePendingAutoLogSnapshot ();
   void clearPendingAutoLogSnapshot ();
+  void armLateAutoLogSnapshot ();
+  void clearLateAutoLogSnapshot ();
   void clearAutoCqPartnerLock ();
   void updateAutoCqPartnerLock ();
   void restoreAutoCqPartnerLock ();
@@ -902,6 +905,15 @@ private:
   bool loadDecodiumCertificateFile (QString const& path, bool rememberPath, bool interactive);
   void autoLoadDecodiumCertificate ();
   void updateDecodiumCertificateStatus ();
+  void ensureUpdateCheckAction ();
+  void scheduleStartupUpdateCheck ();
+  void startUpdateCheck (bool manual);
+  void handleUpdateCheckReply (QPointer<QNetworkReply>, bool manual);
+  QUrl bestReleaseDownloadUrl (QJsonObject const& release, QString * assetName = nullptr) const;
+  void showUpdateAvailableDialog (QString const& latestVersion, QUrl const& downloadUrl,
+                                  QString const& downloadLabel, QUrl const& releaseUrl,
+                                  QString const& releaseName, QString const& releaseNotes);
+  bool shouldPromptForUpdate (QString const& latestVersion) const;
   void dxpedLoadCertificate ();
   void dxpedLoadSlot   (int slot);
   int  dxpedTxSequencer();
@@ -912,9 +924,12 @@ private:
   bool      m_bDXpedCertified {false};
   DecodiumCertificate m_decodiumCert;
   QString   m_decodiumCertPath;
+  QPointer<QNetworkReply> m_updateCheckReply;
+  bool      m_updateCheckInteractivePending {false};
 
   bool    m_bAutoReply;
   QString m_lastloggedcall; //ft8md
+  QHash<QString, QDateTime> m_recentAutoCqAbandonedUtcByKey;
   QHash<QString, QDateTime> m_recentAutoCqWorkedUtcByKey;
   QHash<QString, QDateTime> m_recentQsoLogUtcByKey;
   bool    m_autoSpotEnabled {false};
@@ -1086,6 +1101,16 @@ private:
   QString m_pendingAutoLogXRcvd;
   QDateTime m_pendingAutoLogOn;
   Radio::Frequency m_pendingAutoLogDialFreq {0};
+  bool m_lateAutoLogValid {false};
+  QString m_lateAutoLogCall;
+  QString m_lateAutoLogGrid;
+  QString m_lateAutoLogRptSent;
+  QString m_lateAutoLogRptRcvd;
+  QString m_lateAutoLogXSent;
+  QString m_lateAutoLogXRcvd;
+  QDateTime m_lateAutoLogOn;
+  Radio::Frequency m_lateAutoLogDialFreq {0};
+  QDateTime m_lateAutoLogExpires;
   QString m_appDir;
   QString m_cqStr;
   QString m_palette;

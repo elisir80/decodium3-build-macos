@@ -1,36 +1,35 @@
-# Note di Documentazione (Italiano) - 1.5.0
+# Note di Documentazione (Italiano) - 1.5.1
 
 Questo indice raccoglie la documentazione release-oriented del ciclo corrente del fork.
 
-- Release corrente: `1.5.0`
-- Ciclo aggiornamento: `1.4.9 -> 1.5.0`
-- Focus principale: recovery audio all'avvio, correttezza QSO FT8/FT4/FT2, stabilita' AutoCQ, Quick QSO FT2, sync decoder e tooling certificati.
+- Release corrente: `1.5.1`
+- Ciclo aggiornamento: `1.5.0 -> 1.5.1`
+- Focus principale: updater interno, correttezza late-signoff FT2/FT4/FT8, hardening AutoCQ sulle direct reply, pulizia mappa e allineamento PSK Reporter.
 
-## Cambi Tecnici Principali (`1.4.9 -> 1.5.0`)
+## Cambi Tecnici Principali (`1.5.0 -> 1.5.1`)
 
-- recovery automatico RX audio all'avvio quando le periferiche salvate sono presenti ma l'RX resta muto.
-- fix del `73` finale in FT8, FT4 e FT2 standard.
-- refactor FT2 Quick QSO e bottone `Quick QSO` agganciato a FT2 `2 msg`.
-- prevenzione duplicate-rework AutoCQ, reset stato queue e conteggio retry su periodi reali.
-- decoder LDPC dedicato FT2 e allineamento decoder condivisi Normalized Min-Sum.
-- supporto certificati Decodium e tool `tools/generate_cert.py`.
+- checker update GitHub integrato con scelta diretta dell'asset corretto per macOS/Linux.
+- recovery late-signoff FT2/FT4/FT8 cosi' `73/RR73` ritardati possono ancora andare a log.
+- fix AutoCQ sui caller diretti quando si esce da CQ e si deve armare subito `Tx2`.
+- fix del report stantio sul primo reply FT2 diretto.
+- pulizia mappa in CQ e allineamento stringa titolo usata verso PSK Reporter.
 
 ## Artifact Release
 
-- `decodium3-ft2-1.5.0-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-1.5.0-macos-tahoe-arm64.zip`
-- `decodium3-ft2-1.5.0-macos-tahoe-arm64-sha256.txt`
-- `decodium3-ft2-1.5.0-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-1.5.0-macos-sequoia-arm64.zip`
-- `decodium3-ft2-1.5.0-macos-sequoia-arm64-sha256.txt`
-- `decodium3-ft2-1.5.0-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-1.5.0-macos-sequoia-x86_64.zip`
-- `decodium3-ft2-1.5.0-macos-sequoia-x86_64-sha256.txt`
-- `decodium3-ft2-1.5.0-macos-monterey-x86_64.dmg` *(best effort/sperimentale, se generato)*
-- `decodium3-ft2-1.5.0-macos-monterey-x86_64.zip` *(best effort/sperimentale, se generato)*
-- `decodium3-ft2-1.5.0-macos-monterey-x86_64-sha256.txt` *(best effort/sperimentale, se generato)*
-- `decodium3-ft2-1.5.0-linux-x86_64.AppImage`
-- `decodium3-ft2-1.5.0-linux-x86_64.AppImage.sha256.txt`
+- `decodium3-ft2-1.5.1-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-1.5.1-macos-tahoe-arm64.zip`
+- `decodium3-ft2-1.5.1-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-1.5.1-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-1.5.1-macos-sequoia-arm64.zip`
+- `decodium3-ft2-1.5.1-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-1.5.1-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-1.5.1-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-1.5.1-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-1.5.1-macos-monterey-x86_64.dmg` *(best effort/sperimentale, se generato)*
+- `decodium3-ft2-1.5.1-macos-monterey-x86_64.zip` *(best effort/sperimentale, se generato)*
+- `decodium3-ft2-1.5.1-macos-monterey-x86_64-sha256.txt` *(best effort/sperimentale, se generato)*
+- `decodium3-ft2-1.5.1-linux-x86_64.AppImage`
+- `decodium3-ft2-1.5.1-linux-x86_64.AppImage.sha256.txt`
 
 ## Requisiti Minimi Linux
 
@@ -64,6 +63,6 @@ cd squashfs-root
 - [README.en-GB.md](../README.en-GB.md)
 - [README.it.md](../README.it.md)
 - [README.es.md](../README.es.md)
-- [RELEASE_NOTES_1.5.0.md](../RELEASE_NOTES_1.5.0.md)
-- [doc/GITHUB_RELEASE_BODY_1.5.0.md](./GITHUB_RELEASE_BODY_1.5.0.md)
+- [RELEASE_NOTES_1.5.1.md](../RELEASE_NOTES_1.5.1.md)
+- [doc/GITHUB_RELEASE_BODY_1.5.1.md](./GITHUB_RELEASE_BODY_1.5.1.md)
 - [CHANGELOG.md](../CHANGELOG.md)

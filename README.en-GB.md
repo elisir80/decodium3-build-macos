@@ -1,50 +1,46 @@
-# Decodium 3 FT2 (macOS/Linux Fork) - 1.5.0
+# Decodium 3 FT2 (macOS/Linux Fork) - 1.5.1
 
-This fork packages Decodium 3 FT2 for macOS and Linux AppImage, with FT2 Quick QSO work, QSO-sequencing fixes, AutoCQ stability improvements, decoder updates, and Decodium certificate tooling maintained in this repository.
+This fork packages Decodium 3 FT2 for macOS and Linux AppImage, with FT2/FT4/FT8 QSO-closing fixes, AutoCQ state-machine hardening, internal update checks, upstream decoder sync, and Decodium certificate tooling maintained in this repository.
 
-Current stable release: `1.5.0`.
+Current stable release: `1.5.1`.
 
-## Changes in 1.5.0 (`1.4.9 -> 1.5.0`)
+## Changes in 1.5.1 (`1.5.0 -> 1.5.1`)
 
-- Audio startup:
-- automatic RX audio recovery added when devices are selected but startup still comes up silent.
-- audio stream reopen and monitor re-arm logic now mirror the manual "Audio Preferences -> OK" recovery path.
+- Internal updater:
+- added GitHub release checks at startup and a manual `Help > Check for updates...` action.
+- the updater now resolves the best-matching macOS/Linux asset directly instead of opening only the generic release page.
 - QSO flow and logging:
-- fixed final `73` behaviour in FT8, FT4, and FT2 standard 5-message flows when the other station sends `RR73` or `73` first.
-- fixed multiple FT2 Quick QSO logging paths, including late log-after-own-73 fallback.
-- DX map and active DX fields now clear correctly when the app returns to CQ after a completed QSO.
+- fixed several FT2/FT4/FT8 late-signoff paths where the app could keep sending `73/RR73`, miss the final log, or fail to recover a delayed close.
+- fixed the path where the remote final `73/RR73` arrived after the local station had already sent its own signoff.
+- improved late-final-ack recovery after timeout so delayed `73/RR73` from the active partner can still be logged correctly.
 - AutoCQ:
-- duplicate rework protection now blocks recently completed calls on every caller-selection path.
-- queue handoff resets stale retry counters, reports, and caller state before the next QSO begins.
-- FT8 retry timeout now counts actual missed periods only.
-- `debug.txt` now records AutoCQ partner changes, queue starts, handoffs, retry progression, and recent-work skips.
-- FT2 protocol/runtime:
-- imported upstream watchdog rescue fix.
-- added dedicated FT2 LDPC decoder file and routed FT2 triggered decode to it.
-- aligned shared LDPC decoders to the upstream Normalized Min-Sum decoder refresh.
-- Quick QSO:
-- `Quick QSO` button added as a UI alias for FT2 `2 msg`.
-- current Quick QSO flow is aligned to the short schema requested for FT2 while keeping backward compatibility for older `TU` variants.
-- Certificates/tooling:
-- added Decodium certificate loader/autoload and main-window status indicator.
-- added `tools/generate_cert.py` to generate `.decodium` certificate files.
+- fixed stale partner reuse after returning to CQ.
+- fixed direct-caller cases that were decoded correctly but still left the app transmitting CQ instead of arming `Tx2`.
+- fixed the first direct FT2 reply using a stale report value from the previous QSO instead of the current caller SNR.
+- expanded recent-work and abandoned-partner suppression to reduce duplicate rework after deferred closures.
+- Map and identity:
+- fixed the live world map showing a fake active QSO path while transmitting plain CQ.
+- aligned the PSK Reporter program identifier to the exact title-bar string shown by the application.
+- Diagnostics/process:
+- expanded `debug.txt` tracing for direct-caller arming, stale-partner cleanup, late signoff recovery, and updater asset selection.
+- local UI version, workflow defaults, and release documents are now aligned to semantic version `1.5.1`.
 
 ## Release Artifacts
 
-- `decodium3-ft2-1.5.0-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-1.5.0-macos-tahoe-arm64.zip`
-- `decodium3-ft2-1.5.0-macos-tahoe-arm64-sha256.txt`
-- `decodium3-ft2-1.5.0-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-1.5.0-macos-sequoia-arm64.zip`
-- `decodium3-ft2-1.5.0-macos-sequoia-arm64-sha256.txt`
-- `decodium3-ft2-1.5.0-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-1.5.0-macos-sequoia-x86_64.zip`
-- `decodium3-ft2-1.5.0-macos-sequoia-x86_64-sha256.txt`
-- `decodium3-ft2-1.5.0-macos-monterey-x86_64.dmg` *(best effort/experimental, if generated)*
-- `decodium3-ft2-1.5.0-macos-monterey-x86_64.zip` *(best effort/experimental, if generated)*
-- `decodium3-ft2-1.5.0-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, if generated)*
-- `decodium3-ft2-1.5.0-linux-x86_64.AppImage`
-- `decodium3-ft2-1.5.0-linux-x86_64.AppImage.sha256.txt`
+- `decodium3-ft2-1.5.1-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-1.5.1-macos-tahoe-arm64.zip`
+- `decodium3-ft2-1.5.1-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-1.5.1-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-1.5.1-macos-sequoia-arm64.zip`
+- `decodium3-ft2-1.5.1-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-1.5.1-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-1.5.1-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-1.5.1-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-1.5.1-macos-monterey-x86_64.dmg` *(best effort/experimental, if generated)*
+- `decodium3-ft2-1.5.1-macos-monterey-x86_64.zip` *(best effort/experimental, if generated)*
+- `decodium3-ft2-1.5.1-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, if generated)*
+- `decodium3-ft2-1.5.1-linux-x86_64.AppImage`
+- `decodium3-ft2-1.5.1-linux-x86_64.AppImage.sha256.txt`
 
 ## Linux Minimum Requirements
 
@@ -62,7 +58,7 @@ Software:
 - `libfuse2` / FUSE2
 - ALSA, PulseAudio, or PipeWire
 - Qt5-capable desktop environment
-- network access recommended for NTP/DX Cluster workflows
+- network access recommended for NTP, DX Cluster, and PSK Reporter workflows
 
 ## Startup Guidance
 
@@ -88,6 +84,6 @@ cd squashfs-root
 - [README.md](README.md)
 - [README.it.md](README.it.md)
 - [README.es.md](README.es.md)
-- [RELEASE_NOTES_1.5.0.md](RELEASE_NOTES_1.5.0.md)
-- [doc/GITHUB_RELEASE_BODY_1.5.0.md](doc/GITHUB_RELEASE_BODY_1.5.0.md)
+- [RELEASE_NOTES_1.5.1.md](RELEASE_NOTES_1.5.1.md)
+- [doc/GITHUB_RELEASE_BODY_1.5.1.md](doc/GITHUB_RELEASE_BODY_1.5.1.md)
 - [CHANGELOG.md](CHANGELOG.md)
