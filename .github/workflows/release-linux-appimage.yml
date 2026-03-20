@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. 1.5.1)"
-        required: true
-        default: "1.5.1"
+        description: "Release version (leave empty to use fork_release_version.txt)"
+        required: false
+        default: ""
       publish_release:
         description: "Upload AppImage to GitHub release"
         required: true
@@ -28,8 +28,10 @@ jobs:
 
       - name: Select version
         run: |
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && -n "${{ github.event.inputs.version }}" ]]; then
             VERSION="${{ github.event.inputs.version }}"
+          elif [[ -f fork_release_version.txt ]]; then
+            VERSION="$(tr -d '\r\n' < fork_release_version.txt)"
           else
             VERSION="0.0.0-ci-${GITHUB_SHA::7}"
           fi

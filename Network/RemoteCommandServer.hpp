@@ -40,6 +40,11 @@ public:
     bool asyncL2Enabled {false};
     bool dualCarrierEnabled {false};
     bool alt12Enabled {false};
+    bool manualTxEnabled {false};
+    bool speedyContestEnabled {false};
+    bool digitalMorseEnabled {false};
+    bool quickQsoEnabled {false};
+    int ft2QsoMessageCount {5};
     bool monitoring {false};
     bool transmitting {false};
     QString myCall;
@@ -84,6 +89,11 @@ Q_SIGNALS:
   void setAsyncL2Requested(QString const& commandId, bool enabled);
   void setDualCarrierRequested(QString const& commandId, bool enabled);
   void setAlt12Requested(QString const& commandId, bool enabled);
+  void setManualTxRequested(QString const& commandId, bool enabled);
+  void setSpeedyContestRequested(QString const& commandId, bool enabled);
+  void setDigitalMorseRequested(QString const& commandId, bool enabled);
+  void setQuickQsoRequested(QString const& commandId, bool enabled);
+  void setFt2QsoMessageCountRequested(QString const& commandId, int count);
   void waterfallStreamingChanged(bool enabled);
   void logMessage(QString const& message) const;
 

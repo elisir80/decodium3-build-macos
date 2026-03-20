@@ -1,5 +1,85 @@
 # Changelog / Registro Modifiche
 
+## [1.5.2] - 2026-03-20
+
+### English
+
+Release focused on FT2 decoder/protocol refresh, FT2/FT4/FT8 QSO-closing stability, startup audio recovery, web-app parity, complete UI translations, and release/version alignment.
+
+#### Added
+
+- Added the Decodium certificate generator `tools/generate_cert.py`.
+- Added web-app controls for `Manual TX`, `Speedy`, `D-CW`, async status, `Quick QSO`, and FT2 `2/3/5 msg`.
+- Added direct-asset selection in the internal updater for the current macOS/Linux platform.
+
+#### Changed
+
+- FT2 decoder code is aligned to the dedicated upstream FT2 LDPC path and refreshed FT2 bitmetrics support.
+- FT2 `Quick QSO` / `2 msg` / `3 msg` / `5 msg` flow is aligned to the current short-QSO behaviour with mixed-mode TU support.
+- UI translations bundled with the app are now complete with no unfinished menu/popup strings.
+- Release versioning is now centrally driven by `fork_release_version.txt`.
+
+#### Fixed
+
+- Fixed multiple FT2/FT4/FT8 late-signoff, late-final-ack, retry, and stale-partner paths that could block logging or repeat `73` / `RR73`.
+- Fixed the `Wait Features + AutoSeq` active-QSO lock for FT4/FT8 so queued calling logic does not interrupt a running contact.
+- Fixed startup and wake-from-sleep RX-audio recovery by tying health checks to the real monitor-on transition.
+- Fixed stale reports or stale callsigns when AutoCQ moves from CQ to a direct caller or from one queued caller to another.
+- Fixed FT2 async/sync duplicate display and removed visible FT2 async decoder tags (`T`, `aN`) from decode panes.
+- Fixed release/version drift between local UI, workflows, and GitHub release publication.
+
+### Italiano
+
+Release focalizzata su refresh decoder/protocollo FT2, stabilita' di chiusura QSO FT2/FT4/FT8, recovery audio all'avvio, parita' web app, traduzioni UI complete e allineamento versione/release.
+
+#### Aggiunto
+
+- Aggiunto il generatore certificati Decodium `tools/generate_cert.py`.
+- Aggiunti nella web app i controlli `Manual TX`, `Speedy`, `D-CW`, stato async, `Quick QSO` e FT2 `2/3/5 msg`.
+- Aggiunta nell'updater interno la selezione diretta dell'asset corretto per la piattaforma macOS/Linux corrente.
+
+#### Modificato
+
+- Il codice decoder FT2 e' allineato al path LDPC FT2 dedicato upstream con supporto bitmetrics FT2 aggiornato.
+- Il flow FT2 `Quick QSO` / `2 msg / 3 msg / 5 msg` e' allineato al comportamento corrente del QSO corto con supporto TU mixed-mode.
+- Le traduzioni UI bundle sono ora complete senza stringhe menu/popup `unfinished`.
+- Il versioning release e' ora centralizzato tramite `fork_release_version.txt`.
+
+#### Corretto
+
+- Corretti molteplici path FT2/FT4/FT8 di late-signoff, late-final-ack, retry e partner stantio che potevano bloccare il log o ripetere `73` / `RR73`.
+- Corretto il lock QSO attivo di `Wait Features + AutoSeq` per FT4/FT8, cosi' la logica di chiamata in coda non interrompe un collegamento in corso.
+- Corretto il recovery RX-audio all'avvio e al wake agganciando gli health-check alla reale transizione monitor-on.
+- Corretti report e callsign stantii quando AutoCQ passa dal CQ a un caller diretto o da un caller in coda al successivo.
+- Corretta la visualizzazione duplicata async/sync FT2 e rimossi dalle decode panes i tag FT2 async visibili (`T`, `aN`).
+- Corretto il disallineamento di versione/release tra UI locale, workflow e pubblicazione GitHub.
+
+### Espanol
+
+Release centrada en refresh decoder/protocolo FT2, estabilidad de cierre QSO FT2/FT4/FT8, recuperacion de audio al arranque, paridad web app, traducciones UI completas y alineacion version/release.
+
+#### Anadido
+
+- Anadido el generador de certificados Decodium `tools/generate_cert.py`.
+- Anadidos en la web app los controles `Manual TX`, `Speedy`, `D-CW`, estado async, `Quick QSO` y FT2 `2/3/5 msg`.
+- Anadida en el updater interno la seleccion directa del asset correcto para la plataforma macOS/Linux actual.
+
+#### Cambios
+
+- El codigo decoder FT2 queda alineado al path LDPC FT2 dedicado upstream con soporte bitmetrics FT2 actualizado.
+- El flow FT2 `Quick QSO` / `2 msg / 3 msg / 5 msg` queda alineado al comportamiento actual del QSO corto con soporte TU mixed-mode.
+- Las traducciones UI bundle quedan completas sin cadenas menu/popup `unfinished`.
+- El versionado release pasa a estar centralizado mediante `fork_release_version.txt`.
+
+#### Corregido
+
+- Corregidos multiples paths FT2/FT4/FT8 de late-signoff, late-final-ack, retry y partner obsoleto que podian bloquear el log o repetir `73` / `RR73`.
+- Corregido el lock de QSO activo de `Wait Features + AutoSeq` para FT4/FT8 para que la logica de llamada en cola no interrumpa un contacto en curso.
+- Corregida la recuperacion RX-audio al arranque y al wake ligando los health-check a la transicion real monitor-on.
+- Corregidos reportes y callsigns obsoletos cuando AutoCQ pasa de CQ a un caller directo o de un caller en cola al siguiente.
+- Corregida la visualizacion duplicada async/sync FT2 y eliminados de las decode panes los tags FT2 async visibles (`T`, `aN`).
+- Corregido el desalineamiento version/release entre UI local, workflows y publicacion GitHub.
+
 ## [1.5.1] - 2026-03-19
 
 ### English

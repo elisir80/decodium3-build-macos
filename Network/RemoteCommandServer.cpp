@@ -22,6 +22,7 @@
 #include <limits>
 
 #include "PrecisionTime.hpp"
+#include "revision_utils.hpp"
 
 namespace
 {
@@ -191,9 +192,37 @@ R"FT2HTML(<!doctype html>
 
       <div class="mode-row emission-row">
         <div class="group-title">Emission Options</div>
-        <div id="ft2_controls" class="btn-grid emission-grid hidden">
-          <button id="btn_async_l2" type="button">Async L2</button>
-          <button id="btn_dual_carrier" type="button">Dual Carrier</button>
+        <div id="ft2_controls" class="ft2-stack hidden">
+          <label class="ft2-check">
+            <input id="chk_manual_tx" type="checkbox" />
+            <span>Manual TX</span>
+          </label>
+          <label class="ft2-check">
+            <input id="chk_speedy" type="checkbox" />
+            <span>Speedy</span>
+          </label>
+          <label class="ft2-check">
+            <input id="chk_digital_morse" type="checkbox" />
+            <span>D-CW</span>
+          </label>
+          <div id="async_card" class="async-card" role="status" aria-live="polite">
+            <div class="async-card-title">ASYNC</div>
+            <div class="async-card-wave" aria-hidden="true">
+              <span></span><span></span><span></span>
+            </div>
+            <div id="async_card_meta" class="async-card-meta">--- dB</div>
+          </div>
+          <label class="ft2-qso-label" for="ft2_qso_count">QSO:</label>
+          <button id="btn_quick_qso" type="button">Quick QSO</button>
+          <select id="ft2_qso_count">
+            <option value="2">2 msg</option>
+            <option value="3">3 msg</option>
+            <option value="5">5 msg</option>
+          </select>
+          <div class="btn-grid emission-grid">
+            <button id="btn_async_l2" type="button">Async L2</button>
+            <button id="btn_dual_carrier" type="button">Dual Carrier</button>
+          </div>
         </div>
         <div id="alt_controls" class="btn-grid emission-grid hidden">
           <button id="btn_alt_12" type="button">Alt 1/2</button>
@@ -364,12 +393,97 @@ input,select{width:100%;padding:8px;border-radius:8px;border:1px solid #37567f;b
 #activity_body tr.tx-row:hover td{background:#fff9a8}
 
 .control label{display:block;font-size:.8rem;color:var(--muted);margin:8px 0 4px}
+.ft2-stack{
+  display:grid;
+  gap:10px;
+  max-width:340px;
+}
+.ft2-check{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:1rem;
+  color:var(--text);
+}
+.ft2-check input{
+  width:18px;
+  height:18px;
+  accent-color:#2ce59b;
+}
+.ft2-qso-label{
+  color:var(--text);
+  font-size:1rem;
+}
+#btn_quick_qso,
+#ft2_qso_count{
+  width:100%;
+}
+#ft2_qso_count{
+  background:#0d1828;
+  color:var(--text);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:12px 14px;
+  font-size:1rem;
+}
+.async-card{
+  width:176px;
+  min-height:102px;
+  padding:8px 10px 10px;
+  border-radius:14px;
+  border:1px solid #334561;
+  background:linear-gradient(180deg,#151d31 0%,#11182a 100%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.03);
+}
+.async-card.active{
+  border-color:#00d27c;
+  box-shadow:0 0 0 1px rgba(0,210,124,.3), 0 14px 30px rgba(0,0,0,.25);
+}
+.async-card-title{
+  color:#00e98a;
+  font-weight:800;
+  letter-spacing:.12em;
+  font-size:.82rem;
+  margin-bottom:10px;
+}
+.async-card-wave{
+  height:44px;
+  display:flex;
+  align-items:flex-end;
+  gap:10px;
+  overflow:hidden;
+}
+.async-card-wave span{
+  flex:1 1 0;
+  min-width:0;
+  border-radius:999px;
+  background:linear-gradient(180deg,#15f0a0 0%,#00c676 100%);
+  animation:asyncPulse 1.35s ease-in-out infinite;
+  opacity:.92;
+}
+.async-card-wave span:nth-child(1){height:22px;animation-delay:0s}
+.async-card-wave span:nth-child(2){height:36px;animation-delay:.18s}
+.async-card-wave span:nth-child(3){height:28px;animation-delay:.32s}
+.async-card.idle .async-card-wave span{
+  animation-play-state:paused;
+  opacity:.35;
+}
+.async-card-meta{
+  margin-top:10px;
+  color:#dfe8ff;
+  font-size:.86rem;
+}
+@keyframes asyncPulse{
+  0%,100%{transform:translateY(0) scaleY(.82)}
+  50%{transform:translateY(-2px) scaleY(1.08)}
+}
 @media (max-width:1220px){
   .freq-row{grid-template-columns:1fr}
   .kv-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
   .btn-grid{grid-template-columns:repeat(8,minmax(0,1fr))}
   .emission-grid{grid-template-columns:repeat(2,minmax(0,1fr));max-width:none}
   #alt_controls.emission-grid{grid-template-columns:1fr}
+  .ft2-stack{max-width:none}
   .split{grid-template-columns:1fr}
 }
 @media (max-width:760px){
@@ -379,6 +493,7 @@ input,select{width:100%;padding:8px;border-radius:8px;border:1px solid #37567f;b
   .btn-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
   .emission-grid{grid-template-columns:repeat(2,minmax(0,1fr));max-width:none}
   #alt_controls.emission-grid{grid-template-columns:1fr}
+  .async-card{width:100%}
   .quick-row{grid-template-columns:1fr}
   #activity_table th,#activity_table td{padding:3px 4px;font-size:.74rem}
   #activity_table th:nth-child(1),#activity_table td:nth-child(1){width:62px}
@@ -395,7 +510,7 @@ input,select{width:100%;padding:8px;border-radius:8px;border:1px solid #37567f;b
 
 QByteArray dashboard_js()
 {
-  return QByteArrayLiteral(
+  return QString::fromLatin1(
 R"FT2JS((() => {
   const el = (id) => document.getElementById(id);
   const conn = el('conn');
@@ -420,6 +535,13 @@ R"FT2JS((() => {
   const btnAsyncL2 = el('btn_async_l2');
   const btnDualCarrier = el('btn_dual_carrier');
   const btnAlt12 = el('btn_alt_12');
+  const chkManualTx = el('chk_manual_tx');
+  const chkSpeedy = el('chk_speedy');
+  const chkDigitalMorse = el('chk_digital_morse');
+  const btnQuickQso = el('btn_quick_qso');
+  const ft2QsoCount = el('ft2_qso_count');
+  const asyncCard = el('async_card');
+  const asyncCardMeta = el('async_card_meta');
   const ft2Controls = el('ft2_controls');
   const altControls = el('alt_controls');
   const btnInstall = el('btn_install');
@@ -455,7 +577,7 @@ R"FT2JS((() => {
   const AUTH_TTL_MS = 30 * 60 * 1000;
   const AUTH_STORAGE_KEY = 'ft2_remote_auth_v1';
   const MODE_FREQ_STORAGE_KEY = 'ft2_remote_mode_freq_v1';
-  const SW_VERSION = '1.5.0';
+  const SW_VERSION = '%1';
   const MODE_PRESET_MODES = ['FT2','FT8','FT4','MSK144','Q65','JT65','JT9','FST4','WSPR'];
   let activeMode = '';
   let activeBand = '';
@@ -473,9 +595,16 @@ R"FT2JS((() => {
   let asyncL2Enabled = false;
   let dualCarrierEnabled = false;
   let alt12Enabled = false;
+  let manualTxEnabled = false;
+  let speedyContestEnabled = false;
+  let digitalMorseEnabled = false;
+  let quickQsoEnabled = false;
+  let ft2QsoMessageCount = 5;
   let waterfallEnabled = false;
   let waterfallMeta = {startHz:0, spanHz:0, width:0};
   let currentMode = '';
+  let monitoringState = false;
+  let transmittingState = false;
   let currentRxHz = 0;
   let currentTxHz = 0;
   let pendingRxHz = null;
@@ -792,6 +921,37 @@ R"FT2JS((() => {
     }
   }
 
+  function applyFt2ControlsState() {
+    if (chkManualTx) chkManualTx.checked = !!manualTxEnabled;
+    if (chkSpeedy) chkSpeedy.checked = !!speedyContestEnabled;
+    if (chkDigitalMorse) chkDigitalMorse.checked = !!digitalMorseEnabled;
+    if (btnQuickQso) {
+      btnQuickQso.classList.toggle('active', !!quickQsoEnabled);
+      btnQuickQso.textContent = quickQsoEnabled ? 'Quick QSO ON' : 'Quick QSO';
+    }
+    if (ft2QsoCount) {
+      ft2QsoCount.value = String(ft2QsoMessageCount || 5);
+    }
+    if (asyncCard) {
+      const isFt2 = (currentMode || '').toUpperCase() === 'FT2';
+      const active = isFt2 && !!asyncL2Enabled;
+      asyncCard.classList.toggle('active', active);
+      asyncCard.classList.toggle('idle', !active);
+    }
+    if (asyncCardMeta) {
+      const isFt2 = (currentMode || '').toUpperCase() === 'FT2';
+      if (!isFt2) {
+        asyncCardMeta.textContent = 'FT2 only';
+      } else if (transmittingState) {
+        asyncCardMeta.textContent = 'TX running';
+      } else if (monitoringState) {
+        asyncCardMeta.textContent = asyncL2Enabled ? 'Async L2 On' : 'RX idle';
+      } else {
+        asyncCardMeta.textContent = asyncL2Enabled ? 'Async ready' : '--- dB';
+      }
+    }
+  }
+
   function updateAutoCqState(enabled) {
     autoCqEnabled = !!enabled;
     applyAutoCqButtonState();
@@ -812,8 +972,14 @@ R"FT2JS((() => {
     if (typeof s.async_l2_enabled === 'boolean') asyncL2Enabled = s.async_l2_enabled;
     if (typeof s.dual_carrier_enabled === 'boolean') dualCarrierEnabled = s.dual_carrier_enabled;
     if (typeof s.alt_12_enabled === 'boolean') alt12Enabled = s.alt_12_enabled;
+    if (typeof s.manual_tx_enabled === 'boolean') manualTxEnabled = s.manual_tx_enabled;
+    if (typeof s.speedy_contest_enabled === 'boolean') speedyContestEnabled = s.speedy_contest_enabled;
+    if (typeof s.digital_morse_enabled === 'boolean') digitalMorseEnabled = s.digital_morse_enabled;
+    if (typeof s.quick_qso_enabled === 'boolean') quickQsoEnabled = s.quick_qso_enabled;
+    if (typeof s.ft2_qso_message_count === 'number') ft2QsoMessageCount = Number(s.ft2_qso_message_count) || 5;
     applyEmissionControlVisibility();
     applyEmissionButtonsState();
+    applyFt2ControlsState();
   }
 
   function updateWaterfallState(enabled) {
@@ -945,6 +1111,7 @@ R"FT2JS((() => {
   applyTxButtonsState();
   applyEmissionControlVisibility();
   applyEmissionButtonsState();
+  applyFt2ControlsState();
 
   function setConnectionState(isConnected, text) {
     conn.textContent = text || (isConnected ? 'connesso' : 'disconnesso');
@@ -1298,6 +1465,8 @@ R"FT2JS((() => {
     set('st_txen', s.tx_enabled ? 'yes' : 'no');
     set('st_mon', s.monitoring ? 'yes' : 'no');
     set('st_trx', s.transmitting ? 'yes' : 'no');
+    monitoringState = !!s.monitoring;
+    transmittingState = !!s.transmitting;
     updateTxBadge(s.transmitting, s.tx_enabled);
     updateTxPeer(s.transmitting, (s.dx_call || '').toString().trim().toUpperCase());
     if (typeof s.transmitting === 'boolean') {
@@ -1336,6 +1505,7 @@ R"FT2JS((() => {
       updateWaterfallState(s.waterfall_enabled);
     }
     updateModeSpecificControlState(s);
+    applyFt2ControlsState();
     drawWaterfallOverlay();
     refreshButtonHighlights();
   }
@@ -1387,6 +1557,28 @@ R"FT2JS((() => {
     if (type === 'set_alt_12' && typeof j.enabled === 'boolean') {
       alt12Enabled = !!j.enabled;
       applyEmissionButtonsState();
+    }
+    if (type === 'set_manual_tx' && typeof j.enabled === 'boolean') {
+      manualTxEnabled = !!j.enabled;
+      applyFt2ControlsState();
+    }
+    if (type === 'set_speedy_contest' && typeof j.enabled === 'boolean') {
+      speedyContestEnabled = !!j.enabled;
+      applyFt2ControlsState();
+    }
+    if (type === 'set_digital_morse' && typeof j.enabled === 'boolean') {
+      digitalMorseEnabled = !!j.enabled;
+      applyFt2ControlsState();
+    }
+    if (type === 'set_quick_qso' && typeof j.enabled === 'boolean') {
+      quickQsoEnabled = !!j.enabled;
+      if (quickQsoEnabled) ft2QsoMessageCount = 2;
+      applyFt2ControlsState();
+    }
+    if (type === 'set_ft2_qso_msg_count' && typeof j.count === 'number') {
+      ft2QsoMessageCount = Number(j.count) || 5;
+      quickQsoEnabled = ft2QsoMessageCount === 2;
+      applyFt2ControlsState();
     }
     if (type === 'set_rx_frequency' && typeof j.rx_frequency_hz === 'number') {
       currentRxHz = Number(j.rx_frequency_hz);
@@ -1511,6 +1703,28 @@ R"FT2JS((() => {
           alt12Enabled = !!m.enabled;
           applyEmissionButtonsState();
         }
+        if (type === 'set_manual_tx' && typeof m.enabled === 'boolean') {
+          manualTxEnabled = !!m.enabled;
+          applyFt2ControlsState();
+        }
+        if (type === 'set_speedy_contest' && typeof m.enabled === 'boolean') {
+          speedyContestEnabled = !!m.enabled;
+          applyFt2ControlsState();
+        }
+        if (type === 'set_digital_morse' && typeof m.enabled === 'boolean') {
+          digitalMorseEnabled = !!m.enabled;
+          applyFt2ControlsState();
+        }
+        if (type === 'set_quick_qso' && typeof m.enabled === 'boolean') {
+          quickQsoEnabled = !!m.enabled;
+          if (quickQsoEnabled) ft2QsoMessageCount = 2;
+          applyFt2ControlsState();
+        }
+        if (type === 'set_ft2_qso_msg_count' && typeof m.count === 'number') {
+          ft2QsoMessageCount = Number(m.count) || 5;
+          quickQsoEnabled = ft2QsoMessageCount === 2;
+          applyFt2ControlsState();
+        }
         if (type === 'set_tx_frequency' && typeof m.tx_frequency_hz === 'number') {
           currentTxHz = Number(m.tx_frequency_hz);
           if (txFreqInput) txFreqInput.value = m.tx_frequency_hz;
@@ -1625,6 +1839,24 @@ R"FT2JS((() => {
   if (btnAlt12) {
     btnAlt12.onclick = () => sendCommand({type:'set_alt_12', enabled:!alt12Enabled}).catch(handleCommandError);
   }
+  if (chkManualTx) {
+    chkManualTx.onchange = () => sendCommand({type:'set_manual_tx', enabled:!!chkManualTx.checked}).catch(handleCommandError);
+  }
+  if (chkSpeedy) {
+    chkSpeedy.onchange = () => sendCommand({type:'set_speedy_contest', enabled:!!chkSpeedy.checked}).catch(handleCommandError);
+  }
+  if (chkDigitalMorse) {
+    chkDigitalMorse.onchange = () => sendCommand({type:'set_digital_morse', enabled:!!chkDigitalMorse.checked}).catch(handleCommandError);
+  }
+  if (btnQuickQso) {
+    btnQuickQso.onclick = () => sendCommand({type:'set_quick_qso', enabled:!quickQsoEnabled}).catch(handleCommandError);
+  }
+  if (ft2QsoCount) {
+    ft2QsoCount.onchange = () => {
+      const count = Number(ft2QsoCount.value || 5);
+      sendCommand({type:'set_ft2_qso_msg_count', count}).catch(handleCommandError);
+    };
+  }
   el('btn_call').onclick = () => sendCommand({type:'select_caller', target_call:el('caller_call').value, target_grid:el('caller_grid').value}).catch(handleCommandError);
   if (btnWfToggle) {
     btnWfToggle.onclick = () => sendCommand({type:'set_waterfall_enabled', enabled:!waterfallEnabled}).catch(handleCommandError);
@@ -1732,7 +1964,7 @@ R"FT2JS((() => {
     }
   })();
 })();
-)FT2JS");
+)FT2JS").arg(fork_release_version()).toUtf8();
 }
 
 QByteArray dashboard_manifest()
@@ -2229,6 +2461,11 @@ void RemoteCommandServer::onNewConnection()
         {"async_l2_enabled", rt.asyncL2Enabled},
         {"dual_carrier_enabled", rt.dualCarrierEnabled},
         {"alt_12_enabled", rt.alt12Enabled},
+        {"manual_tx_enabled", rt.manualTxEnabled},
+        {"speedy_contest_enabled", rt.speedyContestEnabled},
+        {"digital_morse_enabled", rt.digitalMorseEnabled},
+        {"quick_qso_enabled", rt.quickQsoEnabled},
+        {"ft2_qso_message_count", rt.ft2QsoMessageCount},
         {"auto_cq_enabled", rt.autoCqEnabled},
         {"auto_spot_enabled", rt.autoSpotEnabled},
         {"waterfall_enabled", waterfallEnabled_},
@@ -2836,6 +3073,151 @@ RemoteCommandServer::CommandResult RemoteCommandServer::processCommandObject(QJs
       return result;
     }
 
+  if (commandType == QStringLiteral("set_manual_tx"))
+    {
+      if (!object.contains(QStringLiteral("enabled")))
+        {
+          result.payload = makeRejectPayload(commandId, QStringLiteral("rejected_invalid_request"), QStringLiteral("enabled is required"));
+          return result;
+        }
+      auto const mode = state.mode.trimmed().toUpper();
+      if (mode != QStringLiteral("FT2"))
+        {
+          result.payload = makeRejectPayload(commandId, QStringLiteral("rejected_invalid_state"), QStringLiteral("Manual TX is available only in FT2"));
+          return result;
+        }
+      auto enabled = object.value(QStringLiteral("enabled")).toBool(false);
+      seenCommandIds_.insert(commandId, nowUtcMs);
+      Q_EMIT setManualTxRequested(commandId, enabled);
+      result.accepted = true;
+      result.payload = QJsonObject {
+        {"event", QStringLiteral("command_ack")},
+        {"command_id", commandId},
+        {"type", QStringLiteral("set_manual_tx")},
+        {"status", QStringLiteral("accepted_immediate")},
+        {"enabled", enabled},
+        {"server_now_ms", nowUtcMs},
+      };
+      return result;
+    }
+
+  if (commandType == QStringLiteral("set_speedy_contest"))
+    {
+      if (!object.contains(QStringLiteral("enabled")))
+        {
+          result.payload = makeRejectPayload(commandId, QStringLiteral("rejected_invalid_request"), QStringLiteral("enabled is required"));
+          return result;
+        }
+      auto const mode = state.mode.trimmed().toUpper();
+      if (mode != QStringLiteral("FT2"))
+        {
+          result.payload = makeRejectPayload(commandId, QStringLiteral("rejected_invalid_state"), QStringLiteral("Speedy is available only in FT2"));
+          return result;
+        }
+      auto enabled = object.value(QStringLiteral("enabled")).toBool(false);
+      seenCommandIds_.insert(commandId, nowUtcMs);
+      Q_EMIT setSpeedyContestRequested(commandId, enabled);
+      result.accepted = true;
+      result.payload = QJsonObject {
+        {"event", QStringLiteral("command_ack")},
+        {"command_id", commandId},
+        {"type", QStringLiteral("set_speedy_contest")},
+        {"status", QStringLiteral("accepted_immediate")},
+        {"enabled", enabled},
+        {"server_now_ms", nowUtcMs},
+      };
+      return result;
+    }
+
+  if (commandType == QStringLiteral("set_digital_morse"))
+    {
+      if (!object.contains(QStringLiteral("enabled")))
+        {
+          result.payload = makeRejectPayload(commandId, QStringLiteral("rejected_invalid_request"), QStringLiteral("enabled is required"));
+          return result;
+        }
+      auto const mode = state.mode.trimmed().toUpper();
+      if (mode != QStringLiteral("FT2"))
+        {
+          result.payload = makeRejectPayload(commandId, QStringLiteral("rejected_invalid_state"), QStringLiteral("D-CW is available only in FT2"));
+          return result;
+        }
+      auto enabled = object.value(QStringLiteral("enabled")).toBool(false);
+      seenCommandIds_.insert(commandId, nowUtcMs);
+      Q_EMIT setDigitalMorseRequested(commandId, enabled);
+      result.accepted = true;
+      result.payload = QJsonObject {
+        {"event", QStringLiteral("command_ack")},
+        {"command_id", commandId},
+        {"type", QStringLiteral("set_digital_morse")},
+        {"status", QStringLiteral("accepted_immediate")},
+        {"enabled", enabled},
+        {"server_now_ms", nowUtcMs},
+      };
+      return result;
+    }
+
+  if (commandType == QStringLiteral("set_quick_qso"))
+    {
+      if (!object.contains(QStringLiteral("enabled")))
+        {
+          result.payload = makeRejectPayload(commandId, QStringLiteral("rejected_invalid_request"), QStringLiteral("enabled is required"));
+          return result;
+        }
+      auto const mode = state.mode.trimmed().toUpper();
+      if (mode != QStringLiteral("FT2"))
+        {
+          result.payload = makeRejectPayload(commandId, QStringLiteral("rejected_invalid_state"), QStringLiteral("Quick QSO is available only in FT2"));
+          return result;
+        }
+      auto enabled = object.value(QStringLiteral("enabled")).toBool(false);
+      seenCommandIds_.insert(commandId, nowUtcMs);
+      Q_EMIT setQuickQsoRequested(commandId, enabled);
+      result.accepted = true;
+      result.payload = QJsonObject {
+        {"event", QStringLiteral("command_ack")},
+        {"command_id", commandId},
+        {"type", QStringLiteral("set_quick_qso")},
+        {"status", QStringLiteral("accepted_immediate")},
+        {"enabled", enabled},
+        {"server_now_ms", nowUtcMs},
+      };
+      return result;
+    }
+
+  if (commandType == QStringLiteral("set_ft2_qso_msg_count"))
+    {
+      if (!object.contains(QStringLiteral("count")))
+        {
+          result.payload = makeRejectPayload(commandId, QStringLiteral("rejected_invalid_request"), QStringLiteral("count is required"));
+          return result;
+        }
+      auto const mode = state.mode.trimmed().toUpper();
+      if (mode != QStringLiteral("FT2"))
+        {
+          result.payload = makeRejectPayload(commandId, QStringLiteral("rejected_invalid_state"), QStringLiteral("FT2 QSO profile is available only in FT2"));
+          return result;
+        }
+      auto const count = object.value(QStringLiteral("count")).toInt(0);
+      if (count != 2 && count != 3 && count != 5)
+        {
+          result.payload = makeRejectPayload(commandId, QStringLiteral("rejected_invalid_request"), QStringLiteral("count must be 2, 3, or 5"));
+          return result;
+        }
+      seenCommandIds_.insert(commandId, nowUtcMs);
+      Q_EMIT setFt2QsoMessageCountRequested(commandId, count);
+      result.accepted = true;
+      result.payload = QJsonObject {
+        {"event", QStringLiteral("command_ack")},
+        {"command_id", commandId},
+        {"type", QStringLiteral("set_ft2_qso_msg_count")},
+        {"status", QStringLiteral("accepted_immediate")},
+        {"count", count},
+        {"server_now_ms", nowUtcMs},
+      };
+      return result;
+    }
+
   if (commandType == QStringLiteral("set_waterfall_enabled"))
     {
       if (!object.contains(QStringLiteral("enabled")))
@@ -3288,6 +3670,11 @@ void RemoteCommandServer::onHttpSocketReadyRead()
           health.insert(QStringLiteral("async_l2_enabled"), rt.asyncL2Enabled);
           health.insert(QStringLiteral("dual_carrier_enabled"), rt.dualCarrierEnabled);
           health.insert(QStringLiteral("alt_12_enabled"), rt.alt12Enabled);
+          health.insert(QStringLiteral("manual_tx_enabled"), rt.manualTxEnabled);
+          health.insert(QStringLiteral("speedy_contest_enabled"), rt.speedyContestEnabled);
+          health.insert(QStringLiteral("digital_morse_enabled"), rt.digitalMorseEnabled);
+          health.insert(QStringLiteral("quick_qso_enabled"), rt.quickQsoEnabled);
+          health.insert(QStringLiteral("ft2_qso_message_count"), rt.ft2QsoMessageCount);
           health.insert(QStringLiteral("monitoring"), rt.monitoring);
           health.insert(QStringLiteral("transmitting"), rt.transmitting);
           health.insert(QStringLiteral("my_call"), rt.myCall);
@@ -3334,6 +3721,11 @@ void RemoteCommandServer::onHttpSocketReadyRead()
                       {"async_l2_enabled", rt.asyncL2Enabled},
                       {"dual_carrier_enabled", rt.dualCarrierEnabled},
                       {"alt_12_enabled", rt.alt12Enabled},
+                      {"manual_tx_enabled", rt.manualTxEnabled},
+                      {"speedy_contest_enabled", rt.speedyContestEnabled},
+                      {"digital_morse_enabled", rt.digitalMorseEnabled},
+                      {"quick_qso_enabled", rt.quickQsoEnabled},
+                      {"ft2_qso_message_count", rt.ft2QsoMessageCount},
                       {"monitoring", rt.monitoring},
                       {"transmitting", rt.transmitting},
                       {"my_call", rt.myCall},
@@ -3481,6 +3873,11 @@ void RemoteCommandServer::onTelemetryTick()
     {"async_l2_enabled", state.asyncL2Enabled},
     {"dual_carrier_enabled", state.dualCarrierEnabled},
     {"alt_12_enabled", state.alt12Enabled},
+    {"manual_tx_enabled", state.manualTxEnabled},
+    {"speedy_contest_enabled", state.speedyContestEnabled},
+    {"digital_morse_enabled", state.digitalMorseEnabled},
+    {"quick_qso_enabled", state.quickQsoEnabled},
+    {"ft2_qso_message_count", state.ft2QsoMessageCount},
     {"monitoring", state.monitoring},
     {"transmitting", state.transmitting},
     {"my_call", state.myCall},

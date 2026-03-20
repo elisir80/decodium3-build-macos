@@ -577,6 +577,17 @@ void DisplayText::displayDecodedText(DecodedText const& decodedText, QString con
       apTag = message.mid (ap_pos).trimmed ();
       message = message.left (ap_pos).trimmed ();
     }
+
+  QString ft2DecoderTag;
+  if (mode == "FT2")
+    {
+      auto ft2_tag_pos = message.lastIndexOf (QRegularExpression {R"((?:\s+\?)?(?:\s+[AaQq][0-9*]|\s+T)\s*$)"});
+      if (ft2_tag_pos >= 0)
+        {
+          ft2DecoderTag = message.mid (ft2_tag_pos).trimmed ();
+          message = message.left (ft2_tag_pos).trimmed ();
+        }
+    }
   m_CQPriority="";
   if (CQcall || (is_73 && m_config->highlight_73()) || (mode == "FT4" && m_config->highlight_73() && m_config->NCCC_Sprint()
       && (SpecOp::NA_VHF == m_config->special_op_id()) && decodedText.string().contains(" R ")))
@@ -754,7 +765,8 @@ void DisplayText::displayDecodedText(DecodedText const& decodedText, QString con
 
   // Keep country/zone alignment stable: append AP/quality marker at line tail
   // instead of prefixing it into the right-side country column.
-  if (!apTag.isEmpty()) {
+  // FT2 decoder tags ("T", "aN") are intentionally hidden from the panes.
+  if (!apTag.isEmpty() && ft2DecoderTag.isEmpty()) {
     if (message.contains (QChar::Nbsp)) {
       message += QChar {' '} + apTag;
     } else {

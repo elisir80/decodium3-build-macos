@@ -8,7 +8,7 @@
 #include "scs_version.h"
 
 #ifndef FORK_RELEASE_VERSION
-#define FORK_RELEASE_VERSION "1.5.1"
+#define FORK_RELEASE_VERSION "dev"
 #endif
 
 namespace

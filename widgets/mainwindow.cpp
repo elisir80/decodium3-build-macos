@@ -445,6 +445,26 @@ static QString udp_decode_message_text (QString const& decodeLine)
   return decodeLine.mid (has_seconds ? 24 : 22);
 }
 
+static QString canonical_decode_payload_for_dedupe (QString const& decodeLine, QString const& mode)
+{
+  QString payload = udp_decode_message_text (decodeLine).remove ("<").remove (">").simplified ().toUpper ();
+  if (payload.isEmpty ()) {
+    return payload;
+  }
+
+  // FT2 async/triggered decoders can append a trailing annotation token
+  // ("T", "a2", etc.) to the same payload. Keep it visible in the panes,
+  // but ignore it for dedupe/confirmation so the async and sync copies
+  // collapse to one logical decode.
+  if (mode == "FT2") {
+    payload.replace (QRegularExpression {R"((?:\s+\?)?(?:\s+[AQ]\d|\s+[AQ]\*|\s+T)\s*$)"},
+                     QString {});
+    payload = payload.simplified ();
+  }
+
+  return payload;
+}
+
 static void normalize_ft2_mode_marker (QString& line, QString const& currentMode)
 {
   if (currentMode != "FT2") {
@@ -560,19 +580,8 @@ static void apply_async_ft2_tdelta (QString& line, qint64 asyncRxStartMs)
 
 static QString udp_client_id_from_application_name ()
 {
-  QString const baseId {"Decodium"};
   QString const appName = QCoreApplication::applicationName ().trimmed ();
-  int const separator = appName.indexOf (" - ");
-  if (separator < 0) {
-    return baseId;
-  }
-
-  QString const rigName = appName.mid (separator + 3).trimmed ();
-  if (rigName.isEmpty ()) {
-    return baseId;
-  }
-
-  return QString {"%1 - %2"}.arg (baseId, rigName);
+  return appName.isEmpty () ? QStringLiteral ("ft2") : appName;
 }
 
 void MainWindow::pruneNearDuplicateDecodeCache (qint64 nowMs)
@@ -600,7 +609,7 @@ bool MainWindow::shouldSuppressNearDuplicateDecode (DecodedText const& decodedte
     return false;
   }
 
-  QString payload = udp_decode_message_text (decodedtext.string ()).remove ("<").remove (">").simplified ().toUpper ();
+  QString payload = canonical_decode_payload_for_dedupe (decodedtext.string (), m_mode);
   if (payload.isEmpty ()) {
     return false;
   }
@@ -2064,6 +2073,11 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
                 state.asyncL2Enabled = ui && ui->cbAsyncDecode && ui->cbAsyncDecode->isChecked();
                 state.dualCarrierEnabled = ui && ui->cbDualCarrier && ui->cbDualCarrier->isChecked();
                 state.alt12Enabled = ui && ui->cbAutoTogglePeriod && ui->cbAutoTogglePeriod->isChecked();
+                state.manualTxEnabled = ui && ui->cbManualTx && ui->cbManualTx->isChecked();
+                state.speedyContestEnabled = ui && ui->cbSpeedyContest && ui->cbSpeedyContest->isChecked();
+                state.digitalMorseEnabled = ui && ui->cbDigitalMorse && ui->cbDigitalMorse->isChecked();
+                state.quickQsoEnabled = ui && ui->btnQuickQSO && ui->btnQuickQSO->isChecked();
+                state.ft2QsoMessageCount = ft2QsoMessageCount(m_ft2QsoMessageProfile);
                 state.monitoring = m_monitoring;
                 state.transmitting = m_transmitting;
                 state.myCall = m_config.my_callsign();
@@ -2130,6 +2144,16 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
                     this, &MainWindow::onRemoteSetDualCarrierRequested);
             connect(m_remoteCommandServer, &RemoteCommandServer::setAlt12Requested,
                     this, &MainWindow::onRemoteSetAlt12Requested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setManualTxRequested,
+                    this, &MainWindow::onRemoteSetManualTxRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setSpeedyContestRequested,
+                    this, &MainWindow::onRemoteSetSpeedyContestRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setDigitalMorseRequested,
+                    this, &MainWindow::onRemoteSetDigitalMorseRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setQuickQsoRequested,
+                    this, &MainWindow::onRemoteSetQuickQsoRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setFt2QsoMessageCountRequested,
+                    this, &MainWindow::onRemoteSetFt2QsoMessageCountRequested);
             connect(m_remoteCommandServer, &RemoteCommandServer::waterfallStreamingChanged,
                     this, &MainWindow::onRemoteWaterfallStreamingChanged);
             connect(m_remoteCommandServer, &RemoteCommandServer::logMessage, this,
@@ -2724,78 +2748,14 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
     restartConfiguredAudioStreams (m_monitoring);
     Q_EMIT transmitFrequency (ui->TxFreqSpinBox->value () - m_XIT);
 
-    // Startup robustness: some drivers come up muted/stale until a later
-    // re-open (historically after visiting Settings and pressing OK).
+    // Startup robustness: perform one early stream reopen in case the initial
+    // bind races CoreAudio / USB device bring-up.
     QTimer::singleShot (1500, this, [this] {
       if (m_tci_audio || m_transmitting) {
         return;
       }
       restartConfiguredAudioStreams (m_monitoring);
     });
-
-    auto const startup_audio_bind_ms = QDateTime::currentMSecsSinceEpoch ();
-    auto const restart_monitor_audio = [this] {
-      if (m_mode=="MSK144") {
-        Q_EMIT transmitFrequency (1000.0);
-      } else {
-        Q_EMIT transmitFrequency (ui->TxFreqSpinBox->value () - m_XIT);
-      }
-      on_monitorButton_clicked (true);
-    };
-    auto const restart_if_no_startup_audio = [this, startup_audio_bind_ms, restart_monitor_audio] (int delay_ms) {
-      QTimer::singleShot (delay_ms, this, [this, startup_audio_bind_ms, delay_ms, restart_monitor_audio] {
-        if (m_tci_audio || m_transmitting || m_config.audio_input_device ().isNull ())
-          {
-            return;
-          }
-        if (m_last_audio_frame_ms >= startup_audio_bind_ms)
-          {
-            return;
-          }
-
-        LOG_WARN ("startup audio health-check: no RX frames after "
-                  << delay_ms << " ms, refreshing monitor/audio");
-        if (m_monitoring && g_iptt != 1)
-          {
-            on_monitorButton_clicked (false);
-            QTimer::singleShot (220, this, [this, startup_audio_bind_ms, restart_monitor_audio] {
-              if (m_tci_audio || m_transmitting || m_monitoring || g_iptt == 1)
-                {
-                  return;
-                }
-              if (m_last_audio_frame_ms >= startup_audio_bind_ms)
-                {
-                  return;
-                }
-              restart_monitor_audio ();
-            });
-            return;
-          }
-
-        restartConfiguredAudioStreams (m_monitoring);
-      });
-    };
-    restart_if_no_startup_audio (4000);
-    restart_if_no_startup_audio (8000);
-
-#if defined(Q_OS_MACOS)
-    // On some macOS CoreAudio setups, streams look selected but become active
-    // only after a monitor restart. Perform one automatic refresh at startup.
-    QTimer::singleShot (2800, this, [this] {
-      if (m_tci_audio || m_transmitting || !m_monitoring || g_iptt == 1)
-        {
-          return;
-        }
-      on_monitorButton_clicked (false);
-      QTimer::singleShot (220, this, [this] {
-        if (m_tci_audio || m_transmitting || m_monitoring || g_iptt == 1)
-          {
-            return;
-          }
-        on_monitorButton_clicked (true);
-      });
-    });
-#endif
   }
 
   enable_DXCC_entity (m_config.DXCC ());  // sets text window proportions and (re)inits the logbook
@@ -5277,6 +5237,73 @@ void MainWindow::restartConfiguredAudioStreams (bool resume_monitor)
     }
 }
 
+void MainWindow::armAudioInputHealthChecks (qint64 baseline_ms)
+{
+  if (m_tci_audio || m_config.audio_input_device ().isNull ())
+    {
+      return;
+    }
+
+  static int const delays_ms[] = {2500, 5000, 9000};
+  for (auto const delay_ms : delays_ms)
+    {
+      QTimer::singleShot (delay_ms, this, [this, baseline_ms, delay_ms] {
+          if (m_tci_audio || m_transmitting || g_iptt == 1)
+            {
+              return;
+            }
+          if (!m_monitoring || m_config.audio_input_device ().isNull ())
+            {
+              return;
+            }
+          if (m_last_audio_frame_ms >= baseline_ms)
+            {
+              return;
+            }
+
+          LOG_WARN ("audio health-check: no RX frames after "
+                    << delay_ms
+                    << " ms from monitor start, replaying settings-style audio reopen");
+
+          bool const was_monitoring = m_monitoring;
+          if (was_monitoring)
+            {
+              on_monitorButton_clicked (false);
+            }
+
+          restartConfiguredAudioStreams (false);
+
+          QTimer::singleShot (260, this, [this, baseline_ms, delay_ms, was_monitoring] {
+              if (m_tci_audio || m_transmitting || g_iptt == 1)
+                {
+                  return;
+                }
+              if (m_last_audio_frame_ms >= baseline_ms)
+                {
+                  return;
+                }
+
+              if (m_mode == "MSK144")
+                {
+                  Q_EMIT transmitFrequency (1000.0);
+                }
+              else
+                {
+                  Q_EMIT transmitFrequency (ui->TxFreqSpinBox->value () - m_XIT);
+                }
+
+              if (was_monitoring && !m_monitoring)
+                {
+                  on_monitorButton_clicked (true);
+                }
+
+              LOG_WARN ("audio health-check: settings-style reopen applied after "
+                        << delay_ms << " ms without RX frames");
+            });
+        });
+    }
+}
+
 void MainWindow::onApplicationStateChanged(Qt::ApplicationState state)
 {
   auto const previous = m_last_application_state;
@@ -5328,6 +5355,7 @@ void MainWindow::onApplicationStateChanged(Qt::ApplicationState state)
             }
 
           restartConfiguredAudioStreams (true);
+          armAudioInputHealthChecks (QDateTime::currentMSecsSinceEpoch ());
           showStatusMessage (tr ("Audio input resumed after system wake."));
         });
     }
@@ -5665,6 +5693,7 @@ void MainWindow::on_monitorButton_clicked (bool checked)
 
 void MainWindow::monitor (bool state)
 {
+  bool const activating = state && !m_monitoring;
   ui->monitorButton->setChecked (state);
   if (state) {
     m_diskData = false;	// no longer reading WAV files
@@ -5701,6 +5730,10 @@ void MainWindow::monitor (bool state)
     }
   }
   m_monitoring = state;
+  if (activating && !m_tci_audio)
+    {
+      armAudioInputHealthChecks (QDateTime::currentMSecsSinceEpoch ());
+    }
   check_button_color();
 }
 
@@ -8704,7 +8737,7 @@ bool MainWindow::isDuplicateDecode(QString const& message)
   }
 
   // Key from payload (robust against variable spacing / packed rows).
-  QString key = udp_decode_message_text(message).remove("<").remove(">").trimmed().toUpper();
+  QString key = canonical_decode_payload_for_dedupe (message, m_mode);
   if (key.isEmpty()) return false;
 
   // Extract SNR using DecodedText parser (no fixed-column assumptions).
@@ -8743,7 +8776,7 @@ bool MainWindow::asyncConfirmDecode(QString const& message, int freq, int snr)
   if (snr >= -19) return true;
 
   // Extract payload key robustly (no fixed-column assumptions).
-  QString key = udp_decode_message_text(message).remove("<").remove(">").trimmed().toUpper();
+  QString key = canonical_decode_payload_for_dedupe (message, m_mode);
   if (key.isEmpty()) return true;  // safety: let it through
 
   // Check if this matches a pending decode
@@ -13444,7 +13477,10 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
   }
 
   // prior DX call (possible QSO partner)
-  auto qso_partner_base_call = Radio::base_callsign (ui->dxCallEntry->text ()).trimmed ().toUpper ();
+  auto const qso_partner_call = (!m_hisCall.trimmed ().isEmpty ()
+                                 ? m_hisCall
+                                 : ui->dxCallEntry->text ()).trimmed ().toUpper ();
+  auto qso_partner_base_call = Radio::base_callsign (qso_partner_call).trimmed ().toUpper ();
   auto const locked_partner_base_call = Radio::base_callsign (m_autoCqLockedCall).trimmed ().toUpper ();
   if (m_autoCQ && m_QSOProgress > CALLING && qso_partner_base_call.isEmpty () && !locked_partner_base_call.isEmpty ()) {
     qso_partner_base_call = locked_partner_base_call;
@@ -13452,10 +13488,16 @@ void MainWindow::processMessage (DecodedText const& message, Qt::KeyboardModifie
   auto base_call = Radio::base_callsign (hiscall).trimmed ().toUpper ();
   bool const qso_partner_matched = message_words.size () > 3
                                    && !qso_partner_base_call.isEmpty ()
-                                   && message_words.at (3).contains (qso_partner_base_call);
+                                   && (message_words.at (3).contains (qso_partner_base_call)
+                                       || (!qso_partner_call.isEmpty ()
+                                           && message_words.at (3).contains (qso_partner_call)));
   bool const manual_partner_override = ctrl || shift;
+  bool const wait_lock_enabled = m_config.Wait_features_enabled ()
+                                 && ui->cbAutoSeq
+                                 && ui->cbAutoSeq->isChecked ();
   bool const lock_active_qso = m_auto
-                               && m_QSOProgress >= REPORT
+                               && wait_lock_enabled
+                               && m_QSOProgress >= REPLYING
                                && m_QSOProgress <= SIGNOFF
                                && !manual_partner_override
                                && !qso_partner_base_call.isEmpty ();
@@ -16048,6 +16090,9 @@ void MainWindow::on_dxGridEntry_textChanged (QString const& grid)
 void MainWindow::on_genStdMsgsPushButton_clicked()          //genStdMsgs button
 {
   ui->pbBandHopping->setChecked(false); // disable band hopping
+  bool const preserveActiveTxSelection =
+      !m_hisCall.trimmed().isEmpty() && m_QSOProgress > CALLING && m_ntx >= 2;
+  int const preservedNtx = preserveActiveTxSelection ? m_ntx : 0;
   genStdMsgs(m_rpt);
   m_dblClk = false;    //avt
   statusUpdate();             //avt 12/20/21 send msg w/m_dblClk false to defeat same-message check
@@ -16058,12 +16103,30 @@ void MainWindow::on_genStdMsgsPushButton_clicked()          //genStdMsgs button
   m_dblClk = false;     //avt 12/20/21 one-shot event notification
   m_checkCmd = "";
 
-  if (!m_bDoubleClicked && m_hisCall!="") {
+  if (preserveActiveTxSelection) {
+      m_ntx = preservedNtx;
+      switch (preservedNtx) {
+        case 2: ui->txrb2->setChecked(true); break;
+        case 3: ui->txrb3->setChecked(true); break;
+        case 4: ui->txrb4->setChecked(true); break;
+        case 5: ui->txrb5->setChecked(true); break;
+        case 6: ui->txrb6->setChecked(true); break;
+        default: ui->txrb1->setChecked(true); break;
+      }
+      debugToFile(QString{"genStdMsgs preserve ntx:%1 qso:%2 call:%3"}
+                      .arg(preservedNtx)
+                      .arg(m_QSOProgress)
+                      .arg(m_hisCall.trimmed().toUpper()));
+  }
+  else if (!m_bDoubleClicked && m_hisCall!="") {
       if (ui->tx1->isEnabled ()) {
           QTimer::singleShot (0, ui->txrb1, SLOT (click ()));   // Go to Tx1
       } else {
           QTimer::singleShot (0, ui->txrb2, SLOT (click ()));   // Go to Tx2 if Tx1 is disabled
       }
+      debugToFile(QString{"genStdMsgs reselect tx1/tx2 qso:%1 call:%2"}
+                      .arg(m_QSOProgress)
+                      .arg(m_hisCall.trimmed().toUpper()));
       m_bMyCallStd=stdCall(m_config.my_callsign()); //ft8md
       m_bHisCallStd=stdCall(m_hisCall); //ft8md
       
@@ -25781,4 +25844,96 @@ void MainWindow::onRemoteSetAlt12Requested(QString const& commandId, bool enable
     }
   ui->cbAutoTogglePeriod->setChecked(enabled);
   showStatusMessage(enabled ? tr("Remote Alt 1/2 enabled") : tr("Remote Alt 1/2 disabled"));
+}
+
+void MainWindow::onRemoteSetManualTxRequested(QString const& commandId, bool enabled)
+{
+  Q_UNUSED(commandId);
+  if (!ui || !ui->cbManualTx)
+    {
+      return;
+    }
+  if (m_mode != "FT2")
+    {
+      showStatusMessage(tr("Remote Manual TX ignored: not in FT2 mode"));
+      return;
+    }
+  ui->cbManualTx->setChecked(enabled);
+  showStatusMessage(enabled ? tr("Remote Manual TX enabled") : tr("Remote Manual TX disabled"));
+}
+
+void MainWindow::onRemoteSetSpeedyContestRequested(QString const& commandId, bool enabled)
+{
+  Q_UNUSED(commandId);
+  if (!ui || !ui->cbSpeedyContest)
+    {
+      return;
+    }
+  if (m_mode != "FT2")
+    {
+      showStatusMessage(tr("Remote Speedy ignored: not in FT2 mode"));
+      return;
+    }
+  ui->cbSpeedyContest->setChecked(enabled);
+  showStatusMessage(enabled ? tr("Remote Speedy enabled") : tr("Remote Speedy disabled"));
+}
+
+void MainWindow::onRemoteSetDigitalMorseRequested(QString const& commandId, bool enabled)
+{
+  Q_UNUSED(commandId);
+  if (!ui || !ui->cbDigitalMorse)
+    {
+      return;
+    }
+  if (m_mode != "FT2")
+    {
+      showStatusMessage(tr("Remote D-CW ignored: not in FT2 mode"));
+      return;
+    }
+  ui->cbDigitalMorse->setChecked(enabled);
+  showStatusMessage(enabled ? tr("Remote D-CW enabled") : tr("Remote D-CW disabled"));
+}
+
+void MainWindow::onRemoteSetQuickQsoRequested(QString const& commandId, bool enabled)
+{
+  Q_UNUSED(commandId);
+  if (!ui || !ui->btnQuickQSO)
+    {
+      return;
+    }
+  if (m_mode != "FT2")
+    {
+      showStatusMessage(tr("Remote Quick QSO ignored: not in FT2 mode"));
+      return;
+    }
+  ui->btnQuickQSO->setChecked(enabled);
+  showStatusMessage(enabled ? tr("Remote Quick QSO enabled") : tr("Remote Quick QSO disabled"));
+}
+
+void MainWindow::onRemoteSetFt2QsoMessageCountRequested(QString const& commandId, int count)
+{
+  Q_UNUSED(commandId);
+  if (!ui || !ui->cbQsoMsgCount)
+    {
+      return;
+    }
+  if (m_mode != "FT2")
+    {
+      showStatusMessage(tr("Remote QSO profile ignored: not in FT2 mode"));
+      return;
+    }
+
+  int index {-1};
+  switch (count)
+    {
+    case 2: index = 0; break;
+    case 3: index = 1; break;
+    case 5: index = 2; break;
+    default:
+      showStatusMessage(tr("Remote QSO profile ignored: unsupported FT2 count %1").arg(count));
+      return;
+    }
+
+  ui->cbQsoMsgCount->setCurrentIndex(index);
+  showStatusMessage(tr("Remote QSO profile set to %1 msg").arg(count));
 }

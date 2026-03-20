@@ -1,46 +1,47 @@
-# Decodium 3 FT2 (macOS/Linux Fork) - 1.5.1
+# Decodium 3 FT2 (macOS/Linux Fork) - 1.5.2
 
-This fork packages Decodium 3 FT2 for macOS and Linux AppImage, with FT2/FT4/FT8 QSO-closing fixes, AutoCQ state-machine hardening, internal update checks, upstream decoder sync, and Decodium certificate tooling maintained in this repository.
+This fork packages Decodium 3 FT2 for macOS and Linux AppImage, with FT2/FT4/FT8 QSO-closing fixes, AutoCQ hardening, FT2 decoder updates from upstream, startup audio recovery, updater support, web-app parity controls, complete UI translations, and Decodium certificate tooling maintained in this repository.
 
-Current stable release: `1.5.1`.
+Current stable release: `1.5.2`.
 
-## Changes in 1.5.1 (`1.5.0 -> 1.5.1`)
+## Changes in 1.5.2 (`1.5.1 -> 1.5.2`)
 
-- Internal updater:
-- added GitHub release checks at startup and a manual `Help > Check for updates...` action.
-- the updater now resolves the best-matching macOS/Linux asset directly instead of opening only the generic release page.
-- QSO flow and logging:
-- fixed several FT2/FT4/FT8 late-signoff paths where the app could keep sending `73/RR73`, miss the final log, or fail to recover a delayed close.
-- fixed the path where the remote final `73/RR73` arrived after the local station had already sent its own signoff.
-- improved late-final-ack recovery after timeout so delayed `73/RR73` from the active partner can still be logged correctly.
-- AutoCQ:
-- fixed stale partner reuse after returning to CQ.
-- fixed direct-caller cases that were decoded correctly but still left the app transmitting CQ instead of arming `Tx2`.
-- fixed the first direct FT2 reply using a stale report value from the previous QSO instead of the current caller SNR.
-- expanded recent-work and abandoned-partner suppression to reduce duplicate rework after deferred closures.
+- FT2 / FT4 / FT8 runtime correctness:
+- hardened late-signoff, late-final-ack, stale-partner, retry, and direct-reply paths across standard QSO flows so completed QSOs log correctly and do not loop on `73` / `RR73`.
+- restored the active-QSO lock used by `Wait Features + AutoSeq` in FT4/FT8 so a running QSO is not interrupted by queued calling logic.
+- fixed stale callsign/report reuse when AutoCQ moves from CQ to a new direct caller or from one queued station to the next.
+- FT2 protocol and decoder work:
+- aligned FT2 decoder code to the dedicated upstream FT2 LDPC path and refreshed FT2 bitmetrics support.
+- completed the FT2 `2 msg / 3 msg / 5 msg` flow, including `Quick QSO`, mixed-mode TU handling, and current FT2 short-QSO routing.
+- hid FT2 async/triggered decoder tags (`T`, `aN`) from decode panes and collapsed async/sync duplicates into one logical decode.
+- Audio / UI / remote control:
+- strengthened startup and wake-from-sleep RX-audio recovery so monitor-on now triggers health checks and automatic reopen of streams if audio stays silent.
+- brought the web app/dashboard closer to desktop parity with `Manual TX`, `Speedy`, `D-CW`, async card, `Quick QSO`, and `2/3/5 msg` controls.
+- completed all bundled UI translation files so menu, popup, and in-program strings no longer ship with unfinished gaps.
+- Platform / tooling:
+- added Decodium certificate loading/autoload/status plus the local `tools/generate_cert.py` generator.
+- kept the internal updater and refined it to open the best matching macOS/Linux asset directly.
+- centralised release versioning through `fork_release_version.txt` so local builds, workflows, and GitHub releases stay aligned.
 - Map and identity:
-- fixed the live world map showing a fake active QSO path while transmitting plain CQ.
-- aligned the PSK Reporter program identifier to the exact title-bar string shown by the application.
-- Diagnostics/process:
-- expanded `debug.txt` tracing for direct-caller arming, stale-partner cleanup, late signoff recovery, and updater asset selection.
-- local UI version, workflow defaults, and release documents are now aligned to semantic version `1.5.1`.
+- fixed stale or fake live-map links while returning to CQ or transmitting plain CQ.
+- aligned PSK Reporter identity to the exact application title string.
 
 ## Release Artifacts
 
-- `decodium3-ft2-1.5.1-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-1.5.1-macos-tahoe-arm64.zip`
-- `decodium3-ft2-1.5.1-macos-tahoe-arm64-sha256.txt`
-- `decodium3-ft2-1.5.1-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-1.5.1-macos-sequoia-arm64.zip`
-- `decodium3-ft2-1.5.1-macos-sequoia-arm64-sha256.txt`
-- `decodium3-ft2-1.5.1-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-1.5.1-macos-sequoia-x86_64.zip`
-- `decodium3-ft2-1.5.1-macos-sequoia-x86_64-sha256.txt`
-- `decodium3-ft2-1.5.1-macos-monterey-x86_64.dmg` *(best effort/experimental, if generated)*
-- `decodium3-ft2-1.5.1-macos-monterey-x86_64.zip` *(best effort/experimental, if generated)*
-- `decodium3-ft2-1.5.1-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, if generated)*
-- `decodium3-ft2-1.5.1-linux-x86_64.AppImage`
-- `decodium3-ft2-1.5.1-linux-x86_64.AppImage.sha256.txt`
+- `decodium3-ft2-1.5.2-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-1.5.2-macos-tahoe-arm64.zip`
+- `decodium3-ft2-1.5.2-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-1.5.2-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-1.5.2-macos-sequoia-arm64.zip`
+- `decodium3-ft2-1.5.2-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-1.5.2-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-1.5.2-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-1.5.2-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-1.5.2-macos-monterey-x86_64.dmg` *(best effort/experimental, if generated)*
+- `decodium3-ft2-1.5.2-macos-monterey-x86_64.zip` *(best effort/experimental, if generated)*
+- `decodium3-ft2-1.5.2-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, if generated)*
+- `decodium3-ft2-1.5.2-linux-x86_64.AppImage`
+- `decodium3-ft2-1.5.2-linux-x86_64.AppImage.sha256.txt`
 
 ## Linux Minimum Requirements
 
@@ -58,7 +59,7 @@ Software:
 - `libfuse2` / FUSE2
 - ALSA, PulseAudio, or PipeWire
 - Qt5-capable desktop environment
-- network access recommended for NTP, DX Cluster, and PSK Reporter workflows
+- network access recommended for NTP, DX Cluster, PSK Reporter, updater, and online features
 
 ## Startup Guidance
 
@@ -84,6 +85,6 @@ cd squashfs-root
 - [README.md](README.md)
 - [README.it.md](README.it.md)
 - [README.es.md](README.es.md)
-- [RELEASE_NOTES_1.5.1.md](RELEASE_NOTES_1.5.1.md)
-- [doc/GITHUB_RELEASE_BODY_1.5.1.md](doc/GITHUB_RELEASE_BODY_1.5.1.md)
+- [RELEASE_NOTES_1.5.2.md](RELEASE_NOTES_1.5.2.md)
+- [doc/GITHUB_RELEASE_BODY_1.5.2.md](doc/GITHUB_RELEASE_BODY_1.5.2.md)
 - [CHANGELOG.md](CHANGELOG.md)

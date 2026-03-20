@@ -77,7 +77,9 @@ include (set_build_type)
 # RC 0 or omitted is a development build, GA is a General Availability release build
 set_build_type (RC 1)
 set (wsjtx_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}${BUILD_TYPE_REVISION}")
-set (FORK_RELEASE_VERSION "1.5.0" CACHE STRING "Fork release version shown in UI title" FORCE)
+file (READ "${CMAKE_CURRENT_SOURCE_DIR}/fork_release_version.txt" FORK_RELEASE_VERSION)
+string (STRIP "${FORK_RELEASE_VERSION}" FORK_RELEASE_VERSION)
+set (FORK_RELEASE_VERSION "${FORK_RELEASE_VERSION}" CACHE STRING "Fork release version shown in UI title" FORCE)
 add_definitions (-DFORK_RELEASE_VERSION=\"${FORK_RELEASE_VERSION}\")
 
 #

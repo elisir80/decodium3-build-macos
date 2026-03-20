@@ -4,14 +4,14 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/release-macos.sh <version> [--publish] [--repo owner/repo]
-                                 [--compat-macos 15.0] [--skip-compat-check]
-                                 [--codesign-identity "-"]
-                                 [--asset-suffix macos-sequoia-arm64]
+  scripts/release-macos.sh [<version>] [--publish] [--repo owner/repo]
+                           [--compat-macos 15.0] [--skip-compat-check]
+                           [--codesign-identity "-"]
+                           [--asset-suffix macos-sequoia-arm64]
 
 Examples:
-  scripts/release-macos.sh 1.5.1
-  scripts/release-macos.sh 1.5.1 --publish --repo elisir80/decodium3-build-macos
+  scripts/release-macos.sh
+  scripts/release-macos.sh <version> --publish --repo elisir80/decodium3-build-macos
 
 What it does:
   1) Configures the project in ./build
@@ -27,13 +27,19 @@ What it does:
 EOF
 }
 
-if [[ $# -lt 1 ]]; then
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VERSION_FILE="${REPO_ROOT}/fork_release_version.txt"
+VERSION_RAW=""
+
+if [[ $# -gt 0 && "$1" != --* ]]; then
+  VERSION_RAW="$1"
+  shift
+elif [[ -f "${VERSION_FILE}" ]]; then
+  VERSION_RAW="$(tr -d '\r\n' < "${VERSION_FILE}")"
+else
   usage
   exit 1
 fi
-
-VERSION_RAW="$1"
-shift
 
 VERSION="${VERSION_RAW#v}"
 

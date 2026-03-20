@@ -183,6 +183,7 @@ private:
   void childEvent(QChildEvent *) override;
   bool eventFilter(QObject *, QEvent *) override;
   void restartConfiguredAudioStreams (bool resume_monitor);
+  void armAudioInputHealthChecks (qint64 baseline_ms);
   void showQSYMessage(QString message);
   void handleDoubleClickOnCall (Qt::KeyboardModifiers modifiers, bool fromBandActivityWindow);
   bool singleDecodeColumnFlowEnabled () const { return false; }
@@ -544,6 +545,11 @@ private slots:
   void onRemoteSetAsyncL2Requested(QString const& commandId, bool enabled);
   void onRemoteSetDualCarrierRequested(QString const& commandId, bool enabled);
   void onRemoteSetAlt12Requested(QString const& commandId, bool enabled);
+  void onRemoteSetManualTxRequested(QString const& commandId, bool enabled);
+  void onRemoteSetSpeedyContestRequested(QString const& commandId, bool enabled);
+  void onRemoteSetDigitalMorseRequested(QString const& commandId, bool enabled);
+  void onRemoteSetQuickQsoRequested(QString const& commandId, bool enabled);
+  void onRemoteSetFt2QsoMessageCountRequested(QString const& commandId, int count);
   void onMapContactClicked(QString const& call, QString const& grid);
   void onRemoteWaterfallStreamingChanged(bool enabled);
   void onWideGraphWaterfallRow(QByteArray const& rowLevels,
