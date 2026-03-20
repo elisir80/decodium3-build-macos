@@ -112,7 +112,7 @@ class MessageClient::impl
 
 public:
   impl (QString const& id, QString const& version, QString const& revision,
-        port_type server_port, int TTL, MessageClient * self)
+        port_type server_port, port_type listen_port, int TTL, MessageClient * self)
     : self_ {self}
     , enabled_ {false}
     , id_ {id}
@@ -120,6 +120,7 @@ public:
     , revision_ {revision}
     , dns_lookup_id_ {-1}
     , server_port_ {server_port}
+    , listen_port_ {listen_port}
     , TTL_ {TTL}
     , schema_ {2}  // use 2 prior to negotiation not 1 which is broken
     , heartbeat_timer_ {new QTimer {this}}
@@ -291,10 +292,22 @@ void MessageClient::impl::start ()
       // Bind to fixed listen_port_ if configured, otherwise ephemeral.
       // A fixed port allows external programs (JTAlert, DecoAlert) to
       // reliably send commands to Decodium without heartbeat discovery.
+      bool bound {false};
       if (listen_port_ > 0)
-        bind (interface_addr, listen_port_, ShareAddress | ReuseAddressHint);
-      else
-        bind (interface_addr);
+        {
+          bound = bind (interface_addr, listen_port_, ShareAddress | ReuseAddressHint);
+          if (!bound)
+            {
+              Q_EMIT self_->error (
+                QString {"Unable to bind UDP listen port %1 (%2); falling back to an ephemeral port"}
+                  .arg (listen_port_)
+                  .arg (errorString ()));
+            }
+        }
+      if (!bound)
+        {
+          bound = bind (interface_addr);
+        }
       // qDebug () << "Bound to UDP port:" << localPort () << "on:" << localAddress ();
 
       // set multicast TTL to limit scope when sending to multicast
@@ -864,10 +877,11 @@ auto MessageClient::impl::check_status (QDataStream const& stream) const -> Stre
 
 MessageClient::MessageClient (QString const& id, QString const& version, QString const& revision,
                               QString const& server_name, port_type server_port,
+                              port_type listen_port,
                               QStringList const& network_interface_names,
                               int TTL, QObject * self)
   : QObject {self}
-  , m_ {id, version, revision, server_port, TTL, this}
+  , m_ {id, version, revision, server_port, listen_port, TTL, this}
 {
   connect (&*m_
 #if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
@@ -921,16 +935,14 @@ void MessageClient::set_listen_port (port_type listen_port)
   if (m_->listen_port_ != listen_port)
     {
       m_->listen_port_ = listen_port;
-      // Rebind immediately if already connected to a server
+      // Rebind immediately if already connected to a server and emit a
+      // fresh heartbeat from the final source port. Some external
+      // programs, including CQRLOG wsjtx remote mode, reply to the most
+      // recent sender port they observed in the heartbeat.
       if (!m_->server_.isNull ())
         {
-          QHostAddress interface_addr (QAbstractSocket::IPv6Protocol == m_->server_.protocol ()
-                                       ? QHostAddress::AnyIPv6 : QHostAddress::AnyIPv4);
           m_->close ();
-          if (listen_port > 0)
-            m_->bind (interface_addr, listen_port, QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint);
-          else
-            m_->bind (interface_addr);
+          m_->start ();
         }
     }
 }

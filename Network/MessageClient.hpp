@@ -36,6 +36,7 @@ public:
   // messages will be silently dropped until a server host lookup is complete
   MessageClient (QString const& id, QString const& version, QString const& revision,
                  QString const& server_name, port_type server_port,
+                 port_type listen_port,
                  QStringList const& network_interface_names,
                  int TTL, QObject * parent = nullptr);
 

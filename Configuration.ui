@@ -2522,14 +2522,14 @@ comments field.</string>
             </item>
             <item row="4" column="1">
              <widget class="QSpinBox" name="udp_listen_port_spin_box">
-              <property name="toolTip">
-               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Porta fissa su cui Decodium ascolta comandi UDP in ingresso (es. da DecoAlert). Default 2238. 0 = porta casuale.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             <property name="toolTip">
+               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Porta fissa su cui Decodium ascolta comandi UDP in ingresso (es. da DecoAlert). Default 0 = porta casuale, compatibile con il comportamento storico WSJT-X/CQRLOG. Imposta un valore fisso solo se un controller esterno lo richiede esplicitamente.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
               </property>
               <property name="maximum">
                <number>65535</number>
               </property>
               <property name="value">
-               <number>2238</number>
+               <number>0</number>
               </property>
              </widget>
             </item>

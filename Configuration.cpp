@@ -3406,7 +3406,7 @@ void Configuration::impl::read_settings ()
   udp_interface_names_ = settings_->value ("UDPInterface").toStringList ();
   udp_TTL_ = settings_->value ("UDPTTL", 1).toInt ();
   udp_server_port_ = settings_->value ("UDPServerPort", 2237).toUInt ();
-  udp_listen_port_ = settings_->value ("UDPListenPort", 2238).toUInt ();
+  udp_listen_port_ = settings_->value ("UDPListenPort", 0).toUInt ();
   n1mm_server_name_ = settings_->value ("N1MMServer", "127.0.0.1").toString ();
   n1mm_server_port_ = settings_->value ("N1MMServerPort", 2333).toUInt ();
   broadcast_to_n1mm_ = settings_->value ("BroadcastToN1MM", false).toBool ();
