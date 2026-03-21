@@ -580,8 +580,12 @@ static void apply_async_ft2_tdelta (QString& line, qint64 asyncRxStartMs)
 
 static QString udp_client_id_from_application_name ()
 {
-  QString const appName = QCoreApplication::applicationName ().trimmed ();
-  return appName.isEmpty () ? QStringLiteral ("ft2") : appName;
+  QString const forcedId = qEnvironmentVariable ("DECO_UDP_CLIENT_ID").trimmed ();
+  if (!forcedId.isEmpty ())
+    {
+      return forcedId;
+    }
+  return QStringLiteral ("WSJTX");
 }
 
 void MainWindow::pruneNearDuplicateDecodeCache (qint64 nowMs)
@@ -20896,7 +20900,6 @@ void MainWindow::statusUpdate () const
     {
       tr_period = m_externalCtrl ? (int)(m_TRperiod * 1000) :quint32_max;   //avt 9/30/25
     }
-
   // Keep UDP status aligned with the real on-air mode. External loggers
   // such as CQRLOG expect FT2 sessions to remain FT2 from status through log.
   m_messageClient->status_update (m_freqNominal, m_mode, (m_externalCtrl ? m_dxCall : m_hisCall),   //avt 11/12/21
