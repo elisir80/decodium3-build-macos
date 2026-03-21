@@ -1,37 +1,35 @@
-# Notas de Documentacion (Espanol) - 1.5.2
+# Notas de Documentacion (Espanol) - 1.5.3
 
 Este indice agrupa la documentacion de release del ciclo actual del fork.
 
-- Release actual: `1.5.2`
-- Ciclo de actualizacion: `1.5.1 -> 1.5.2`
-- Foco principal: actualizaciones decoder/protocolo FT2, correccion AutoCQ y Wait Features, recuperacion de audio al arranque, paridad web app, traducciones UI completas y alineacion version/release.
+- Release actual: `1.5.3`
+- Ciclo de actualizacion: `1.5.2 -> 1.5.3`
+- Foco principal: compatibilidad CQRLOG, correccion Wait Features FT4/FT8, propagacion de version local, nuevas traducciones bundle DE/FR y alineacion release.
 
-## Cambios Tecnicos Principales (`1.5.1 -> 1.5.2`)
+## Cambios Tecnicos Principales (`1.5.2 -> 1.5.3`)
 
-- refresh decoder FT2 con path LDPC FT2 dedicado upstream y soporte bitmetrics FT2 actualizado.
-- finalizacion del flow FT2 `Quick QSO` / `2 msg / 3 msg / 5 msg` con manejo TU mixed-mode.
-- restauracion del lock QSO activo `Wait Features + AutoSeq` para FT4/FT8.
-- recuperacion RX-audio al arranque y al wake ligada a la activacion real del monitor.
-- extension de la paridad web app/dashboard con Manual TX, Speedy, D-CW, async, Quick QSO y controles 2/3/5 mensajes.
-- finalizacion de traducciones UI bundle y eliminacion de tags async FT2 visibles en las decode panes.
-- centralizacion del versionado release mediante `fork_release_version.txt`.
+- restaurada la interoperabilidad Linux con `CQRLOG wsjtx remote`, manteniendo el comportamiento historico de la listen port UDP y usando `WSJTX` como client id de compatibilidad.
+- corregida la propagacion de version en las builds locales para que un cambio en `fork_release_version.txt` fuerce la version correcta dentro del binario compilado.
+- endurecido `Wait Features + AutoSeq` en FT4/FT8 para que las colisiones sobre slots ocupados pausen el ciclo TX actual en lugar de transmitir sobre un QSO activo.
+- anadidas traducciones UI bundle reales en aleman y frances y filtrado el menu de idiomas a las traducciones realmente incluidas.
+- alineados a `1.5.3` los defaults release y la documentacion, incluido el default del workflow Linux Hamlib experimental.
 
 ## Artefactos Release
 
-- `decodium3-ft2-1.5.2-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-1.5.2-macos-tahoe-arm64.zip`
-- `decodium3-ft2-1.5.2-macos-tahoe-arm64-sha256.txt`
-- `decodium3-ft2-1.5.2-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-1.5.2-macos-sequoia-arm64.zip`
-- `decodium3-ft2-1.5.2-macos-sequoia-arm64-sha256.txt`
-- `decodium3-ft2-1.5.2-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-1.5.2-macos-sequoia-x86_64.zip`
-- `decodium3-ft2-1.5.2-macos-sequoia-x86_64-sha256.txt`
-- `decodium3-ft2-1.5.2-macos-monterey-x86_64.dmg` *(best effort/experimental, si se genera)*
-- `decodium3-ft2-1.5.2-macos-monterey-x86_64.zip` *(best effort/experimental, si se genera)*
-- `decodium3-ft2-1.5.2-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, si se genera)*
-- `decodium3-ft2-1.5.2-linux-x86_64.AppImage`
-- `decodium3-ft2-1.5.2-linux-x86_64.AppImage.sha256.txt`
+- `decodium3-ft2-1.5.3-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-1.5.3-macos-tahoe-arm64.zip`
+- `decodium3-ft2-1.5.3-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-1.5.3-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-1.5.3-macos-sequoia-arm64.zip`
+- `decodium3-ft2-1.5.3-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-1.5.3-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-1.5.3-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-1.5.3-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-1.5.3-macos-monterey-x86_64.dmg` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-1.5.3-macos-monterey-x86_64.zip` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-1.5.3-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-1.5.3-linux-x86_64.AppImage`
+- `decodium3-ft2-1.5.3-linux-x86_64.AppImage.sha256.txt`
 
 ## Requisitos Minimos Linux
 
@@ -63,6 +61,6 @@ cd squashfs-root
 - [README.en-GB.md](../README.en-GB.md)
 - [README.it.md](../README.it.md)
 - [README.es.md](../README.es.md)
-- [RELEASE_NOTES_1.5.2.md](../RELEASE_NOTES_1.5.2.md)
-- [doc/GITHUB_RELEASE_BODY_1.5.2.md](./GITHUB_RELEASE_BODY_1.5.2.md)
+- [RELEASE_NOTES_1.5.3.md](../RELEASE_NOTES_1.5.3.md)
+- [doc/GITHUB_RELEASE_BODY_1.5.3.md](./GITHUB_RELEASE_BODY_1.5.3.md)
 - [CHANGELOG.md](../CHANGELOG.md)

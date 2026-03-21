@@ -137,6 +137,11 @@ char const * update_api_url = "https://api.github.com/repos/elisir80/decodium3-b
 int constexpr update_startup_delay_ms = 3500;
 int constexpr update_remind_later_hours = 24;
 
+bool bundled_translation_exists (QString const& code)
+{
+  return QFileInfo::exists (QStringLiteral (":/Translations/wsjtx_%1.qm").arg (code));
+}
+
 QString normalized_release_version (QString version)
 {
   version = version.trimmed ();
@@ -1567,29 +1572,49 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
     struct LangInfo { char const * code; char const * name; };
     static LangInfo const langs[] = {
       {"en", "English"},
+      {"ca", "Català"},
+      {"da", "Dansk"},
+      {"de", "Deutsch"},
       {"it", "Italiano"},
       {"es", "Español"},
       {"fr", "Français"},
-      {"de", "Deutsch"},
-      {"pt", "Português"},
       {"ja", "日本語"},
       {"zh", "中文"},
-      {"ko", "한국어"},
-      {"tr", "Türkçe"},
+      {"zh_TW", "繁體中文"},
+      {"ru", "Русский"},
+      {"en_GB", "English (UK)"},
     };
     auto * menuLang = new QMenu (tr ("Language"), this);
-    QString const currentLang = m_settings->value ("UILanguage").toString ();
+    QString currentLang = m_settings->value ("UILanguage").toString ();
     auto * langGroup = new QActionGroup (this);
     langGroup->setExclusive (true);
+    QAction * englishAction = nullptr;
+    bool anyChecked = false;
     for (auto const& li : langs) {
+      QString const langCode = QString::fromLatin1 (li.code);
+      if (!bundled_translation_exists (langCode)) {
+        continue;
+      }
       auto * act = menuLang->addAction (QString::fromUtf8 (li.name));
       act->setCheckable (true);
-      act->setData (QString::fromLatin1 (li.code));
-      if (currentLang == QLatin1String {li.code}
-          || (currentLang.isEmpty () && QLatin1String {li.code} == QLatin1String {"en"})) {
+      act->setData (langCode);
+      if (langCode == QStringLiteral ("en")) {
+        englishAction = act;
+      }
+      if (currentLang == langCode
+          || (currentLang.isEmpty () && langCode == QStringLiteral ("en"))) {
         act->setChecked (true);
+        anyChecked = true;
       }
       langGroup->addAction (act);
+    }
+    if (!anyChecked && englishAction) {
+      englishAction->setChecked (true);
+      if (!currentLang.isEmpty ()) {
+        m_settings->remove ("UILanguage");
+        m_settings->sync ();
+        currentLang.clear ();
+      }
     }
     connect (langGroup, &QActionGroup::triggered, this, [this] (QAction * act) {
       auto const lang = act ? act->data ().toString () : QString {};
@@ -6824,6 +6849,30 @@ void MainWindow::stopWRTimeout()
   if (!m_autoCQ) auto_tx_mode(false);
 }
 
+void MainWindow::pauseCurrentTxCycleForWaitFeatures(QString const& reason)
+{
+  debugToFile(QString {"wait-features pause reason:%1 auto:%2 qso:%3 tx:%4 iptt:%5 ntx:%6"}
+                  .arg(reason)
+                  .arg(m_auto)
+                  .arg(m_QSOProgress)
+                  .arg(m_transmitting)
+                  .arg(g_iptt)
+                  .arg(m_ntx));
+  tx_watchdog(false);
+  m_bTxTime = false;
+  m_restart = false;
+  m_tx_when_ready = false;
+  if (ptt1Timer.isActive()) {
+    ptt1Timer.stop();
+  }
+  if (g_iptt == 1 || m_transmitting) {
+    stopTx();
+  } else {
+    m_btxok = false;
+    statusUpdate();
+  }
+}
+
 void MainWindow::stopWCTimeout()
 {
   if (ui->DX_Call_Button->isChecked()) {
@@ -11350,19 +11399,33 @@ void MainWindow::auto_sequence (DecodedText const& message, unsigned start_toler
       tx_watchdog (false);
       auto_tx_mode (true);
     }
-    if (m_auto
+    bool const waitFeaturesAutoSeqEnabled =
+        m_config.Wait_features_enabled ()
+        && (ft2AutoSeqEnabled ()
+            || (ui->cbAutoSeq->isVisible ()
+                && (ui->cbAutoSeq->isEnabled () or is_externalCtrlMode())
+                && ui->cbAutoSeq->isChecked ()));
+    bool const waitFeaturesNeedsResync =
+        waitFeaturesAutoSeqEnabled
+        && m_auto
         && (m_QSOProgress==REPLYING  or (!ui->tx1->isEnabled () and m_QSOProgress==REPORT))
-        && SpecOp::HOUND != m_specOp && qAbs (ui->TxFreqSpinBox->value () - df) <= int (stop_tolerance) //
+        && SpecOp::HOUND != m_specOp
+        && qAbs (ui->TxFreqSpinBox->value () - df) <= int (stop_tolerance)
         && message_words.at (2) != "DE"
         && !message_words.at (2).contains (QRegularExpression {
           myBaseEffective.isEmpty ()
             ? QString {"^(CQ|QRZ)$"}
             : QString {"(^(CQ|QRZ))|" + myBaseEffective}
         })
-        && message_words.at (3).contains (Radio::base_callsign (ui->dxCallEntry->text ()))) {
-      // auto stop to avoid accidental QRM
-      //ui->stopTxButton->click (); // halt any transmission  avt 11/17/20  not necessary, interferes with external controller actions
-    } else if (m_auto             // transmit allowed
+        && !activePartnerBase.isEmpty ()
+        && message_words.at (3).contains (activePartnerBase);
+    if (waitFeaturesNeedsResync) {
+      // A late partner reply landed on our transmit slot: skip this period,
+      // preserve AutoSeq state, and let processMessage() re-sync the QSO.
+      pauseCurrentTxCycleForWaitFeatures(QString {"late-partner-reply msg:%1"}
+                                             .arg (msg_no_hash.trimmed ()));
+    }
+    if (m_auto             // transmit allowed
                //avt 10/2/25
                && (ft2AutoSeqEnabled ()
                    || (ui->cbAutoSeq->isVisible ()

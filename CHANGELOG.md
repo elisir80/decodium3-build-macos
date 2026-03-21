@@ -1,84 +1,66 @@
 # Changelog / Registro Modifiche
 
-## [1.5.2] - 2026-03-20
+## [1.5.3] - 2026-03-22
 
 ### English
 
-Release focused on FT2 decoder/protocol refresh, FT2/FT4/FT8 QSO-closing stability, startup audio recovery, web-app parity, complete UI translations, and release/version alignment.
+Release focused on CQRLOG interoperability, FT4/FT8 Wait Features behaviour, local version propagation, and new bundled German/French translations.
 
 #### Added
 
-- Added the Decodium certificate generator `tools/generate_cert.py`.
-- Added web-app controls for `Manual TX`, `Speedy`, `D-CW`, async status, `Quick QSO`, and FT2 `2/3/5 msg`.
-- Added direct-asset selection in the internal updater for the current macOS/Linux platform.
+- Added bundled German (`de`) and French (`fr`) UI translation packs.
+- Added the helper `tools/generate_ts_translations.py` to rebuild missing TS bundles from the English base.
 
 #### Changed
 
-- FT2 decoder code is aligned to the dedicated upstream FT2 LDPC path and refreshed FT2 bitmetrics support.
-- FT2 `Quick QSO` / `2 msg` / `3 msg` / `5 msg` flow is aligned to the current short-QSO behaviour with mixed-mode TU support.
-- UI translations bundled with the app are now complete with no unfinished menu/popup strings.
-- Release versioning is now centrally driven by `fork_release_version.txt`.
+- The language menu now exposes only translations that are actually bundled in the app and falls back safely to English if a saved language is no longer available.
+- Release defaults and documentation are aligned to semantic version `1.5.3`, including the experimental Hamlib Linux build default.
 
 #### Fixed
 
-- Fixed multiple FT2/FT4/FT8 late-signoff, late-final-ack, retry, and stale-partner paths that could block logging or repeat `73` / `RR73`.
-- Fixed the `Wait Features + AutoSeq` active-QSO lock for FT4/FT8 so queued calling logic does not interrupt a running contact.
-- Fixed startup and wake-from-sleep RX-audio recovery by tying health checks to the real monitor-on transition.
-- Fixed stale reports or stale callsigns when AutoCQ moves from CQ to a direct caller or from one queued caller to another.
-- Fixed FT2 async/sync duplicate display and removed visible FT2 async decoder tags (`T`, `aN`) from decode panes.
-- Fixed release/version drift between local UI, workflows, and GitHub release publication.
+- Fixed Linux `CQRLOG wsjtx remote` interoperability by restoring the historical UDP listen-port behaviour and using `WSJTX` as the compatibility client id.
+- Fixed local rebuild version drift so changing `fork_release_version.txt` propagates to the compiled app after rebuild/reconfigure.
+- Fixed FT4/FT8 `Wait Features + AutoSeq` so a busy or late partner reply now pauses the current TX cycle instead of transmitting over an active QSO.
 
 ### Italiano
 
-Release focalizzata su refresh decoder/protocollo FT2, stabilita' di chiusura QSO FT2/FT4/FT8, recovery audio all'avvio, parita' web app, traduzioni UI complete e allineamento versione/release.
+Release focalizzata su interoperabilita' CQRLOG, comportamento `Wait Features` in FT4/FT8, propagazione versione locale e nuove traduzioni bundle in tedesco/francese.
 
 #### Aggiunto
 
-- Aggiunto il generatore certificati Decodium `tools/generate_cert.py`.
-- Aggiunti nella web app i controlli `Manual TX`, `Speedy`, `D-CW`, stato async, `Quick QSO` e FT2 `2/3/5 msg`.
-- Aggiunta nell'updater interno la selezione diretta dell'asset corretto per la piattaforma macOS/Linux corrente.
+- Aggiunti i pacchetti traduzione UI bundle tedesco (`de`) e francese (`fr`).
+- Aggiunto l'helper `tools/generate_ts_translations.py` per rigenerare i bundle TS mancanti a partire dalla base inglese.
 
 #### Modificato
 
-- Il codice decoder FT2 e' allineato al path LDPC FT2 dedicato upstream con supporto bitmetrics FT2 aggiornato.
-- Il flow FT2 `Quick QSO` / `2 msg / 3 msg / 5 msg` e' allineato al comportamento corrente del QSO corto con supporto TU mixed-mode.
-- Le traduzioni UI bundle sono ora complete senza stringhe menu/popup `unfinished`.
-- Il versioning release e' ora centralizzato tramite `fork_release_version.txt`.
+- Il menu lingue mostra ora solo traduzioni realmente incluse nell'app e ripiega in sicurezza sull'inglese se la lingua salvata non e' piu' disponibile.
+- Default release e documentazione sono allineati alla semver `1.5.3`, incluso il default del build Linux sperimentale Hamlib.
 
 #### Corretto
 
-- Corretti molteplici path FT2/FT4/FT8 di late-signoff, late-final-ack, retry e partner stantio che potevano bloccare il log o ripetere `73` / `RR73`.
-- Corretto il lock QSO attivo di `Wait Features + AutoSeq` per FT4/FT8, cosi' la logica di chiamata in coda non interrompe un collegamento in corso.
-- Corretto il recovery RX-audio all'avvio e al wake agganciando gli health-check alla reale transizione monitor-on.
-- Corretti report e callsign stantii quando AutoCQ passa dal CQ a un caller diretto o da un caller in coda al successivo.
-- Corretta la visualizzazione duplicata async/sync FT2 e rimossi dalle decode panes i tag FT2 async visibili (`T`, `aN`).
-- Corretto il disallineamento di versione/release tra UI locale, workflow e pubblicazione GitHub.
+- Corretta l'interoperabilita' Linux con `CQRLOG wsjtx remote` ripristinando il comportamento storico della listen port UDP e usando `WSJTX` come client id di compatibilita'.
+- Corretto il drift della versione nelle build locali, cosi' un cambio in `fork_release_version.txt` si propaga davvero all'app compilata dopo rebuild/reconfigure.
+- Corretto `Wait Features + AutoSeq` in FT4/FT8: una risposta tardiva o una stazione occupata mette ora in pausa il ciclo TX corrente invece di trasmettere sopra un QSO attivo.
 
 ### Espanol
 
-Release centrada en refresh decoder/protocolo FT2, estabilidad de cierre QSO FT2/FT4/FT8, recuperacion de audio al arranque, paridad web app, traducciones UI completas y alineacion version/release.
+Release centrada en interoperabilidad CQRLOG, comportamiento `Wait Features` en FT4/FT8, propagacion de version local y nuevas traducciones bundle en aleman/frances.
 
 #### Anadido
 
-- Anadido el generador de certificados Decodium `tools/generate_cert.py`.
-- Anadidos en la web app los controles `Manual TX`, `Speedy`, `D-CW`, estado async, `Quick QSO` y FT2 `2/3/5 msg`.
-- Anadida en el updater interno la seleccion directa del asset correcto para la plataforma macOS/Linux actual.
+- Anadidos los paquetes de traduccion UI bundle aleman (`de`) y frances (`fr`).
+- Anadido el helper `tools/generate_ts_translations.py` para regenerar los bundles TS ausentes a partir de la base inglesa.
 
 #### Cambios
 
-- El codigo decoder FT2 queda alineado al path LDPC FT2 dedicado upstream con soporte bitmetrics FT2 actualizado.
-- El flow FT2 `Quick QSO` / `2 msg / 3 msg / 5 msg` queda alineado al comportamiento actual del QSO corto con soporte TU mixed-mode.
-- Las traducciones UI bundle quedan completas sin cadenas menu/popup `unfinished`.
-- El versionado release pasa a estar centralizado mediante `fork_release_version.txt`.
+- El menu de idiomas muestra ahora solo traducciones realmente incluidas en la app y vuelve de forma segura a ingles si la lengua guardada ya no esta disponible.
+- Los defaults de release y la documentacion quedan alineados a la semver `1.5.3`, incluido el default del build Linux experimental Hamlib.
 
 #### Corregido
 
-- Corregidos multiples paths FT2/FT4/FT8 de late-signoff, late-final-ack, retry y partner obsoleto que podian bloquear el log o repetir `73` / `RR73`.
-- Corregido el lock de QSO activo de `Wait Features + AutoSeq` para FT4/FT8 para que la logica de llamada en cola no interrumpa un contacto en curso.
-- Corregida la recuperacion RX-audio al arranque y al wake ligando los health-check a la transicion real monitor-on.
-- Corregidos reportes y callsigns obsoletos cuando AutoCQ pasa de CQ a un caller directo o de un caller en cola al siguiente.
-- Corregida la visualizacion duplicada async/sync FT2 y eliminados de las decode panes los tags FT2 async visibles (`T`, `aN`).
-- Corregido el desalineamiento version/release entre UI local, workflows y publicacion GitHub.
+- Corregida la interoperabilidad Linux con `CQRLOG wsjtx remote` restaurando el comportamiento historico de la listen port UDP y usando `WSJTX` como client id de compatibilidad.
+- Corregido el desfase de version en builds locales para que un cambio en `fork_release_version.txt` se propague de verdad a la app compilada tras rebuild/reconfigure.
+- Corregido `Wait Features + AutoSeq` en FT4/FT8: una respuesta tardia o una estacion ocupada pausa ahora el ciclo TX actual en lugar de transmitir sobre un QSO activo.
 
 ## [1.5.1] - 2026-03-19
 

@@ -229,6 +229,7 @@ private slots:
   void check_button_color();
   void stopWRTimeout();
   void stopWCTimeout();
+  void pauseCurrentTxCycleForWaitFeatures(QString const& reason);
   void bandHoppingTimer();
   void bandHopping();
   void on_houndButton_clicked(bool checked);
