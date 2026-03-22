@@ -5361,7 +5361,7 @@ QPushButton[state=&quot;ok&quot;] {
   </action>
   <action name="actionAbout">
    <property name="text">
-    <string>About Decodium v3.0 SE KP5</string>
+    <string>About Decodium</string>
    </property>
    <property name="menuRole">
     <enum>QAction::AboutRole</enum>

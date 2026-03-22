@@ -3153,8 +3153,8 @@ R"FT2MAN({
 
 QByteArray dashboard_service_worker_js()
 {
-  return QByteArrayLiteral(
-R"FT2SW(const CACHE_NAME = 'decodium-remote-shell-v3';
+  return QStringLiteral(
+R"FT2SW(const CACHE_NAME = 'decodium-remote-shell-%1';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -3224,7 +3224,7 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
-)FT2SW");
+)FT2SW").arg(fork_release_version()).toUtf8();
 }
 
 QByteArray dashboard_icon_png(int size)
