@@ -74,12 +74,12 @@ R"FT2HTML(<!doctype html>
 <body>
   <div id="login_overlay" class="login-overlay hidden">
     <div class="login-card">
-      <h2>Remote Access</h2>
+      <h2 id="login_title">Remote Access</h2>
       <p id="login_caption">Insert username and password to unlock dashboard</p>
       <form id="login_form" autocomplete="on">
-        <label for="login_user">Username</label>
+        <label id="lbl_login_user" for="login_user">Username</label>
         <input id="login_user" name="username" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="admin" />
-        <label for="login_token">Password</label>
+        <label id="lbl_login_token" for="login_token">Password</label>
         <input id="login_token" name="token" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Access password" />
         <div id="login_token_hint" class="login-token-hint"></div>
         <button id="btn_login" type="submit" class="primary">Unlock</button>
@@ -91,7 +91,7 @@ R"FT2HTML(<!doctype html>
   <div class="app">
     <header class="top">
       <div>
-        <h1>Decodium Remote Console</h1>
+        <h1 id="app_title">Decodium Remote Console</h1>
         <div class="sub">Fork by 9H1SR Salvatore Raccampo</div>
       </div>
       <div class="top-actions">
@@ -106,24 +106,24 @@ R"FT2HTML(<!doctype html>
     <section class="panel main-controls">
       <div class="freq-row">
         <div class="dial-box">
-          <div class="lbl">Dial Frequency</div>
+          <div id="lbl_dial" class="lbl">Dial Frequency</div>
           <div id="st_dial" class="dial">-</div>
         </div>
         <div class="kv-grid">
-          <div class="kv"><span>Mode</span><strong id="st_mode">-</strong></div>
-          <div class="kv"><span>Band</span><strong id="st_band">-</strong></div>
-          <div class="kv"><span>Rx</span><strong id="st_rx">-</strong></div>
-          <div class="kv"><span>Tx</span><strong id="st_tx">-</strong></div>
-          <div class="kv"><span>My Call</span><strong id="st_mycall">-</strong></div>
-          <div class="kv"><span>DX Call</span><strong id="st_dxcall">-</strong></div>
-        <div class="kv"><span>TX Enabled</span><strong id="st_txen">-</strong></div>
-        <div class="kv"><span>Transmitting</span><strong id="st_trx">-</strong></div>
-        <div class="kv"><span>Monitoring</span><strong id="st_mon">-</strong></div>
+          <div class="kv"><span id="lbl_mode">Mode</span><strong id="st_mode">-</strong></div>
+          <div class="kv"><span id="lbl_band">Band</span><strong id="st_band">-</strong></div>
+          <div class="kv"><span id="lbl_rx">Rx</span><strong id="st_rx">-</strong></div>
+          <div class="kv"><span id="lbl_tx">Tx</span><strong id="st_tx">-</strong></div>
+          <div class="kv"><span id="lbl_mycall">My Call</span><strong id="st_mycall">-</strong></div>
+          <div class="kv"><span id="lbl_dxcall">DX Call</span><strong id="st_dxcall">-</strong></div>
+        <div class="kv"><span id="lbl_tx_enabled">TX Enabled</span><strong id="st_txen">-</strong></div>
+        <div class="kv"><span id="lbl_transmitting">Transmitting</span><strong id="st_trx">-</strong></div>
+        <div class="kv"><span id="lbl_monitoring">Monitoring</span><strong id="st_mon">-</strong></div>
         </div>
       </div>
 
       <div class="mode-row">
-        <div class="group-title">Mode</div>
+        <div id="ttl_mode" class="group-title">Mode</div>
         <div class="btn-grid" id="mode_buttons">
           <button class="mode-btn" data-mode="FT2">FT2</button>
           <button class="mode-btn" data-mode="FT8">FT8</button>
@@ -138,7 +138,7 @@ R"FT2HTML(<!doctype html>
       </div>
 
       <div class="band-row">
-        <div class="group-title">Band</div>
+        <div id="ttl_band" class="group-title">Band</div>
         <div class="btn-grid" id="band_buttons">
           <button class="band-btn" data-band="160m">160</button>
           <button class="band-btn" data-band="80m">80</button>
@@ -158,7 +158,7 @@ R"FT2HTML(<!doctype html>
 
       <div class="quick-row">
         <div class="quick-item">
-          <label for="rxfreq">Rx / Tx Frequency (Hz)</label>
+          <label for="rxfreq"><span id="lbl_rxtx_freq">Rx / Tx Frequency (Hz)</span></label>
           <div class="inline rxtx-inline">
             <input id="rxfreq" type="number" min="0" max="5000" step="1" />
             <input id="txfreq" type="number" min="0" max="5000" step="1" />
@@ -170,7 +170,7 @@ R"FT2HTML(<!doctype html>
           </div>
         </div>
         <div class="quick-item">
-          <label for="mode_preset_select">Mode Preset (Rx/Tx)</label>
+          <label for="mode_preset_select"><span id="lbl_mode_preset">Mode Preset (Rx/Tx)</span></label>
           <div class="inline mode-preset-inline">
             <select id="mode_preset_select"></select>
             <button id="btn_apply_mode_preset" type="button">Apply Preset</button>
@@ -180,30 +180,31 @@ R"FT2HTML(<!doctype html>
           </div>
         </div>
         <div class="quick-item">
-          <label>TX Control</label>
+          <label><span id="lbl_tx_control">TX Control</span></label>
           <div class="inline tx-inline">
             <button id="btn_tx_on" class="ok">Enable TX</button>
             <button id="btn_auto_cq" type="button">Auto CQ</button>
             <button id="btn_auto_spot" type="button">AutoSpot</button>
+            <button id="btn_monitor" type="button">Monitoring</button>
             <button id="btn_tx_off" class="warn">Disable TX</button>
           </div>
         </div>
       </div>
 
       <div class="mode-row emission-row">
-        <div class="group-title">Emission Options</div>
+        <div id="ttl_emission" class="group-title">Emission Options</div>
         <div id="ft2_controls" class="ft2-stack hidden">
           <label class="ft2-check">
             <input id="chk_manual_tx" type="checkbox" />
-            <span>Manual TX</span>
+            <span id="lbl_manual_tx">Manual TX</span>
           </label>
           <label class="ft2-check">
             <input id="chk_speedy" type="checkbox" />
-            <span>Speedy</span>
+            <span id="lbl_speedy">Speedy</span>
           </label>
           <label class="ft2-check">
             <input id="chk_digital_morse" type="checkbox" />
-            <span>D-CW</span>
+            <span id="lbl_digital_morse">D-CW</span>
           </label>
           <div id="async_card" class="async-card" role="status" aria-live="polite">
             <div class="async-card-title">ASYNC</div>
@@ -212,7 +213,7 @@ R"FT2HTML(<!doctype html>
             </div>
             <div id="async_card_meta" class="async-card-meta">--- dB</div>
           </div>
-          <label class="ft2-qso-label" for="ft2_qso_count">QSO:</label>
+          <label class="ft2-qso-label" for="ft2_qso_count" id="lbl_qso">QSO:</label>
           <button id="btn_quick_qso" type="button">Quick QSO</button>
           <select id="ft2_qso_count">
             <option value="2">2 msg</option>
@@ -232,39 +233,41 @@ R"FT2HTML(<!doctype html>
 
     <section class="panel waterfall-panel">
       <div class="panel-title-row">
-        <div class="panel-title">Waterfall (experimental)</div>
+        <div id="ttl_waterfall" class="panel-title">Waterfall (experimental)</div>
         <button id="btn_wf_toggle" type="button">Waterfall OFF</button>
       </div>
       <div class="waterfall-wrap">
         <canvas id="waterfall_canvas" width="960" height="260"></canvas>
         <canvas id="waterfall_overlay" width="960" height="260"></canvas>
       </div>
-      <div class="waterfall-hint">Tap/click on waterfall to set Rx frequency.</div>
+      <div id="waterfall_hint" class="waterfall-hint">Tap/click on waterfall to set Rx frequency.</div>
     </section>
 
     <section class="split">
       <article class="panel activity">
         <div class="panel-title-row">
-          <div class="panel-title">RX/TX Activity</div>
+          <div id="ttl_activity" class="panel-title">RX/TX Activity</div>
           <div class="activity-controls">
+            <button id="btn_filter_cq" type="button">Hide CQ</button>
+            <button id="btn_filter_73" type="button">Hide 73</button>
             <button id="btn_activity_pause" type="button">Pausa</button>
             <button id="btn_activity_clear" type="button">Pulisci</button>
           </div>
         </div>
         <table id="activity_table">
           <thead>
-            <tr><th>UTC</th><th>dB</th><th>DT</th><th>Freq</th><th>Message</th></tr>
+            <tr><th id="th_utc">UTC</th><th id="th_db">dB</th><th id="th_dt">DT</th><th id="th_freq">Freq</th><th id="th_msg">Message</th></tr>
           </thead>
           <tbody id="activity_body"></tbody>
         </table>
       </article>
 
       <article class="panel control">
-        <div class="panel-title">Remote Action</div>
-        <label>Call
+        <div id="ttl_remote_action" class="panel-title">Remote Action</div>
+        <label><span id="lbl_call">Call</span>
           <input id="caller_call" type="text" placeholder="K1ABC" />
         </label>
-        <label>Grid
+        <label><span id="lbl_grid">Grid</span>
           <input id="caller_grid" type="text" placeholder="FN31" />
         </label>
         <button id="btn_call" class="primary">Call Station (slot-aware)</button>
@@ -324,7 +327,7 @@ h1{font-size:1.15rem;margin:0;font-weight:700;letter-spacing:.2px}
 .panel{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:12px;padding:10px}
 .panel-title{font-size:.95rem;font-weight:700;margin-bottom:8px}
 .panel-title-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
-.activity-controls{display:flex;gap:6px}
+.activity-controls{display:flex;gap:6px;flex-wrap:wrap}
 .activity-controls button{padding:5px 9px;font-size:.74rem;border-radius:7px}
 .activity-controls button.active{background:var(--warn);color:#fff}
 
@@ -360,7 +363,7 @@ button,input{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .mode-preset-inline{grid-template-columns:minmax(120px,1fr) auto}
 .mode-preset-actions{grid-template-columns:1fr;margin-top:6px}
 .mode-preset-actions button{width:100%;min-height:36px}
-.tx-inline{grid-template-columns:repeat(4,minmax(96px,1fr))}
+.tx-inline{grid-template-columns:repeat(auto-fit,minmax(92px,1fr))}
 .quick-row .inline button{padding:6px 6px;font-size:.75rem}
 input,select{width:100%;padding:8px;border-radius:8px;border:1px solid #37567f;background:#0a1322;color:var(--text)}
 .emission-row{margin-top:8px}
@@ -518,11 +521,14 @@ R"FT2JS((() => {
   const trxPeer = el('trx_peer');
   const actionStatus = el('action_status');
   const activityBody = el('activity_body');
+  const btnFilterCq = el('btn_filter_cq');
+  const btnFilter73 = el('btn_filter_73');
   const btnActivityPause = el('btn_activity_pause');
   const btnActivityClear = el('btn_activity_clear');
   const btnWfToggle = el('btn_wf_toggle');
   const btnAutoCQ = el('btn_auto_cq');
   const btnAutoSpot = el('btn_auto_spot');
+  const btnMonitor = el('btn_monitor');
   const btnTxOn = el('btn_tx_on');
   const btnTxOff = el('btn_tx_off');
   const btnTxFreq = el('btn_txfreq');
@@ -557,18 +563,979 @@ R"FT2JS((() => {
   const loginTokenHint = el('login_token_hint');
   const loginError = el('login_error');
   const loginCaption = el('login_caption');
-  const isItalianUi = ((navigator.language || navigator.userLanguage || 'en').toLowerCase().startsWith('it'));
-  const uiText = isItalianUi
-    ? {
-        loginCaptionAuth: 'Inserisci username e password per sbloccare la dashboard',
-        loginCaptionNoAuth: 'Autenticazione non richiesta',
-        tokenMinHint: 'La password di accesso deve avere almeno 12 caratteri.'
-      }
-    : {
-        loginCaptionAuth: 'Insert username and password to unlock dashboard',
-        loginCaptionNoAuth: 'Authentication not required',
-        tokenMinHint: 'The access password must be at least 12 characters.'
-      };
+  const appleWebAppTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+  const UI_TEXT_EN = {
+    lang: 'en',
+    pageTitle: 'Decodium Remote Console',
+    shortTitle: 'Decodium Remote',
+    remoteAccess: 'Remote Access',
+    loginCaptionAuth: 'Insert username and password to unlock dashboard',
+    loginCaptionNoAuth: 'Authentication not required',
+    username: 'Username',
+    password: 'Password',
+    accessPassword: 'Access password',
+    unlock: 'Unlock',
+    tokenMinHint: 'The access password must be at least 12 characters.',
+    installApp: 'Install App',
+    dialFrequency: 'Dial Frequency',
+    mode: 'Mode',
+    band: 'Band',
+    rx: 'Rx',
+    tx: 'Tx',
+    myCall: 'My Call',
+    dxCall: 'DX Call',
+    txEnabled: 'TX Enabled',
+    transmitting: 'Transmitting',
+    monitoring: 'Monitoring',
+    rxTxFrequency: 'Rx / Tx Frequency (Hz)',
+    setRxTx: 'Set Rx+Tx',
+    setRx: 'Set Rx',
+    setTx: 'Set Tx',
+    modePreset: 'Mode Preset (Rx/Tx)',
+    applyPreset: 'Apply Preset',
+    saveCurrent: 'Save Current',
+    txControl: 'TX Control',
+    enableTx: 'Enable TX',
+    disableTx: 'Disable TX',
+    autoCq: 'Auto CQ',
+    autoSpot: 'AutoSpot',
+    emissionOptions: 'Emission Options',
+    manualTx: 'Manual TX',
+    speedy: 'Speedy',
+    digitalMorse: 'D-CW',
+    qso: 'QSO:',
+    quickQso: 'Quick QSO',
+    asyncL2: 'Async L2',
+    dualCarrier: 'Dual Carrier',
+    alt12: 'Alt 1/2',
+    waterfallTitle: 'Waterfall (experimental)',
+    waterfallOn: 'Waterfall ON',
+    waterfallOff: 'Waterfall OFF',
+    waterfallHint: 'Tap/click on waterfall to set Rx frequency.',
+    activityTitle: 'RX/TX Activity',
+    hideCq: 'Hide CQ',
+    cqHidden: 'CQ hidden',
+    hide73: 'Hide 73',
+    d73Hidden: '73 hidden',
+    pause: 'Pause',
+    resume: 'Resume',
+    clear: 'Clear',
+    remoteAction: 'Remote Action',
+    call: 'Call',
+    grid: 'Grid',
+    frequency: 'Freq',
+    message: 'Message',
+    callStation: 'Call Station (slot-aware)',
+    connected: 'connected',
+    connectedPoll: 'connected (poll)',
+    disconnected: 'disconnected',
+    authenticating: 'authenticating...',
+    locked: 'locked',
+    wsError: 'ws error',
+    authFailed: 'auth failed',
+    invalidCredentials: 'Invalid username or password',
+    passwordRequired: 'Password required',
+    yes: 'yes',
+    no: 'no',
+    monitoringOn: 'Monitoring ON',
+    monitoringOff: 'Monitoring OFF',
+    autoCqOn: 'Auto CQ ON',
+    autoCqOff: 'Auto CQ OFF',
+    autoSpotOn: 'AutoSpot ON',
+    autoSpotOff: 'AutoSpot OFF',
+    quickQsoOn: 'Quick QSO ON',
+    quickQsoOff: 'Quick QSO',
+    asyncL2On: 'Async L2 ON',
+    asyncL2Off: 'Async L2',
+    dualCarrierOn: 'Dual Carrier ON',
+    dualCarrierOff: 'Dual Carrier',
+    alt12On: 'Alt 1/2 ON',
+    alt12Off: 'Alt 1/2',
+    ft2Only: 'FT2 only',
+    txRunning: 'TX running',
+    rxIdle: 'RX idle',
+    asyncReady: 'Async ready',
+    txOnAir: 'TX ON AIR',
+    rxTxArm: 'RX (TX ARM)',
+    rxOnly: 'RX',
+    dxPrefix: 'DX',
+    txWith: 'TX with',
+    lastTx: 'Last TX',
+    txStarted: 'TX STARTED',
+    txEndedRx: 'TX ENDED (RX)',
+    ready: 'Ready',
+    commandFailed: 'Command failed',
+    bandActivityPaused: 'Band activity paused',
+    bandActivityResumed: 'Band activity resumed',
+    bandActivityCleared: 'Band activity cleared',
+    installHintPrompt: 'Tap Install App to add Decodium to your home screen.',
+    installHintIos: 'iPhone/iPad: Safari -> Share -> Add to Home Screen.',
+    installHintInsecure: 'For full app install on Android, use HTTPS or localhost.',
+    installHintAndroid: 'Android: Browser menu -> Add to Home screen.',
+    initError: 'init error',
+    backendUnreachable: 'backend unreachable',
+    msgSuffix: 'msg',
+    noPresetSaved: 'no preset saved for',
+    invalidPresetValues: 'invalid preset values for',
+    presetSaved: 'preset saved',
+    presetLabel: 'preset',
+    rxTxSet: 'Rx/Tx set'
+  };
+  const UI_TEXT_IT = {
+    lang: 'it',
+    pageTitle: 'Console Remota Decodium',
+    shortTitle: 'Decodium Remote',
+    remoteAccess: 'Accesso Remoto',
+    loginCaptionAuth: 'Inserisci username e password per sbloccare la dashboard',
+    loginCaptionNoAuth: 'Autenticazione non richiesta',
+    username: 'Nome utente',
+    password: 'Password',
+    accessPassword: 'Password di accesso',
+    unlock: 'Sblocca',
+    tokenMinHint: 'La password di accesso deve avere almeno 12 caratteri.',
+    installApp: 'Installa App',
+    dialFrequency: 'Frequenza Dial',
+    mode: 'Modo',
+    band: 'Banda',
+    rx: 'Rx',
+    tx: 'Tx',
+    myCall: 'Mio Call',
+    dxCall: 'Call DX',
+    txEnabled: 'TX Abilitato',
+    transmitting: 'In Trasmissione',
+    monitoring: 'Monitoring',
+    rxTxFrequency: 'Frequenza Rx / Tx (Hz)',
+    setRxTx: 'Imposta Rx+Tx',
+    setRx: 'Imposta Rx',
+    setTx: 'Imposta Tx',
+    modePreset: 'Preset Modo (Rx/Tx)',
+    applyPreset: 'Applica Preset',
+    saveCurrent: 'Salva Attuale',
+    txControl: 'Controllo TX',
+    enableTx: 'Abilita TX',
+    disableTx: 'Disabilita TX',
+    autoCq: 'Auto CQ',
+    autoSpot: 'AutoSpot',
+    emissionOptions: 'Opzioni Emissione',
+    manualTx: 'TX Manuale',
+    speedy: 'Speedy',
+    digitalMorse: 'D-CW',
+    qso: 'QSO:',
+    quickQso: 'QSO Rapido',
+    asyncL2: 'Async L2',
+    dualCarrier: 'Dual Carrier',
+    alt12: 'Alt 1/2',
+    waterfallTitle: 'Waterfall (sperimentale)',
+    waterfallOn: 'Waterfall ON',
+    waterfallOff: 'Waterfall OFF',
+    waterfallHint: 'Tocca/clicca sul waterfall per impostare la frequenza Rx.',
+    activityTitle: 'Attivita RX/TX',
+    hideCq: 'Nascondi CQ',
+    cqHidden: 'CQ nascosti',
+    hide73: 'Nascondi 73',
+    d73Hidden: '73 nascosti',
+    pause: 'Pausa',
+    resume: 'Riprendi',
+    clear: 'Pulisci',
+    remoteAction: 'Azione Remota',
+    call: 'Call',
+    grid: 'Grid',
+    frequency: 'Freq',
+    message: 'Messaggio',
+    callStation: 'Chiama Stazione (slot-aware)',
+    connected: 'connesso',
+    connectedPoll: 'connesso (poll)',
+    disconnected: 'disconnesso',
+    authenticating: 'autenticazione...',
+    locked: 'bloccato',
+    wsError: 'errore ws',
+    authFailed: 'autenticazione fallita',
+    invalidCredentials: 'Username o password non validi',
+    passwordRequired: 'Password richiesta',
+    yes: 'si',
+    no: 'no',
+    monitoringOn: 'Monitoring ON',
+    monitoringOff: 'Monitoring OFF',
+    autoCqOn: 'Auto CQ ON',
+    autoCqOff: 'Auto CQ OFF',
+    autoSpotOn: 'AutoSpot ON',
+    autoSpotOff: 'AutoSpot OFF',
+    quickQsoOn: 'QSO Rapido ON',
+    quickQsoOff: 'QSO Rapido',
+    asyncL2On: 'Async L2 ON',
+    asyncL2Off: 'Async L2',
+    dualCarrierOn: 'Dual Carrier ON',
+    dualCarrierOff: 'Dual Carrier',
+    alt12On: 'Alt 1/2 ON',
+    alt12Off: 'Alt 1/2',
+    ft2Only: 'Solo FT2',
+    txRunning: 'TX in corso',
+    rxIdle: 'RX inattivo',
+    asyncReady: 'Async pronto',
+    txOnAir: 'TX ON AIR',
+    rxTxArm: 'RX (TX ARM)',
+    rxOnly: 'RX',
+    dxPrefix: 'DX',
+    txWith: 'TX con',
+    lastTx: 'Ultimo TX',
+    txStarted: 'TX AVVIATO',
+    txEndedRx: 'TX TERMINATO (RX)',
+    ready: 'Pronto',
+    commandFailed: 'Comando fallito',
+    bandActivityPaused: 'Attivita banda in pausa',
+    bandActivityResumed: 'Attivita banda ripresa',
+    bandActivityCleared: 'Attivita banda pulita',
+    installHintPrompt: 'Tocca Installa App per aggiungere Decodium alla schermata Home.',
+    installHintIos: 'iPhone/iPad: Safari -> Condividi -> Aggiungi a Home.',
+    installHintInsecure: 'Per installare l app completa su Android usa HTTPS o localhost.',
+    installHintAndroid: 'Android: menu del browser -> Aggiungi a schermata Home.',
+    initError: 'errore init',
+    backendUnreachable: 'backend non raggiungibile',
+    msgSuffix: 'msg',
+    noPresetSaved: 'nessun preset salvato per',
+    invalidPresetValues: 'valori preset non validi per',
+    presetSaved: 'preset salvato',
+    presetLabel: 'preset',
+    rxTxSet: 'Rx/Tx impostati'
+  };
+  const buildUiText = (lang, overrides = {}) => ({...UI_TEXT_EN, lang, ...overrides});
+  const UI_TEXT_EN_GB = buildUiText('en-GB', {});
+  const UI_TEXT_CA = buildUiText('ca', {
+    pageTitle: 'Consola remota de Decodium',
+    remoteAccess: 'Acces remot',
+    loginCaptionAuth: 'Introdueix usuari i contrasenya per desbloquejar el tauler',
+    loginCaptionNoAuth: 'Autenticacio no requerida',
+    username: 'Usuari',
+    password: 'Contrasenya',
+    accessPassword: "Contrasenya d'acces",
+    unlock: 'Desbloqueja',
+    tokenMinHint: "La contrasenya d'acces ha de tenir com a minim 12 caracters.",
+    installApp: "Instal la l'app",
+    dialFrequency: 'Frequencia dial',
+    band: 'Banda',
+    myCall: 'El meu indicatiu',
+    dxCall: 'Indicatiu DX',
+    txEnabled: 'TX habilitat',
+    transmitting: 'En transmissio',
+    monitoring: 'Monitoratge',
+    rxTxFrequency: 'Frequencia Rx / Tx (Hz)',
+    setRxTx: 'Defineix Rx+Tx',
+    setRx: 'Defineix Rx',
+    setTx: 'Defineix Tx',
+    modePreset: 'Preset de mode (Rx/Tx)',
+    applyPreset: 'Aplica preset',
+    saveCurrent: "Desa l'actual",
+    txControl: 'Control TX',
+    enableTx: 'Habilita TX',
+    disableTx: 'Deshabilita TX',
+    emissionOptions: "Opcions d'emissio",
+    manualTx: 'TX manual',
+    waterfallTitle: 'Waterfall (experimental)',
+    waterfallHint: 'Toca o clica al waterfall per definir la frequencia Rx.',
+    activityTitle: 'Activitat RX/TX',
+    hideCq: 'Amaga CQ',
+    cqHidden: 'CQ amagats',
+    hide73: 'Amaga 73',
+    d73Hidden: '73 amagats',
+    pause: 'Pausa',
+    resume: 'Continua',
+    clear: 'Neteja',
+    remoteAction: 'Accio remota',
+    callStation: 'Crida estacio (slot-aware)',
+    connected: 'connectat',
+    connectedPoll: 'connectat (poll)',
+    disconnected: 'desconnectat',
+    authenticating: 'autenticant...',
+    locked: 'bloquejat',
+    wsError: 'error ws',
+    authFailed: "autenticacio fallida",
+    invalidCredentials: 'Usuari o contrasenya no valids',
+    passwordRequired: 'Cal contrasenya',
+    yes: 'si',
+    no: 'no',
+    monitoringOn: 'Monitoratge ON',
+    monitoringOff: 'Monitoratge OFF',
+    quickQsoOn: 'QSO rapid ON',
+    quickQsoOff: 'QSO rapid',
+    ft2Only: 'Nomes FT2',
+    txRunning: 'TX en curs',
+    rxIdle: 'RX inactiu',
+    asyncReady: 'Async preparat',
+    txWith: 'TX amb',
+    lastTx: 'Ultim TX',
+    ready: 'Preparat',
+    commandFailed: 'Ordre fallida',
+    bandActivityPaused: 'Activitat de banda en pausa',
+    bandActivityResumed: 'Activitat de banda represa',
+    bandActivityCleared: 'Activitat de banda netejada',
+    installHintPrompt: "Toca Instal la App per afegir Decodium a la pantalla d'inici.",
+    installHintIos: "iPhone/iPad: Safari -> Comparteix -> Afegeix a la pantalla d'inici.",
+    installHintInsecure: "Per instal lar l'app completa a Android, fes servir HTTPS o localhost.",
+    installHintAndroid: "Android: menu del navegador -> Afegeix a la pantalla d'inici.",
+    initError: 'error init',
+    backendUnreachable: 'backend inabastable',
+    noPresetSaved: 'cap preset desat per a',
+    invalidPresetValues: 'valors de preset no valids per a',
+    presetSaved: 'preset desat',
+    rxTxSet: 'Rx/Tx definit'
+  });
+  const UI_TEXT_DA = buildUiText('da', {
+    pageTitle: 'Decodium fjernkonsol',
+    remoteAccess: 'Fjernadgang',
+    loginCaptionAuth: 'Indtast brugernavn og adgangskode for at lase dashboard op',
+    loginCaptionNoAuth: 'Godkendelse ikke pakraevet',
+    username: 'Brugernavn',
+    password: 'Adgangskode',
+    accessPassword: 'Adgangskode',
+    unlock: 'Las op',
+    tokenMinHint: 'Adgangskoden skal vaere mindst 12 tegn.',
+    installApp: 'Installer app',
+    dialFrequency: 'Dialfrekvens',
+    band: 'Band',
+    myCall: 'Mit kaldesignal',
+    dxCall: 'DX-kaldesignal',
+    txEnabled: 'TX aktiveret',
+    transmitting: 'Sender',
+    monitoring: 'Overvagning',
+    rxTxFrequency: 'Rx / Tx-frekvens (Hz)',
+    setRxTx: 'Saet Rx+Tx',
+    setRx: 'Saet Rx',
+    setTx: 'Saet Tx',
+    modePreset: 'Tilstands-preset (Rx/Tx)',
+    applyPreset: 'Anvend preset',
+    saveCurrent: 'Gem nuvaerende',
+    txControl: 'TX-kontrol',
+    enableTx: 'Aktiver TX',
+    disableTx: 'Deaktiver TX',
+    emissionOptions: 'Sendemuligheder',
+    manualTx: 'Manuel TX',
+    waterfallTitle: 'Waterfall (eksperimentel)',
+    waterfallHint: 'Tryk/klik pa waterfall for at saette Rx-frekvens.',
+    activityTitle: 'RX/TX-aktivitet',
+    hideCq: 'Skjul CQ',
+    cqHidden: 'CQ skjult',
+    hide73: 'Skjul 73',
+    d73Hidden: '73 skjult',
+    pause: 'Pause',
+    resume: 'Genoptag',
+    clear: 'Ryd',
+    remoteAction: 'Fjernhandling',
+    callStation: 'Kald station (slot-aware)',
+    connected: 'forbundet',
+    connectedPoll: 'forbundet (poll)',
+    disconnected: 'frakoblet',
+    authenticating: 'godkender...',
+    locked: 'last',
+    wsError: 'ws-fejl',
+    authFailed: 'godkendelse mislykkedes',
+    invalidCredentials: 'Ugyldigt brugernavn eller adgangskode',
+    passwordRequired: 'Adgangskode pakraevet',
+    yes: 'ja',
+    no: 'nej',
+    monitoringOn: 'Overvagning ON',
+    monitoringOff: 'Overvagning OFF',
+    quickQsoOn: 'Hurtig QSO ON',
+    quickQsoOff: 'Hurtig QSO',
+    ft2Only: 'Kun FT2',
+    txRunning: 'TX korer',
+    rxIdle: 'RX inaktiv',
+    asyncReady: 'Async klar',
+    txWith: 'TX med',
+    lastTx: 'Sidste TX',
+    ready: 'Klar',
+    commandFailed: 'Kommando mislykkedes',
+    bandActivityPaused: 'Bandaktivitet sat pa pause',
+    bandActivityResumed: 'Bandaktivitet genoptaget',
+    bandActivityCleared: 'Bandaktivitet ryddet',
+    installHintPrompt: 'Tryk pa Installer app for at tilfoje Decodium til hjemmeskaermen.',
+    installHintIos: 'iPhone/iPad: Safari -> Del -> Føj til hjemmeskærm.',
+    installHintInsecure: 'For fuld app-installation pa Android skal du bruge HTTPS eller localhost.',
+    installHintAndroid: 'Android: browsermenu -> Føj til hjemmeskærm.',
+    initError: 'init-fejl',
+    backendUnreachable: 'backend utilgaengelig',
+    noPresetSaved: 'ingen preset gemt for',
+    invalidPresetValues: 'ugyldige preset-vaerdier for',
+    presetSaved: 'preset gemt',
+    rxTxSet: 'Rx/Tx sat'
+  });
+  const UI_TEXT_DE = buildUiText('de', {
+    pageTitle: 'Decodium Fernkonsole',
+    remoteAccess: 'Fernzugriff',
+    loginCaptionAuth: 'Benutzername und Passwort eingeben, um das Dashboard zu entsperren',
+    loginCaptionNoAuth: 'Keine Authentifizierung erforderlich',
+    username: 'Benutzername',
+    password: 'Passwort',
+    accessPassword: 'Zugangspasswort',
+    unlock: 'Entsperren',
+    tokenMinHint: 'Das Zugangspasswort muss mindestens 12 Zeichen lang sein.',
+    installApp: 'App installieren',
+    dialFrequency: 'Dial-Frequenz',
+    band: 'Band',
+    myCall: 'Mein Rufzeichen',
+    dxCall: 'DX-Rufzeichen',
+    txEnabled: 'TX aktiviert',
+    transmitting: 'Sendet',
+    monitoring: 'Monitoring',
+    rxTxFrequency: 'Rx / Tx-Frequenz (Hz)',
+    setRxTx: 'Rx+Tx setzen',
+    setRx: 'Rx setzen',
+    setTx: 'Tx setzen',
+    modePreset: 'Mode-Preset (Rx/Tx)',
+    applyPreset: 'Preset anwenden',
+    saveCurrent: 'Aktuelles speichern',
+    txControl: 'TX-Steuerung',
+    enableTx: 'TX aktivieren',
+    disableTx: 'TX deaktivieren',
+    emissionOptions: 'Sendeoptionen',
+    manualTx: 'Manuelles TX',
+    waterfallTitle: 'Waterfall (experimentell)',
+    waterfallHint: 'Tippen/klicken Sie auf den Waterfall, um die Rx-Frequenz zu setzen.',
+    activityTitle: 'RX/TX-Aktivitat',
+    hideCq: 'CQ ausblenden',
+    cqHidden: 'CQ ausgeblendet',
+    hide73: '73 ausblenden',
+    d73Hidden: '73 ausgeblendet',
+    pause: 'Pause',
+    resume: 'Fortsetzen',
+    clear: 'Leeren',
+    remoteAction: 'Fernaktion',
+    callStation: 'Station rufen (slot-aware)',
+    connected: 'verbunden',
+    connectedPoll: 'verbunden (poll)',
+    disconnected: 'getrennt',
+    authenticating: 'authentifiziere...',
+    locked: 'gesperrt',
+    wsError: 'ws-Fehler',
+    authFailed: 'Authentifizierung fehlgeschlagen',
+    invalidCredentials: 'Ungultiger Benutzername oder Passwort',
+    passwordRequired: 'Passwort erforderlich',
+    yes: 'ja',
+    no: 'nein',
+    monitoringOn: 'Monitoring EIN',
+    monitoringOff: 'Monitoring AUS',
+    quickQsoOn: 'Quick QSO EIN',
+    quickQsoOff: 'Quick QSO',
+    ft2Only: 'Nur FT2',
+    txRunning: 'TX lauft',
+    rxIdle: 'RX inaktiv',
+    asyncReady: 'Async bereit',
+    txWith: 'TX mit',
+    lastTx: 'Letztes TX',
+    ready: 'Bereit',
+    commandFailed: 'Befehl fehlgeschlagen',
+    bandActivityPaused: 'Bandaktivitat pausiert',
+    bandActivityResumed: 'Bandaktivitat fortgesetzt',
+    bandActivityCleared: 'Bandaktivitat geleert',
+    installHintPrompt: 'Tippen Sie auf App installieren, um Decodium zum Homescreen hinzuzufugen.',
+    installHintIos: 'iPhone/iPad: Safari -> Teilen -> Zum Home-Bildschirm.',
+    installHintInsecure: 'Fur die vollstandige App-Installation auf Android HTTPS oder localhost verwenden.',
+    installHintAndroid: 'Android: Browsermenu -> Zum Startbildschirm hinzufugen.',
+    initError: 'Init-Fehler',
+    backendUnreachable: 'Backend nicht erreichbar',
+    noPresetSaved: 'kein Preset gespeichert fur',
+    invalidPresetValues: 'ungultige Preset-Werte fur',
+    presetSaved: 'Preset gespeichert',
+    rxTxSet: 'Rx/Tx gesetzt'
+  });
+  const UI_TEXT_ES = buildUiText('es', {
+    pageTitle: 'Consola remota de Decodium',
+    remoteAccess: 'Acceso remoto',
+    loginCaptionAuth: 'Introduce usuario y contrasena para desbloquear el panel',
+    loginCaptionNoAuth: 'Autenticacion no requerida',
+    username: 'Usuario',
+    password: 'Contrasena',
+    accessPassword: 'Contrasena de acceso',
+    unlock: 'Desbloquear',
+    tokenMinHint: 'La contrasena de acceso debe tener al menos 12 caracteres.',
+    installApp: 'Instalar app',
+    dialFrequency: 'Frecuencia dial',
+    band: 'Banda',
+    myCall: 'Mi indicativo',
+    dxCall: 'Indicativo DX',
+    txEnabled: 'TX habilitado',
+    transmitting: 'Transmitiendo',
+    monitoring: 'Monitorizacion',
+    rxTxFrequency: 'Frecuencia Rx / Tx (Hz)',
+    setRxTx: 'Ajustar Rx+Tx',
+    setRx: 'Ajustar Rx',
+    setTx: 'Ajustar Tx',
+    modePreset: 'Preset de modo (Rx/Tx)',
+    applyPreset: 'Aplicar preset',
+    saveCurrent: 'Guardar actual',
+    txControl: 'Control TX',
+    enableTx: 'Habilitar TX',
+    disableTx: 'Deshabilitar TX',
+    emissionOptions: 'Opciones de emision',
+    manualTx: 'TX manual',
+    waterfallTitle: 'Waterfall (experimental)',
+    waterfallHint: 'Toca/haz clic en el waterfall para ajustar la frecuencia Rx.',
+    activityTitle: 'Actividad RX/TX',
+    hideCq: 'Ocultar CQ',
+    cqHidden: 'CQ ocultos',
+    hide73: 'Ocultar 73',
+    d73Hidden: '73 ocultos',
+    pause: 'Pausa',
+    resume: 'Reanudar',
+    clear: 'Limpiar',
+    remoteAction: 'Accion remota',
+    callStation: 'Llamar estacion (slot-aware)',
+    connected: 'conectado',
+    connectedPoll: 'conectado (poll)',
+    disconnected: 'desconectado',
+    authenticating: 'autenticando...',
+    locked: 'bloqueado',
+    wsError: 'error ws',
+    authFailed: 'autenticacion fallida',
+    invalidCredentials: 'Usuario o contrasena no validos',
+    passwordRequired: 'Contrasena requerida',
+    yes: 'si',
+    no: 'no',
+    monitoringOn: 'Monitorizacion ON',
+    monitoringOff: 'Monitorizacion OFF',
+    quickQsoOn: 'QSO rapido ON',
+    quickQsoOff: 'QSO rapido',
+    ft2Only: 'Solo FT2',
+    txRunning: 'TX en curso',
+    rxIdle: 'RX inactivo',
+    asyncReady: 'Async listo',
+    txWith: 'TX con',
+    lastTx: 'Ultimo TX',
+    ready: 'Listo',
+    commandFailed: 'Comando fallido',
+    bandActivityPaused: 'Actividad de banda en pausa',
+    bandActivityResumed: 'Actividad de banda reanudada',
+    bandActivityCleared: 'Actividad de banda limpiada',
+    installHintPrompt: 'Toca Instalar app para anadir Decodium a tu pantalla de inicio.',
+    installHintIos: 'iPhone/iPad: Safari -> Compartir -> Anadir a inicio.',
+    installHintInsecure: 'Para instalar la app completa en Android usa HTTPS o localhost.',
+    installHintAndroid: 'Android: menu del navegador -> Anadir a pantalla de inicio.',
+    initError: 'error init',
+    backendUnreachable: 'backend no accesible',
+    noPresetSaved: 'no hay preset guardado para',
+    invalidPresetValues: 'valores de preset no validos para',
+    presetSaved: 'preset guardado',
+    rxTxSet: 'Rx/Tx ajustados'
+  });
+  const UI_TEXT_FR = buildUiText('fr', {
+    pageTitle: 'Console distante Decodium',
+    remoteAccess: 'Acces distant',
+    loginCaptionAuth: "Saisissez le nom d'utilisateur et le mot de passe pour deverrouiller le tableau de bord",
+    loginCaptionNoAuth: 'Authentification non requise',
+    username: "Nom d'utilisateur",
+    password: 'Mot de passe',
+    accessPassword: "Mot de passe d'acces",
+    unlock: 'Debloquer',
+    tokenMinHint: "Le mot de passe d'acces doit contenir au moins 12 caracteres.",
+    installApp: "Installer l'app",
+    dialFrequency: 'Frequence dial',
+    band: 'Bande',
+    myCall: 'Mon indicatif',
+    dxCall: 'Indicatif DX',
+    txEnabled: 'TX active',
+    transmitting: 'En emission',
+    monitoring: 'Surveillance',
+    rxTxFrequency: 'Frequence Rx / Tx (Hz)',
+    setRxTx: 'Definir Rx+Tx',
+    setRx: 'Definir Rx',
+    setTx: 'Definir Tx',
+    modePreset: 'Preset mode (Rx/Tx)',
+    applyPreset: 'Appliquer le preset',
+    saveCurrent: "Enregistrer l'actuel",
+    txControl: 'Controle TX',
+    enableTx: 'Activer TX',
+    disableTx: 'Desactiver TX',
+    emissionOptions: "Options d'emission",
+    manualTx: 'TX manuel',
+    waterfallTitle: 'Waterfall (experimental)',
+    waterfallHint: 'Touchez/cliquez sur le waterfall pour regler la frequence Rx.',
+    activityTitle: 'Activite RX/TX',
+    hideCq: 'Masquer CQ',
+    cqHidden: 'CQ masques',
+    hide73: 'Masquer 73',
+    d73Hidden: '73 masques',
+    pause: 'Pause',
+    resume: 'Reprendre',
+    clear: 'Effacer',
+    remoteAction: 'Action distante',
+    callStation: 'Appeler la station (slot-aware)',
+    connected: 'connecte',
+    connectedPoll: 'connecte (poll)',
+    disconnected: 'deconnecte',
+    authenticating: 'authentification...',
+    locked: 'verrouille',
+    wsError: 'erreur ws',
+    authFailed: "echec d'authentification",
+    invalidCredentials: "Nom d'utilisateur ou mot de passe invalide",
+    passwordRequired: 'Mot de passe requis',
+    yes: 'oui',
+    no: 'non',
+    monitoringOn: 'Surveillance ON',
+    monitoringOff: 'Surveillance OFF',
+    quickQsoOn: 'QSO rapide ON',
+    quickQsoOff: 'QSO rapide',
+    ft2Only: 'FT2 seulement',
+    txRunning: 'TX en cours',
+    rxIdle: 'RX inactif',
+    asyncReady: 'Async pret',
+    txWith: 'TX avec',
+    lastTx: 'Dernier TX',
+    ready: 'Pret',
+    commandFailed: 'Commande echouee',
+    bandActivityPaused: 'Activite bande en pause',
+    bandActivityResumed: 'Activite bande reprise',
+    bandActivityCleared: 'Activite bande effacee',
+    installHintPrompt: "Touchez Installer l'app pour ajouter Decodium a l'ecran d'accueil.",
+    installHintIos: "iPhone/iPad: Safari -> Partager -> Sur l'ecran d'accueil.",
+    installHintInsecure: "Pour installer l'app complete sur Android, utilisez HTTPS ou localhost.",
+    installHintAndroid: "Android: menu du navigateur -> Ajouter a l'ecran d'accueil.",
+    initError: 'erreur init',
+    backendUnreachable: 'backend inaccessible',
+    noPresetSaved: 'aucun preset enregistre pour',
+    invalidPresetValues: 'valeurs de preset invalides pour',
+    presetSaved: 'preset enregistre',
+    rxTxSet: 'Rx/Tx definis'
+  });
+  const UI_TEXT_JA = buildUiText('ja', {
+    lang: 'ja',
+    pageTitle: 'Decodium Remote コンソール',
+    remoteAccess: 'リモートアクセス',
+    loginCaptionAuth: 'ダッシュボードを解除するためにユーザー名とパスワードを入力してください',
+    loginCaptionNoAuth: '認証は不要です',
+    username: 'ユーザー名',
+    password: 'パスワード',
+    accessPassword: 'アクセス用パスワード',
+    unlock: '解除',
+    tokenMinHint: 'アクセス用パスワードは12文字以上必要です。',
+    installApp: 'アプリをインストール',
+    dialFrequency: 'ダイヤル周波数',
+    band: 'バンド',
+    myCall: '自局コール',
+    dxCall: 'DXコール',
+    txEnabled: 'TX有効',
+    transmitting: '送信中',
+    monitoring: 'モニタリング',
+    rxTxFrequency: 'Rx / Tx 周波数 (Hz)',
+    setRxTx: 'Rx+Tx設定',
+    setRx: 'Rx設定',
+    setTx: 'Tx設定',
+    modePreset: 'モードプリセット (Rx/Tx)',
+    applyPreset: 'プリセット適用',
+    saveCurrent: '現在値を保存',
+    txControl: 'TX制御',
+    enableTx: 'TX有効',
+    disableTx: 'TX無効',
+    emissionOptions: '送信オプション',
+    manualTx: '手動TX',
+    waterfallTitle: 'Waterfall (実験的)',
+    waterfallHint: 'Waterfallをタップ/クリックしてRx周波数を設定します。',
+    activityTitle: 'RX/TXアクティビティ',
+    hideCq: 'CQを隠す',
+    cqHidden: 'CQ非表示',
+    hide73: '73を隠す',
+    d73Hidden: '73非表示',
+    pause: '一時停止',
+    resume: '再開',
+    clear: 'クリア',
+    remoteAction: 'リモート操作',
+    callStation: '局を呼ぶ (slot-aware)',
+    connected: '接続済み',
+    connectedPoll: '接続済み (poll)',
+    disconnected: '未接続',
+    authenticating: '認証中...',
+    locked: 'ロック中',
+    wsError: 'ws エラー',
+    authFailed: '認証失敗',
+    invalidCredentials: 'ユーザー名またはパスワードが無効です',
+    passwordRequired: 'パスワードが必要です',
+    yes: 'はい',
+    no: 'いいえ',
+    monitoringOn: 'Monitoring ON',
+    monitoringOff: 'Monitoring OFF',
+    quickQsoOn: 'Quick QSO ON',
+    quickQsoOff: 'Quick QSO',
+    ft2Only: 'FT2のみ',
+    txRunning: 'TX動作中',
+    rxIdle: 'RX待機中',
+    asyncReady: 'Async準備完了',
+    txWith: 'TX相手',
+    lastTx: '最後のTX',
+    ready: '準備完了',
+    commandFailed: 'コマンド失敗',
+    bandActivityPaused: 'バンドアクティビティを一時停止しました',
+    bandActivityResumed: 'バンドアクティビティを再開しました',
+    bandActivityCleared: 'バンドアクティビティを消去しました',
+    installHintPrompt: 'アプリをインストールを押してDecodiumをホーム画面に追加します。',
+    installHintIos: 'iPhone/iPad: Safari -> 共有 -> ホーム画面に追加。',
+    installHintInsecure: 'Androidで完全なアプリとしてインストールするにはHTTPSまたはlocalhostを使用してください。',
+    installHintAndroid: 'Android: ブラウザメニュー -> ホーム画面に追加。',
+    initError: '初期化エラー',
+    backendUnreachable: 'バックエンドに接続できません',
+    noPresetSaved: '保存されたプリセットがありません:',
+    invalidPresetValues: 'プリセット値が無効です:',
+    presetSaved: 'プリセット保存',
+    presetLabel: 'プリセット',
+    rxTxSet: 'Rx/Tx設定'
+  });
+  const UI_TEXT_RU = buildUiText('ru', {
+    lang: 'ru',
+    pageTitle: 'Удаленная консоль Decodium',
+    remoteAccess: 'Удаленный доступ',
+    loginCaptionAuth: 'Введите имя пользователя и пароль для разблокировки панели',
+    loginCaptionNoAuth: 'Аутентификация не требуется',
+    username: 'Имя пользователя',
+    password: 'Пароль',
+    accessPassword: 'Пароль доступа',
+    unlock: 'Разблокировать',
+    tokenMinHint: 'Пароль доступа должен содержать не менее 12 символов.',
+    installApp: 'Установить приложение',
+    dialFrequency: 'Частота dial',
+    band: 'Диапазон',
+    myCall: 'Мой позывной',
+    dxCall: 'DX позывной',
+    txEnabled: 'TX включен',
+    transmitting: 'Передача',
+    monitoring: 'Мониторинг',
+    rxTxFrequency: 'Частота Rx / Tx (Hz)',
+    setRxTx: 'Установить Rx+Tx',
+    setRx: 'Установить Rx',
+    setTx: 'Установить Tx',
+    modePreset: 'Пресет режима (Rx/Tx)',
+    applyPreset: 'Применить пресет',
+    saveCurrent: 'Сохранить текущее',
+    txControl: 'Управление TX',
+    enableTx: 'Включить TX',
+    disableTx: 'Выключить TX',
+    emissionOptions: 'Параметры передачи',
+    manualTx: 'Ручной TX',
+    waterfallTitle: 'Waterfall (экспериментально)',
+    waterfallHint: 'Нажмите на waterfall, чтобы установить частоту Rx.',
+    activityTitle: 'Активность RX/TX',
+    hideCq: 'Скрыть CQ',
+    cqHidden: 'CQ скрыты',
+    hide73: 'Скрыть 73',
+    d73Hidden: '73 скрыты',
+    pause: 'Пауза',
+    resume: 'Продолжить',
+    clear: 'Очистить',
+    remoteAction: 'Удаленное действие',
+    callStation: 'Вызвать станцию (slot-aware)',
+    connected: 'подключено',
+    connectedPoll: 'подключено (poll)',
+    disconnected: 'отключено',
+    authenticating: 'аутентификация...',
+    locked: 'заблокировано',
+    wsError: 'ошибка ws',
+    authFailed: 'ошибка аутентификации',
+    invalidCredentials: 'Неверное имя пользователя или пароль',
+    passwordRequired: 'Требуется пароль',
+    yes: 'да',
+    no: 'нет',
+    monitoringOn: 'Мониторинг ON',
+    monitoringOff: 'Мониторинг OFF',
+    quickQsoOn: 'Quick QSO ON',
+    quickQsoOff: 'Quick QSO',
+    ft2Only: 'Только FT2',
+    txRunning: 'TX выполняется',
+    rxIdle: 'RX неактивен',
+    asyncReady: 'Async готов',
+    txWith: 'TX с',
+    lastTx: 'Последний TX',
+    ready: 'Готово',
+    commandFailed: 'Команда не выполнена',
+    bandActivityPaused: 'Активность диапазона приостановлена',
+    bandActivityResumed: 'Активность диапазона возобновлена',
+    bandActivityCleared: 'Активность диапазона очищена',
+    installHintPrompt: 'Нажмите Установить приложение, чтобы добавить Decodium на главный экран.',
+    installHintIos: 'iPhone/iPad: Safari -> Поделиться -> На экран Домой.',
+    installHintInsecure: 'Для полной установки на Android используйте HTTPS или localhost.',
+    installHintAndroid: 'Android: меню браузера -> Добавить на главный экран.',
+    initError: 'ошибка инициализации',
+    backendUnreachable: 'backend недоступен',
+    noPresetSaved: 'нет сохраненного пресета для',
+    invalidPresetValues: 'неверные значения пресета для',
+    presetSaved: 'пресет сохранен',
+    rxTxSet: 'Rx/Tx установлены'
+  });
+  const UI_TEXT_ZH = buildUiText('zh-CN', {
+    lang: 'zh-CN',
+    pageTitle: 'Decodium 远程控制台',
+    remoteAccess: '远程访问',
+    loginCaptionAuth: '请输入用户名和密码以解锁面板',
+    loginCaptionNoAuth: '无需身份验证',
+    username: '用户名',
+    password: '密码',
+    accessPassword: '访问密码',
+    unlock: '解锁',
+    tokenMinHint: '访问密码至少需要 12 个字符。',
+    installApp: '安装应用',
+    dialFrequency: '拨号频率',
+    band: '波段',
+    myCall: '我的呼号',
+    dxCall: 'DX 呼号',
+    txEnabled: 'TX 已启用',
+    transmitting: '发射中',
+    monitoring: '监控',
+    rxTxFrequency: 'Rx / Tx 频率 (Hz)',
+    setRxTx: '设置 Rx+Tx',
+    setRx: '设置 Rx',
+    setTx: '设置 Tx',
+    modePreset: '模式预设 (Rx/Tx)',
+    applyPreset: '应用预设',
+    saveCurrent: '保存当前值',
+    txControl: 'TX 控制',
+    enableTx: '启用 TX',
+    disableTx: '禁用 TX',
+    emissionOptions: '发射选项',
+    manualTx: '手动 TX',
+    waterfallTitle: 'Waterfall（实验性）',
+    waterfallHint: '点击 waterfall 以设置 Rx 频率。',
+    activityTitle: 'RX/TX 活动',
+    hideCq: '隐藏 CQ',
+    cqHidden: '已隐藏 CQ',
+    hide73: '隐藏 73',
+    d73Hidden: '已隐藏 73',
+    pause: '暂停',
+    resume: '继续',
+    clear: '清除',
+    remoteAction: '远程操作',
+    callStation: '呼叫电台（slot-aware）',
+    connected: '已连接',
+    connectedPoll: '已连接 (poll)',
+    disconnected: '未连接',
+    authenticating: '认证中...',
+    locked: '已锁定',
+    wsError: 'ws 错误',
+    authFailed: '认证失败',
+    invalidCredentials: '用户名或密码无效',
+    passwordRequired: '需要密码',
+    yes: '是',
+    no: '否',
+    monitoringOn: '监控 ON',
+    monitoringOff: '监控 OFF',
+    quickQsoOn: 'Quick QSO ON',
+    quickQsoOff: 'Quick QSO',
+    ft2Only: '仅 FT2',
+    txRunning: 'TX 运行中',
+    rxIdle: 'RX 空闲',
+    asyncReady: 'Async 就绪',
+    txWith: 'TX 对象',
+    lastTx: '上次 TX',
+    ready: '就绪',
+    commandFailed: '命令失败',
+    bandActivityPaused: '频段活动已暂停',
+    bandActivityResumed: '频段活动已恢复',
+    bandActivityCleared: '频段活动已清除',
+    installHintPrompt: '点击安装应用，将 Decodium 添加到主屏幕。',
+    installHintIos: 'iPhone/iPad: Safari -> 分享 -> 添加到主屏幕。',
+    installHintInsecure: '若要在 Android 上完整安装，请使用 HTTPS 或 localhost。',
+    installHintAndroid: 'Android: 浏览器菜单 -> 添加到主屏幕。',
+    initError: '初始化错误',
+    backendUnreachable: '后端不可达',
+    noPresetSaved: '没有已保存的预设:',
+    invalidPresetValues: '预设值无效:',
+    presetSaved: '预设已保存',
+    presetLabel: '预设',
+    rxTxSet: 'Rx/Tx 已设置'
+  });
+  const UI_TEXT_ZH_TW = buildUiText('zh-TW', {
+    lang: 'zh-TW',
+    pageTitle: 'Decodium 遠端控制台',
+    remoteAccess: '遠端存取',
+    loginCaptionAuth: '請輸入使用者名稱與密碼以解鎖面板',
+    loginCaptionNoAuth: '不需要驗證',
+    username: '使用者名稱',
+    password: '密碼',
+    accessPassword: '存取密碼',
+    unlock: '解鎖',
+    tokenMinHint: '存取密碼至少需要 12 個字元。',
+    installApp: '安裝 App',
+    dialFrequency: '撥號頻率',
+    band: '波段',
+    myCall: '我的呼號',
+    dxCall: 'DX 呼號',
+    txEnabled: 'TX 已啟用',
+    transmitting: '發射中',
+    monitoring: '監控',
+    rxTxFrequency: 'Rx / Tx 頻率 (Hz)',
+    setRxTx: '設定 Rx+Tx',
+    setRx: '設定 Rx',
+    setTx: '設定 Tx',
+    modePreset: '模式預設 (Rx/Tx)',
+    applyPreset: '套用預設',
+    saveCurrent: '儲存目前值',
+    txControl: 'TX 控制',
+    enableTx: '啟用 TX',
+    disableTx: '停用 TX',
+    emissionOptions: '發射選項',
+    manualTx: '手動 TX',
+    waterfallTitle: 'Waterfall（實驗性）',
+    waterfallHint: '點擊 waterfall 以設定 Rx 頻率。',
+    activityTitle: 'RX/TX 活動',
+    hideCq: '隱藏 CQ',
+    cqHidden: 'CQ 已隱藏',
+    hide73: '隱藏 73',
+    d73Hidden: '73 已隱藏',
+    pause: '暫停',
+    resume: '繼續',
+    clear: '清除',
+    remoteAction: '遠端操作',
+    callStation: '呼叫電台（slot-aware）',
+    connected: '已連線',
+    connectedPoll: '已連線 (poll)',
+    disconnected: '未連線',
+    authenticating: '驗證中...',
+    locked: '已鎖定',
+    wsError: 'ws 錯誤',
+    authFailed: '驗證失敗',
+    invalidCredentials: '使用者名稱或密碼無效',
+    passwordRequired: '需要密碼',
+    yes: '是',
+    no: '否',
+    monitoringOn: '監控 ON',
+    monitoringOff: '監控 OFF',
+    quickQsoOn: 'Quick QSO ON',
+    quickQsoOff: 'Quick QSO',
+    ft2Only: '僅限 FT2',
+    txRunning: 'TX 執行中',
+    rxIdle: 'RX 閒置',
+    asyncReady: 'Async 就緒',
+    txWith: 'TX 對象',
+    lastTx: '上次 TX',
+    ready: '就緒',
+    commandFailed: '指令失敗',
+    bandActivityPaused: '波段活動已暫停',
+    bandActivityResumed: '波段活動已恢復',
+    bandActivityCleared: '波段活動已清除',
+    installHintPrompt: '點擊安裝 App，將 Decodium 加到主畫面。',
+    installHintIos: 'iPhone/iPad: Safari -> 分享 -> 加到主畫面。',
+    installHintInsecure: '若要在 Android 上完整安裝，請使用 HTTPS 或 localhost。',
+    installHintAndroid: 'Android: 瀏覽器選單 -> 加到主畫面。',
+    initError: '初始化錯誤',
+    backendUnreachable: '後端無法連線',
+    noPresetSaved: '沒有已儲存的預設:',
+    invalidPresetValues: '預設值無效:',
+    presetSaved: '預設已儲存',
+    presetLabel: '預設',
+    rxTxSet: 'Rx/Tx 已設定'
+  });
+  const UI_TEXT_BY_LANG = {
+    en: UI_TEXT_EN,
+    en_us: UI_TEXT_EN,
+    en_gb: UI_TEXT_EN_GB,
+    it: UI_TEXT_IT,
+    ca: UI_TEXT_CA,
+    da: UI_TEXT_DA,
+    de: UI_TEXT_DE,
+    es: UI_TEXT_ES,
+    fr: UI_TEXT_FR,
+    ja: UI_TEXT_JA,
+    ru: UI_TEXT_RU,
+    zh: UI_TEXT_ZH,
+    zh_cn: UI_TEXT_ZH,
+    zh_tw: UI_TEXT_ZH_TW
+  };
+  let appUiLanguage = 'en';
+  let uiText = UI_TEXT_EN;
   let ws = null;
   let health = null;
   const activityRows = [];
@@ -586,6 +1553,8 @@ R"FT2JS((() => {
   let requiresAuth = false;
   let wsAuthed = false;
   let activityPaused = false;
+  let activityHideCq = false;
+  let activityHide73 = false;
   let lastTransmitting = null;
   let lastTxPeer = '';
   let txPeerFromRows = '';
@@ -600,6 +1569,7 @@ R"FT2JS((() => {
   let digitalMorseEnabled = false;
   let quickQsoEnabled = false;
   let ft2QsoMessageCount = 5;
+  let asyncSnrDb = -99;
   let waterfallEnabled = false;
   let waterfallMeta = {startHz:0, spanHz:0, width:0};
   let currentMode = '';
@@ -632,11 +1602,122 @@ R"FT2JS((() => {
   };
   const normalizeAuthToken = (v) => (v || '').toString().replace(/[\r\n]+/g, '').trim();
   const normalizeModeKey = (v) => (v || '').toString().trim().toUpperCase();
+  const normalizeUiLanguage = (v) => (v || '').toString().trim().replace(/-/g, '_').toLowerCase();
   const sanitizeFrequency = (v) => {
     const n = Number(v);
     if (!Number.isFinite(n)) return null;
     return Math.max(0, Math.min(5000, Math.round(n)));
   };
+  const setText = (id, v) => {
+    const node = el(id);
+    if (node) node.textContent = v ?? '';
+  };
+  const setPlaceholder = (id, v) => {
+    const node = el(id);
+    if (node) node.setAttribute('placeholder', v ?? '');
+  };
+  const selectUiText = (code) => {
+    const normalized = normalizeUiLanguage(code);
+    if (!normalized) return UI_TEXT_EN;
+    return UI_TEXT_BY_LANG[normalized]
+      || UI_TEXT_BY_LANG[normalized.split('_')[0]]
+      || UI_TEXT_EN;
+  };
+  const boolText = (v) => v ? uiText.yes : uiText.no;
+  const msgCountText = (count) => `${count} ${uiText.msgSuffix}`;
+
+  function applyLocalization() {
+    document.documentElement.lang = uiText.lang || 'en';
+    document.title = uiText.pageTitle;
+    if (appleWebAppTitle) {
+      appleWebAppTitle.setAttribute('content', uiText.shortTitle);
+    }
+    setText('login_title', uiText.remoteAccess);
+    setText('lbl_login_user', uiText.username);
+    setText('lbl_login_token', uiText.password);
+    setPlaceholder('login_token', uiText.accessPassword);
+    setText('btn_login', uiText.unlock);
+    setText('app_title', uiText.pageTitle);
+    setText('btn_install', uiText.installApp);
+    setText('lbl_dial', uiText.dialFrequency);
+    setText('lbl_mode', uiText.mode);
+    setText('lbl_band', uiText.band);
+    setText('lbl_rx', uiText.rx);
+    setText('lbl_tx', uiText.tx);
+    setText('lbl_mycall', uiText.myCall);
+    setText('lbl_dxcall', uiText.dxCall);
+    setText('lbl_tx_enabled', uiText.txEnabled);
+    setText('lbl_transmitting', uiText.transmitting);
+    setText('lbl_monitoring', uiText.monitoring);
+    setText('ttl_mode', uiText.mode);
+    setText('ttl_band', uiText.band);
+    setText('lbl_rxtx_freq', uiText.rxTxFrequency);
+    setText('btn_set_rxtx', uiText.setRxTx);
+    setText('btn_rxfreq', uiText.setRx);
+    setText('btn_txfreq', uiText.setTx);
+    setText('lbl_mode_preset', uiText.modePreset);
+    setText('btn_apply_mode_preset', uiText.applyPreset);
+    setText('btn_save_mode_preset', uiText.saveCurrent);
+    setText('lbl_tx_control', uiText.txControl);
+    setText('btn_tx_on', uiText.enableTx);
+    setText('btn_tx_off', uiText.disableTx);
+    setText('ttl_emission', uiText.emissionOptions);
+    setText('lbl_manual_tx', uiText.manualTx);
+    setText('lbl_speedy', uiText.speedy);
+    setText('lbl_digital_morse', uiText.digitalMorse);
+    setText('lbl_qso', uiText.qso);
+    setText('ttl_waterfall', uiText.waterfallTitle);
+    setText('waterfall_hint', uiText.waterfallHint);
+    setText('ttl_activity', uiText.activityTitle);
+    setText('th_utc', 'UTC');
+    setText('th_db', 'dB');
+    setText('th_dt', 'DT');
+    setText('th_freq', uiText.frequency);
+    setText('th_msg', uiText.message);
+    setText('ttl_remote_action', uiText.remoteAction);
+    setText('lbl_call', uiText.call);
+    setText('lbl_grid', uiText.grid);
+    setText('btn_call', uiText.callStation);
+    if (ft2QsoCount && ft2QsoCount.options.length >= 3) {
+      ft2QsoCount.options[0].textContent = msgCountText(2);
+      ft2QsoCount.options[1].textContent = msgCountText(3);
+      ft2QsoCount.options[2].textContent = msgCountText(5);
+    }
+    if (loginCaption) {
+      loginCaption.textContent = requiresAuth ? uiText.loginCaptionAuth : uiText.loginCaptionNoAuth;
+    }
+    if (loginTokenHint) {
+      loginTokenHint.textContent = uiText.tokenMinHint;
+    }
+    applyWaterfallButtonState();
+    applyAutoCqButtonState();
+    applyAutoSpotButtonState();
+    applyMonitoringButtonState();
+    applyEmissionButtonsState();
+    applyActivityFilterButtonsState();
+    applyFt2ControlsState();
+    if (btnActivityPause) {
+      btnActivityPause.textContent = activityPaused ? uiText.resume : uiText.pause;
+    }
+    if (btnActivityClear) {
+      btnActivityClear.textContent = uiText.clear;
+    }
+    updateTxBadge(transmittingState, txEnabledState);
+    updateTxPeer(transmittingState, '');
+    if (conn) {
+      const connText = (conn.textContent || '').trim().toLowerCase();
+      if (!conn.classList.contains('on')
+          && (!connText || connText === 'disconnected' || connText === 'disconnesso')) {
+        conn.textContent = uiText.disconnected;
+      }
+    }
+  }
+
+  function setAppUiLanguage(code) {
+    appUiLanguage = normalizeUiLanguage(code || 'en') || 'en';
+    uiText = selectUiText(appUiLanguage);
+    applyLocalization();
+  }
 
   document.addEventListener('gesturestart', (ev) => ev.preventDefault(), {passive:false});
   document.addEventListener('gesturechange', (ev) => ev.preventDefault(), {passive:false});
@@ -744,13 +1825,13 @@ R"FT2JS((() => {
     if (!key) return false;
     const preset = modeFrequencyPresets[key];
     if (!preset) {
-      if (!silent) setActionStatus(`no preset saved for ${key}`, true);
+      if (!silent) setActionStatus(`${uiText.noPresetSaved} ${key}`, true);
       return false;
     }
     const rx = sanitizeFrequency(preset.rx);
     const tx = sanitizeFrequency(preset.tx);
     if (rx === null || tx === null) {
-      if (!silent) setActionStatus(`invalid preset values for ${key}`, true);
+      if (!silent) setActionStatus(`${uiText.invalidPresetValues} ${key}`, true);
       return false;
     }
     if (rxFreqInput) rxFreqInput.value = rx;
@@ -762,7 +1843,7 @@ R"FT2JS((() => {
     await sendCommand({type:'set_rx_frequency', rx_frequency_hz:rx});
     await sendCommand({type:'set_tx_frequency', tx_frequency_hz:tx});
     if (!silent) {
-      setActionStatus(`preset ${key}: Rx ${rx} / Tx ${tx}`, false);
+      setActionStatus(`${uiText.presetLabel} ${key}: Rx ${rx} / Tx ${tx}`, false);
     }
     return true;
   }
@@ -771,8 +1852,7 @@ R"FT2JS((() => {
   loadModeFrequencyPresets();
   if (loginUser) loginUser.value = authUser || 'admin';
   if (loginToken && authToken) loginToken.value = authToken;
-  if (loginCaption) loginCaption.textContent = uiText.loginCaptionAuth;
-  if (loginTokenHint) loginTokenHint.textContent = uiText.tokenMinHint;
+  applyLocalization();
   updateModePresetSelect();
   if (rxFreqInput) {
     const markRxEdited = () => {
@@ -812,7 +1892,10 @@ R"FT2JS((() => {
     const gridMatch = message.match(/\b([A-R]{2}\d{2}(?:[A-X]{2})?)\b/i);
     const grid = gridMatch ? gridMatch[1].toUpperCase() : '';
     const blacklist = new Set(['CQ','QRZ','DE','RR73','73','R','RRR','TU','PSE']);
-    const tokens = message.toUpperCase().split(/[^A-Z0-9\/]+/).filter(Boolean);
+    const upperMessage = message.toUpperCase();
+    const tokens = upperMessage.split(/[^A-Z0-9\/]+/).filter(Boolean);
+    const isCqRow = /^(?:CQ(?:_[A-Z0-9]+)?|QRZ)\b/.test(upperMessage);
+    const is73Row = tokens.includes('73') || tokens.includes('RR73');
     let call = '';
     for (const tok of tokens) {
       if (blacklist.has(tok)) continue;
@@ -821,7 +1904,7 @@ R"FT2JS((() => {
         break;
       }
     }
-    return {utc, db, dt, freq, message, call, grid, isTxRow, arrivedMs};
+    return {utc, db, dt, freq, message, call, grid, isTxRow, isCqRow, is73Row, arrivedMs};
   }
 
   function trimActivityRows() {
@@ -838,6 +1921,10 @@ R"FT2JS((() => {
     const stick = isNearBottom(activityBody.parentElement);
     activityBody.innerHTML = '';
     for (const row of activityRows) {
+      if (!row.sep) {
+        if (activityHideCq && row.isCqRow) continue;
+        if (activityHide73 && row.is73Row) continue;
+      }
       const tr = document.createElement('tr');
       if (row.sep) {
         tr.className = row.txEvent ? 'sep tx-event' : 'sep';
@@ -880,19 +1967,36 @@ R"FT2JS((() => {
   function applyWaterfallButtonState() {
     if (!btnWfToggle) return;
     btnWfToggle.classList.toggle('active', waterfallEnabled);
-    btnWfToggle.textContent = waterfallEnabled ? 'Waterfall ON' : 'Waterfall OFF';
+    btnWfToggle.textContent = waterfallEnabled ? uiText.waterfallOn : uiText.waterfallOff;
   }
 
   function applyAutoCqButtonState() {
     if (!btnAutoCQ) return;
     btnAutoCQ.classList.toggle('active', autoCqEnabled);
-    btnAutoCQ.textContent = autoCqEnabled ? 'Auto CQ ON' : 'Auto CQ OFF';
+    btnAutoCQ.textContent = autoCqEnabled ? uiText.autoCqOn : uiText.autoCqOff;
   }
 
   function applyAutoSpotButtonState() {
     if (!btnAutoSpot) return;
     btnAutoSpot.classList.toggle('active', autoSpotEnabled);
-    btnAutoSpot.textContent = autoSpotEnabled ? 'AutoSpot ON' : 'AutoSpot OFF';
+    btnAutoSpot.textContent = autoSpotEnabled ? uiText.autoSpotOn : uiText.autoSpotOff;
+  }
+
+  function applyMonitoringButtonState() {
+    if (!btnMonitor) return;
+    btnMonitor.classList.toggle('active', monitoringState);
+    btnMonitor.textContent = monitoringState ? uiText.monitoringOn : uiText.monitoringOff;
+  }
+
+  function applyActivityFilterButtonsState() {
+    if (btnFilterCq) {
+      btnFilterCq.classList.toggle('active', activityHideCq);
+      btnFilterCq.textContent = activityHideCq ? uiText.cqHidden : uiText.hideCq;
+    }
+    if (btnFilter73) {
+      btnFilter73.classList.toggle('active', activityHide73);
+      btnFilter73.textContent = activityHide73 ? uiText.d73Hidden : uiText.hide73;
+    }
   }
 
   function applyTxButtonsState() {
@@ -909,15 +2013,15 @@ R"FT2JS((() => {
   function applyEmissionButtonsState() {
     if (btnAsyncL2) {
       btnAsyncL2.classList.toggle('active', asyncL2Enabled);
-      btnAsyncL2.textContent = asyncL2Enabled ? 'Async L2 ON' : 'Async L2';
+      btnAsyncL2.textContent = asyncL2Enabled ? uiText.asyncL2On : uiText.asyncL2Off;
     }
     if (btnDualCarrier) {
       btnDualCarrier.classList.toggle('active', dualCarrierEnabled);
-      btnDualCarrier.textContent = dualCarrierEnabled ? 'Dual Carrier ON' : 'Dual Carrier';
+      btnDualCarrier.textContent = dualCarrierEnabled ? uiText.dualCarrierOn : uiText.dualCarrierOff;
     }
     if (btnAlt12) {
       btnAlt12.classList.toggle('active', alt12Enabled);
-      btnAlt12.textContent = alt12Enabled ? 'Alt 1/2 ON' : 'Alt 1/2';
+      btnAlt12.textContent = alt12Enabled ? uiText.alt12On : uiText.alt12Off;
     }
   }
 
@@ -927,7 +2031,7 @@ R"FT2JS((() => {
     if (chkDigitalMorse) chkDigitalMorse.checked = !!digitalMorseEnabled;
     if (btnQuickQso) {
       btnQuickQso.classList.toggle('active', !!quickQsoEnabled);
-      btnQuickQso.textContent = quickQsoEnabled ? 'Quick QSO ON' : 'Quick QSO';
+      btnQuickQso.textContent = quickQsoEnabled ? uiText.quickQsoOn : uiText.quickQsoOff;
     }
     if (ft2QsoCount) {
       ft2QsoCount.value = String(ft2QsoMessageCount || 5);
@@ -941,13 +2045,15 @@ R"FT2JS((() => {
     if (asyncCardMeta) {
       const isFt2 = (currentMode || '').toUpperCase() === 'FT2';
       if (!isFt2) {
-        asyncCardMeta.textContent = 'FT2 only';
+        asyncCardMeta.textContent = uiText.ft2Only;
+      } else if (asyncSnrDb > -99) {
+        asyncCardMeta.textContent = `${asyncSnrDb} dB`;
       } else if (transmittingState) {
-        asyncCardMeta.textContent = 'TX running';
+        asyncCardMeta.textContent = uiText.txRunning;
       } else if (monitoringState) {
-        asyncCardMeta.textContent = asyncL2Enabled ? 'Async L2 On' : 'RX idle';
+        asyncCardMeta.textContent = asyncL2Enabled ? uiText.asyncL2On : uiText.rxIdle;
       } else {
-        asyncCardMeta.textContent = asyncL2Enabled ? 'Async ready' : '--- dB';
+        asyncCardMeta.textContent = asyncL2Enabled ? uiText.asyncReady : '--- dB';
       }
     }
   }
@@ -1108,13 +2214,15 @@ R"FT2JS((() => {
 
   applyWaterfallButtonState();
   applyAutoCqButtonState();
+  applyMonitoringButtonState();
   applyTxButtonsState();
   applyEmissionControlVisibility();
   applyEmissionButtonsState();
+  applyActivityFilterButtonsState();
   applyFt2ControlsState();
 
   function setConnectionState(isConnected, text) {
-    conn.textContent = text || (isConnected ? 'connesso' : 'disconnesso');
+    conn.textContent = text || (isConnected ? uiText.connected : uiText.disconnected);
     conn.classList.toggle('on', isConnected);
     conn.classList.toggle('off', !isConnected);
   }
@@ -1127,9 +2235,9 @@ R"FT2JS((() => {
         || lowered.includes('load failed')) {
       const host = location.hostname || 'localhost';
       const port = location.port ? (':' + location.port) : '';
-      return `init error: backend unreachable (${host}${port})`;
+      return `${uiText.initError}: ${uiText.backendUnreachable} (${host}${port})`;
     }
-    return 'init error: ' + (message || 'unknown error');
+    return `${uiText.initError}: ${message || 'unknown error'}`;
   }
 
   function updateTxBadge(transmitting, txEnabled) {
@@ -1137,7 +2245,7 @@ R"FT2JS((() => {
     const isTx = !!transmitting;
     trxLive.classList.toggle('tx', isTx);
     trxLive.classList.toggle('rx', !isTx);
-    trxLive.textContent = isTx ? 'TX ON AIR' : (txEnabled ? 'RX (TX ARM)' : 'RX');
+    trxLive.textContent = isTx ? uiText.txOnAir : (txEnabled ? uiText.rxTxArm : uiText.rxOnly);
   }
 
   function updateTxPeer(transmitting, dxCall) {
@@ -1148,9 +2256,9 @@ R"FT2JS((() => {
     }
     trxPeer.classList.toggle('onair', !!transmitting);
     if (transmitting) {
-      trxPeer.textContent = peer ? ('TX with ' + peer) : 'TX with -';
+      trxPeer.textContent = peer ? (`${uiText.txWith} ${peer}`) : `${uiText.txWith} -`;
     } else {
-      trxPeer.textContent = lastTxPeer ? ('Last TX: ' + lastTxPeer) : 'DX: -';
+      trxPeer.textContent = lastTxPeer ? (`${uiText.lastTx}: ${lastTxPeer}`) : `${uiText.dxPrefix}: -`;
     }
   }
 
@@ -1159,7 +2267,7 @@ R"FT2JS((() => {
     activityRows.push({
       sep: true,
       txEvent: true,
-      text: transmitting ? (`TX STARTED${peer ? ' -> ' + peer : ''}`) : 'TX ENDED (RX)',
+      text: transmitting ? (`${uiText.txStarted}${peer ? ' -> ' + peer : ''}`) : uiText.txEndedRx,
       arrivedMs: now
     });
     trimActivityRows();
@@ -1169,13 +2277,13 @@ R"FT2JS((() => {
   function setActionStatus(message, isError = false) {
     if (!actionStatus) return;
     const txt = (message || '').toString().trim();
-    actionStatus.textContent = txt || 'Ready';
+    actionStatus.textContent = txt || uiText.ready;
     actionStatus.classList.toggle('ok', !!txt && !isError);
     actionStatus.classList.toggle('err', !!txt && isError);
   }
 
   function commandErrorMessage(err) {
-    if (!err) return 'Command failed';
+    if (!err) return uiText.commandFailed;
     if (typeof err === 'string') return err;
     const msg = (err.message || '').toString().trim();
     if (msg) return msg;
@@ -1187,7 +2295,7 @@ R"FT2JS((() => {
       if (status) return status;
       if (reason) return reason;
     }
-    return 'Command failed';
+    return uiText.commandFailed;
   }
 
   function isAuthErrorMessage(message) {
@@ -1206,7 +2314,7 @@ R"FT2JS((() => {
       wsAuthed = false;
       clearAuth();
       stopStatePolling();
-      showLogin(true, 'Invalid username or password');
+      showLogin(true, uiText.invalidCredentials);
       return;
     }
     setActionStatus(message, true);
@@ -1242,11 +2350,11 @@ R"FT2JS((() => {
         const replaceActivity = !wsIsUsable() && !activityPaused;
         await getState(replaceActivity);
         if (!wsIsUsable()) {
-          setConnectionState(true, 'connesso (poll)');
+          setConnectionState(true, uiText.connectedPoll);
         }
       } catch {
         if (!wsIsUsable()) {
-          setConnectionState(false, 'disconnected');
+          setConnectionState(false, uiText.disconnected);
         }
       }
       refreshWaterfallPoller();
@@ -1282,17 +2390,17 @@ R"FT2JS((() => {
 
     if (deferredInstallPrompt) {
       btnInstall.classList.remove('hidden');
-      setInstallHint('Tap Install App to add Decodium to your home screen.', true);
+      setInstallHint(uiText.installHintPrompt, true);
       return;
     }
 
     btnInstall.classList.add('hidden');
     if (isIOS()) {
-      setInstallHint('iPhone/iPad: Safari -> Share -> Add to Home Screen.', true);
+      setInstallHint(uiText.installHintIos, true);
     } else if (!secureEligible) {
-      setInstallHint('For full app install on Android, use HTTPS or localhost.', true);
+      setInstallHint(uiText.installHintInsecure, true);
     } else {
-      setInstallHint('Android: Browser menu -> Add to Home screen.', true);
+      setInstallHint(uiText.installHintAndroid, true);
     }
   }
 
@@ -1377,6 +2485,9 @@ R"FT2JS((() => {
     const r = await fetch('/api/v1/health', {headers: buildHeaders()});
     if (!r.ok) throw new Error('health http ' + r.status);
     health = await r.json();
+    if (typeof health.ui_language === 'string' && health.ui_language.trim()) {
+      setAppUiLanguage(health.ui_language);
+    }
     requiresAuth = !!health.requires_auth;
     if (typeof health.auth_user === 'string' && health.auth_user.trim()) {
       authUser = normalizeAuthUser(health.auth_user);
@@ -1454,6 +2565,9 @@ R"FT2JS((() => {
     const displayTxHz = (pendingGuardActive && pendingTxHz !== null) ? pendingTxHz : currentTxHz;
 
     updateModePresetSelect();
+    if (typeof s.ui_language === 'string' && s.ui_language.trim()) {
+      setAppUiLanguage(s.ui_language);
+    }
     set('st_mode', s.mode);
     set('st_band', incomingBand || activeBand || '-');
     set('st_dial', fmtHz(s.dial_frequency_hz) + ' Hz');
@@ -1462,11 +2576,13 @@ R"FT2JS((() => {
     if (typeof s.tx_enabled === 'boolean') {
       updateTxEnabledState(s.tx_enabled);
     }
-    set('st_txen', s.tx_enabled ? 'yes' : 'no');
-    set('st_mon', s.monitoring ? 'yes' : 'no');
-    set('st_trx', s.transmitting ? 'yes' : 'no');
+    set('st_txen', boolText(!!s.tx_enabled));
+    set('st_mon', boolText(!!s.monitoring));
+    set('st_trx', boolText(!!s.transmitting));
+    asyncSnrDb = (typeof s.async_snr_db === 'number') ? Math.round(Number(s.async_snr_db)) : -99;
     monitoringState = !!s.monitoring;
     transmittingState = !!s.transmitting;
+    applyMonitoringButtonState();
     updateTxBadge(s.transmitting, s.tx_enabled);
     updateTxPeer(s.transmitting, (s.dx_call || '').toString().trim().toUpperCase());
     if (typeof s.transmitting === 'boolean') {
@@ -1543,6 +2659,12 @@ R"FT2JS((() => {
     if (type === 'set_auto_spot' && typeof j.enabled === 'boolean') {
       updateAutoSpotState(j.enabled);
     }
+    if (type === 'set_monitoring' && typeof j.enabled === 'boolean') {
+      monitoringState = !!j.enabled;
+      set('st_mon', boolText(monitoringState));
+      applyMonitoringButtonState();
+      applyFt2ControlsState();
+    }
     if (type === 'set_tx_enabled' && typeof j.enabled === 'boolean') {
       updateTxEnabledState(j.enabled);
     }
@@ -1609,22 +2731,22 @@ R"FT2JS((() => {
     ws = new WebSocket(url);
     ws.onopen = () => {
       if (requiresAuth) {
-        setConnectionState(false, 'autenticazione...');
+        setConnectionState(false, uiText.authenticating);
         ws.send(JSON.stringify({type:'auth', username:authUser, token:authToken}));
       } else {
-        setConnectionState(true, 'connesso');
+        setConnectionState(true, uiText.connected);
       }
       refreshWaterfallPoller();
     };
     ws.onclose = () => {
-      setConnectionState(false, 'disconnected');
+      setConnectionState(false, uiText.disconnected);
       refreshWaterfallPoller();
       if (!loginOverlay || loginOverlay.classList.contains('hidden')) {
         setTimeout(connectWs, 1500);
       }
     };
     ws.onerror = () => {
-      setConnectionState(false, 'ws error');
+      setConnectionState(false, uiText.wsError);
       refreshWaterfallPoller();
     };
     ws.onmessage = (ev) => {
@@ -1632,6 +2754,9 @@ R"FT2JS((() => {
       try { m = JSON.parse(ev.data); } catch { return; }
       if (m.event === 'hello' && typeof m.requires_auth === 'boolean') {
         requiresAuth = !!m.requires_auth;
+        if (typeof m.ui_language === 'string' && m.ui_language.trim()) {
+          setAppUiLanguage(m.ui_language);
+        }
         if (typeof m.auth_user === 'string' && m.auth_user.trim()) authUser = normalizeAuthUser(m.auth_user);
         if (loginUser && !loginUser.value) loginUser.value = authUser || 'admin';
         if (typeof m.mode === 'string') {
@@ -1646,6 +2771,13 @@ R"FT2JS((() => {
         if (typeof m.auto_spot_enabled === 'boolean') {
           updateAutoSpotState(m.auto_spot_enabled);
         }
+        if (typeof m.monitoring === 'boolean') {
+          monitoringState = !!m.monitoring;
+          applyMonitoringButtonState();
+        }
+        if (typeof m.async_snr_db === 'number') {
+          asyncSnrDb = Math.round(Number(m.async_snr_db));
+        }
         if (typeof m.tx_enabled === 'boolean') {
           updateTxEnabledState(m.tx_enabled);
         }
@@ -1656,15 +2788,15 @@ R"FT2JS((() => {
         refreshWaterfallPoller();
       } else if (m.event === 'auth_ok') {
         wsAuthed = true;
-        setConnectionState(true, 'connesso');
+        setConnectionState(true, uiText.connected);
         getState(false).catch(() => {});
         refreshWaterfallPoller();
       } else if (m.event === 'auth_failed') {
         wsAuthed = false;
-        setConnectionState(false, 'auth failed');
+        setConnectionState(false, uiText.authFailed);
         stopStatePolling();
         clearAuth();
-        showLogin(true, 'Invalid username or password');
+        showLogin(true, uiText.invalidCredentials);
         if (ws) ws.close();
       } else if (m.event === 'telemetry') {
         if (!requiresAuth || wsAuthed) renderState(m);
@@ -1687,6 +2819,12 @@ R"FT2JS((() => {
         }
         if (type === 'set_auto_spot' && typeof m.enabled === 'boolean') {
           updateAutoSpotState(m.enabled);
+        }
+        if (type === 'set_monitoring' && typeof m.enabled === 'boolean') {
+          monitoringState = !!m.enabled;
+          set('st_mon', boolText(monitoringState));
+          applyMonitoringButtonState();
+          applyFt2ControlsState();
         }
         if (type === 'set_tx_enabled' && typeof m.enabled === 'boolean') {
           updateTxEnabledState(m.enabled);
@@ -1793,7 +2931,7 @@ R"FT2JS((() => {
       try {
         await sendCommand({type:'set_rx_frequency', rx_frequency_hz:rx});
         await sendCommand({type:'set_tx_frequency', tx_frequency_hz:tx});
-        setActionStatus(`Rx/Tx set: ${rx}/${tx} Hz`, false);
+        setActionStatus(`${uiText.rxTxSet}: ${rx}/${tx} Hz`, false);
       } catch (e) {
         pendingRxHz = null;
         pendingTxHz = null;
@@ -1809,7 +2947,7 @@ R"FT2JS((() => {
       const tx = sanitizeFrequency(txFreqInput ? (txFreqInput.value || currentTxHz) : currentTxHz);
       if (rx === null || tx === null) return;
       if (savePresetForMode(mode, rx, tx)) {
-        setActionStatus(`preset saved: ${mode} (${rx}/${tx})`, false);
+        setActionStatus(`${uiText.presetSaved}: ${mode} (${rx}/${tx})`, false);
       }
     };
   }
@@ -1829,6 +2967,9 @@ R"FT2JS((() => {
   }
   if (btnAutoSpot) {
     btnAutoSpot.onclick = () => sendCommand({type:'set_auto_spot', enabled:!autoSpotEnabled}).catch(handleCommandError);
+  }
+  if (btnMonitor) {
+    btnMonitor.onclick = () => sendCommand({type:'set_monitoring', enabled:!monitoringState}).catch(handleCommandError);
   }
   if (btnAsyncL2) {
     btnAsyncL2.onclick = () => sendCommand({type:'set_async_l2', enabled:!asyncL2Enabled}).catch(handleCommandError);
@@ -1879,6 +3020,20 @@ R"FT2JS((() => {
       });
     });
   }
+  if (btnFilterCq) {
+    btnFilterCq.onclick = () => {
+      activityHideCq = !activityHideCq;
+      applyActivityFilterButtonsState();
+      renderActivity();
+    };
+  }
+  if (btnFilter73) {
+    btnFilter73.onclick = () => {
+      activityHide73 = !activityHide73;
+      applyActivityFilterButtonsState();
+      renderActivity();
+    };
+  }
   document.querySelectorAll('.mode-btn').forEach((b) => {
     b.addEventListener('click', () => sendCommand({type:'set_mode', mode:b.dataset.mode}).catch(handleCommandError));
   });
@@ -1890,15 +3045,15 @@ R"FT2JS((() => {
     btnActivityPause.addEventListener('click', () => {
       activityPaused = !activityPaused;
       btnActivityPause.classList.toggle('active', activityPaused);
-      btnActivityPause.textContent = activityPaused ? 'Riprendi' : 'Pausa';
-      setActionStatus(activityPaused ? 'Band activity in pausa' : 'Band activity ripresa', false);
+      btnActivityPause.textContent = activityPaused ? uiText.resume : uiText.pause;
+      setActionStatus(activityPaused ? uiText.bandActivityPaused : uiText.bandActivityResumed, false);
     });
   }
   if (btnActivityClear) {
     btnActivityClear.addEventListener('click', () => {
       activityRows.length = 0;
       renderActivity();
-      setActionStatus('Band activity pulita', false);
+      setActionStatus(uiText.bandActivityCleared, false);
     });
   }
 
@@ -1906,7 +3061,7 @@ R"FT2JS((() => {
     authUser = normalizeAuthUser(loginUser ? loginUser.value : '');
     authToken = normalizeAuthToken(loginToken ? loginToken.value : '');
     if (!authToken) {
-      showLogin(true, 'Password required');
+      showLogin(true, uiText.passwordRequired);
       return;
     }
     try {
@@ -1919,7 +3074,7 @@ R"FT2JS((() => {
     } catch (e) {
       stopStatePolling();
       clearAuth();
-      showLogin(true, 'Invalid username or password');
+      showLogin(true, uiText.invalidCredentials);
     }
   }
 
@@ -1939,7 +3094,7 @@ R"FT2JS((() => {
       if (requiresAuth) {
         if (!authToken) {
           stopStatePolling();
-          setConnectionState(false, 'locked');
+          setConnectionState(false, uiText.locked);
           if (loginUser) loginUser.value = authUser || 'admin';
           showLogin(true);
           return;
@@ -1956,7 +3111,7 @@ R"FT2JS((() => {
     } catch (e) {
       if (requiresAuth) {
         stopStatePolling();
-        setConnectionState(false, 'locked');
+        setConnectionState(false, uiText.locked);
         showLogin(true);
       } else {
         setConnectionState(false, describeInitError(e));
@@ -2457,8 +3612,12 @@ void RemoteCommandServer::onNewConnection()
         {"requires_auth", isAuthRequired()},
         {"auth_user", authUser_},
         {"mode", rt.mode},
+        {"ui_language", rt.uiLanguage},
         {"tx_enabled", rt.txEnabled},
+        {"monitoring", rt.monitoring},
+        {"transmitting", rt.transmitting},
         {"async_l2_enabled", rt.asyncL2Enabled},
+        {"async_snr_db", rt.asyncSnrDb},
         {"dual_carrier_enabled", rt.dualCarrierEnabled},
         {"alt_12_enabled", rt.alt12Enabled},
         {"manual_tx_enabled", rt.manualTxEnabled},
@@ -2982,6 +4141,33 @@ RemoteCommandServer::CommandResult RemoteCommandServer::processCommandObject(QJs
         {"event", QStringLiteral("command_ack")},
         {"command_id", commandId},
         {"type", QStringLiteral("set_auto_spot")},
+        {"status", QStringLiteral("accepted_immediate")},
+        {"enabled", enabled},
+        {"server_now_ms", nowUtcMs},
+      };
+      return result;
+    }
+
+  if (commandType == QStringLiteral("set_monitoring"))
+    {
+      if (!object.contains(QStringLiteral("enabled")))
+        {
+          result.payload = makeRejectPayload(commandId, QStringLiteral("rejected_invalid_request"), QStringLiteral("enabled is required"));
+          return result;
+        }
+      auto enabled = object.value(QStringLiteral("enabled")).toBool(false);
+      if (enabled && state.transmitting)
+        {
+          result.payload = makeRejectPayload(commandId, QStringLiteral("rejected_invalid_state"), QStringLiteral("cannot enable monitoring while transmitting"));
+          return result;
+        }
+      seenCommandIds_.insert(commandId, nowUtcMs);
+      Q_EMIT setMonitoringRequested(commandId, enabled);
+      result.accepted = true;
+      result.payload = QJsonObject {
+        {"event", QStringLiteral("command_ack")},
+        {"command_id", commandId},
+        {"type", QStringLiteral("set_monitoring")},
         {"status", QStringLiteral("accepted_immediate")},
         {"enabled", enabled},
         {"server_now_ms", nowUtcMs},
@@ -3660,6 +4846,7 @@ void RemoteCommandServer::onHttpSocketReadyRead()
         {
           health.insert(QStringLiteral("mode"), rt.mode);
           health.insert(QStringLiteral("band"), rt.band);
+          health.insert(QStringLiteral("ui_language"), rt.uiLanguage);
           health.insert(QStringLiteral("dial_frequency_hz"), static_cast<double>(rt.dialFrequencyHz));
           health.insert(QStringLiteral("rx_frequency_hz"), rt.rxFrequencyHz);
           health.insert(QStringLiteral("tx_frequency_hz"), rt.txFrequencyHz);
@@ -3675,6 +4862,7 @@ void RemoteCommandServer::onHttpSocketReadyRead()
           health.insert(QStringLiteral("digital_morse_enabled"), rt.digitalMorseEnabled);
           health.insert(QStringLiteral("quick_qso_enabled"), rt.quickQsoEnabled);
           health.insert(QStringLiteral("ft2_qso_message_count"), rt.ft2QsoMessageCount);
+          health.insert(QStringLiteral("async_snr_db"), rt.asyncSnrDb);
           health.insert(QStringLiteral("monitoring"), rt.monitoring);
           health.insert(QStringLiteral("transmitting"), rt.transmitting);
           health.insert(QStringLiteral("my_call"), rt.myCall);
@@ -3711,6 +4899,7 @@ void RemoteCommandServer::onHttpSocketReadyRead()
       sendHttpJson(socket, 200, QJsonObject {
                       {"mode", rt.mode},
                       {"band", rt.band},
+                      {"ui_language", rt.uiLanguage},
                       {"dial_frequency_hz", static_cast<double>(rt.dialFrequencyHz)},
                       {"rx_frequency_hz", rt.rxFrequencyHz},
                       {"tx_frequency_hz", rt.txFrequencyHz},
@@ -3726,6 +4915,7 @@ void RemoteCommandServer::onHttpSocketReadyRead()
                       {"digital_morse_enabled", rt.digitalMorseEnabled},
                       {"quick_qso_enabled", rt.quickQsoEnabled},
                       {"ft2_qso_message_count", rt.ft2QsoMessageCount},
+                      {"async_snr_db", rt.asyncSnrDb},
                       {"monitoring", rt.monitoring},
                       {"transmitting", rt.transmitting},
                       {"my_call", rt.myCall},
@@ -3863,6 +5053,7 @@ void RemoteCommandServer::onTelemetryTick()
     {"event", QStringLiteral("telemetry")},
     {"mode", state.mode},
     {"band", state.band},
+    {"ui_language", state.uiLanguage},
     {"dial_frequency_hz", static_cast<double>(state.dialFrequencyHz)},
     {"rx_frequency_hz", state.rxFrequencyHz},
     {"tx_frequency_hz", state.txFrequencyHz},
@@ -3878,6 +5069,7 @@ void RemoteCommandServer::onTelemetryTick()
     {"digital_morse_enabled", state.digitalMorseEnabled},
     {"quick_qso_enabled", state.quickQsoEnabled},
     {"ft2_qso_message_count", state.ft2QsoMessageCount},
+    {"async_snr_db", state.asyncSnrDb},
     {"monitoring", state.monitoring},
     {"transmitting", state.transmitting},
     {"my_call", state.myCall},

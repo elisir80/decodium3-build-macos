@@ -25,6 +25,7 @@ SOFTWARE.
 */
 
 #include <QObject>
+#include <QCryptographicHash>
 
 #define BASE32_CHARSET "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 
@@ -35,9 +36,11 @@ public:
     explicit OTPGenerator(QObject *parent = nullptr);
 
     QByteArray generateHOTP(const QByteArray &rawSecret, quint64 counter, int length);
+    QByteArray generateHOTP(const QByteArray &rawSecret, quint64 counter, int length, QCryptographicHash::Algorithm algorithm);
     Q_INVOKABLE QString generateHOTP(const QString &secret, quint64 counter, int length);
 
     QByteArray generateTOTP(const QByteArray &rawSecret, int length);
+    QByteArray generateTOTP(const QByteArray &rawSecret, QDateTime dt, int length, QCryptographicHash::Algorithm algorithm);
     Q_INVOKABLE QString generateTOTP(const QString &secret, QDateTime dt, int length);
     Q_INVOKABLE QString generateTOTP(const QString &secret, int length);
 private:

@@ -8,6 +8,7 @@
 #include <QSettings>
 #include <QDateTime>
 #include <QTimeZone>
+#include <QLocale>
 #include <QDir>
 #include <QFileInfo>
 #include <QCloseEvent>
@@ -39,6 +40,46 @@ extern "C" {
 
 namespace
 {
+QLocale ui_language_locale (QSettings const * settings)
+{
+  auto language = settings ? settings->value (QStringLiteral ("UILanguage")).toString ().trimmed () : QString {};
+  if (language.isEmpty ())
+    {
+      return QLocale::system ();
+    }
+
+  language.replace ('-', '_');
+  QLocale locale {language};
+  if (locale.name () == QStringLiteral ("C"))
+    {
+      return QLocale::system ();
+    }
+  return locale;
+}
+
+QString localized_utc_date_line (QDate const& date, QSettings const * settings)
+{
+  auto locale = ui_language_locale (settings);
+  auto month = locale.standaloneMonthName (date.month (), QLocale::LongFormat).trimmed ();
+  if (month.isEmpty ())
+    {
+      month = locale.monthName (date.month (), QLocale::LongFormat).trimmed ();
+    }
+  if (month.isEmpty ())
+    {
+      month = QLocale::system ().standaloneMonthName (date.month (), QLocale::LongFormat).trimmed ();
+    }
+  if (month.isEmpty ())
+    {
+      month = QLocale::system ().monthName (date.month (), QLocale::LongFormat).trimmed ();
+    }
+  if (!month.isEmpty ())
+    {
+      month.replace (0, 1, month.left (1).toUpper ());
+    }
+  return QStringLiteral ("%1 %2 %3").arg (date.day ()).arg (month).arg (date.year ());
+}
+
 QString resolve_jpleph_path(Configuration const * configuration, QStringList * searchedPaths)
 {
   QStringList candidates;
@@ -176,8 +217,8 @@ auto Astro::astroUpdate(QDateTime const& t, QString const& mygrid, QString const
   double azsun,elsun,azmoon,elmoon,azmoondx,elmoondx;
   double ramoon,decmoon,dgrd,poloffset,xnr,techo,width1,width2;
   int ntsky;
-  QString date {t.date().toString("yyyy MMM dd").trimmed ()};
-  QString utc {t.time().toString().trimmed ()};
+  QString date {localized_utc_date_line (t.date (), settings_).trimmed ()};
+  QString utc {t.time().toString (QStringLiteral ("HH:mm:ss")).trimmed () + QStringLiteral (" UTC")};
   int nyear {t.date().year()};
   int month {t.date().month()};
   int nday {t.date().day()};
@@ -224,7 +265,7 @@ auto Astro::astroUpdate(QDateTime const& t, QString const& mygrid, QString const
   {
     QTextStream out {&message};
     out << " " << date << "\n"
-      "UTC:  " << utc << "\n"
+      << utc << "\n"
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
         << Qt::fixed
 #else

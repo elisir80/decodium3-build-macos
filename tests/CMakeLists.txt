@@ -19,8 +19,16 @@ set (CMAKE_AUTOMOC ON)
 include_directories (${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_SOURCE_DIR})
 
 add_executable (test_qt_helpers test_qt_helpers.cpp)
-target_link_libraries (test_qt_helpers wsjt_qt Qt5::Test)
+target_link_libraries (test_qt_helpers wsjt_qt wsjt_cxx Qt5::Test)
 add_test (NAME test_qt_helpers COMMAND $<TARGET_FILE:test_qt_helpers>)
+
+add_executable (test_secure_settings test_secure_settings.cpp)
+target_link_libraries (test_secure_settings wsjt_qt wsjt_cxx Qt5::Test)
+add_test (NAME test_secure_settings COMMAND $<TARGET_FILE:test_secure_settings>)
+
+add_executable (test_filedownload test_filedownload.cpp)
+target_link_libraries (test_filedownload wsjt_qt wsjt_cxx Qt5::Test)
+add_test (NAME test_filedownload COMMAND $<TARGET_FILE:test_filedownload>)
 
 if (WSJT_BUILD_UTILS)
   # CLI smoke tests for utility binaries that are built in the main project.

@@ -182,10 +182,12 @@ void PollingTransceiver::handle_timeout ()
     }
   catch (std::exception const& e)
     {
+      CAT_WARNING ("poll failed:" << e.what ());
       message = e.what ();
     }
   catch (...)
     {
+      CAT_WARNING ("poll failed: unexpected exception");
       message = tr ("Unexpected rig error");
     }
   if (!message.isEmpty ())

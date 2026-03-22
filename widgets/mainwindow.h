@@ -543,6 +543,7 @@ private slots:
   void onRemoteSetTxEnabledRequested(QString const& commandId, bool enabled);
   void onRemoteSetAutoCqRequested(QString const& commandId, bool enabled);
   void onRemoteSetAutoSpotRequested(QString const& commandId, bool enabled);
+  void onRemoteSetMonitoringRequested(QString const& commandId, bool enabled);
   void onRemoteSetAsyncL2Requested(QString const& commandId, bool enabled);
   void onRemoteSetDualCarrierRequested(QString const& commandId, bool enabled);
   void onRemoteSetAlt12Requested(QString const& commandId, bool enabled);

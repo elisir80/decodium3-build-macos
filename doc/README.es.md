@@ -1,35 +1,37 @@
-# Notas de Documentacion (Espanol) - 1.5.3
+# Notas de Documentacion (Espanol) - 1.5.4
 
 Este indice agrupa la documentacion de release del ciclo actual del fork.
 
-- Release actual: `1.5.3`
-- Ciclo de actualizacion: `1.5.2 -> 1.5.3`
-- Foco principal: compatibilidad CQRLOG, correccion Wait Features FT4/FT8, propagacion de version local, nuevas traducciones bundle DE/FR y alineacion release.
+- Release actual: `1.5.4`
+- Ciclo de actualizacion: `1.5.3 -> 1.5.4`
+- Foco principal: filtro FT2 anti-ghost, refresh sync decoder FT2/FT4/FT8, paridad de la web app, alineacion completa UI/web de idiomas y endurecimiento de downloader/secure settings.
 
-## Cambios Tecnicos Principales (`1.5.2 -> 1.5.3`)
+## Cambios Tecnicos Principales (`1.5.3 -> 1.5.4`)
 
-- restaurada la interoperabilidad Linux con `CQRLOG wsjtx remote`, manteniendo el comportamiento historico de la listen port UDP y usando `WSJTX` como client id de compatibilidad.
-- corregida la propagacion de version en las builds locales para que un cambio en `fork_release_version.txt` fuerce la version correcta dentro del binario compilado.
-- endurecido `Wait Features + AutoSeq` en FT4/FT8 para que las colisiones sobre slots ocupados pausen el ciclo TX actual en lugar de transmitir sobre un QSO activo.
-- anadidas traducciones UI bundle reales en aleman y frances y filtrado el menu de idiomas a las traducciones realmente incluidas.
-- alineados a `1.5.3` los defaults release y la documentacion, incluido el default del workflow Linux Hamlib experimental.
+- anadido el filtro FT2 anti-ghost para payloads muy debiles y malformados, con logging diagnostico `ghostPass` / `ghostFilt`.
+- actualizado el sync decoder en FT2, FT4 y FT8 con logica Costas `best 3 of 4` / `best 2 of 3` y sustraccion adaptativa mas profunda.
+- anadidos a la web app `Monitoring ON/OFF`, indicador FT2 `ASYNC` en dB y filtros de actividad `Hide CQ` / `Hide 73`.
+- la web app sigue ahora el idioma seleccionado en la app de escritorio y cubre todas las lenguas bundle.
+- eliminada la entrada duplicada `English (UK)` y localizado el formato fecha UTC/Astro.
+- endurecidos fallback/import de secure settings, redirects/limites de tamano del downloader, logging de excepciones CAT, waits de arranque DXLab y defaults HTTPS de LoTW.
+- ampliada la cobertura automatizada con vectores RFC HOTP/TOTP y tests dedicados para downloader y secure settings.
 
 ## Artefactos Release
 
-- `decodium3-ft2-1.5.3-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-1.5.3-macos-tahoe-arm64.zip`
-- `decodium3-ft2-1.5.3-macos-tahoe-arm64-sha256.txt`
-- `decodium3-ft2-1.5.3-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-1.5.3-macos-sequoia-arm64.zip`
-- `decodium3-ft2-1.5.3-macos-sequoia-arm64-sha256.txt`
-- `decodium3-ft2-1.5.3-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-1.5.3-macos-sequoia-x86_64.zip`
-- `decodium3-ft2-1.5.3-macos-sequoia-x86_64-sha256.txt`
-- `decodium3-ft2-1.5.3-macos-monterey-x86_64.dmg` *(best effort/experimental, si se genera)*
-- `decodium3-ft2-1.5.3-macos-monterey-x86_64.zip` *(best effort/experimental, si se genera)*
-- `decodium3-ft2-1.5.3-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, si se genera)*
-- `decodium3-ft2-1.5.3-linux-x86_64.AppImage`
-- `decodium3-ft2-1.5.3-linux-x86_64.AppImage.sha256.txt`
+- `decodium3-ft2-1.5.4-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-1.5.4-macos-tahoe-arm64.zip`
+- `decodium3-ft2-1.5.4-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-1.5.4-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-1.5.4-macos-sequoia-arm64.zip`
+- `decodium3-ft2-1.5.4-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-1.5.4-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-1.5.4-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-1.5.4-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-1.5.4-macos-monterey-x86_64.dmg` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-1.5.4-macos-monterey-x86_64.zip` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-1.5.4-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-1.5.4-linux-x86_64.AppImage`
+- `decodium3-ft2-1.5.4-linux-x86_64.AppImage.sha256.txt`
 
 ## Requisitos Minimos Linux
 
@@ -79,6 +81,6 @@ cd squashfs-root
 - [README.en-GB.md](../README.en-GB.md)
 - [README.it.md](../README.it.md)
 - [README.es.md](../README.es.md)
-- [RELEASE_NOTES_1.5.3.md](../RELEASE_NOTES_1.5.3.md)
-- [doc/GITHUB_RELEASE_BODY_1.5.3.md](./GITHUB_RELEASE_BODY_1.5.3.md)
+- [RELEASE_NOTES_1.5.4.md](../RELEASE_NOTES_1.5.4.md)
+- [doc/GITHUB_RELEASE_BODY_1.5.4.md](./GITHUB_RELEASE_BODY_1.5.4.md)
 - [CHANGELOG.md](../CHANGELOG.md)

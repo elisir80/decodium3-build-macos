@@ -8,6 +8,8 @@
 #include <QtNetwork/QNetworkReply>
 #include <QTemporaryFile>
 #include <QSaveFile>
+#include <QtGlobal>
+#include <QSslError>
 
 class FileDownload : public QObject {
     Q_OBJECT
@@ -28,6 +30,8 @@ private:
     QSaveFile destfile_;
     bool url_valid_;
     int redirect_count_;
+    qint64 downloaded_bytes_;
+    bool size_limit_exceeded_;
 signals:
             void complete(QString filename);
             void progress(QString filename);
@@ -43,10 +47,14 @@ public slots:
     void abort();
     void downloadComplete(QNetworkReply* data);
     void downloadProgress(qint64 recieved, qint64 total);
+    void redirected(QUrl const& url);
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
     void errorOccurred(QNetworkReply::NetworkError code);
 #else
     void obsoleteError();
+#endif
+#if QT_CONFIG(ssl)
+    void sslErrors(QList<QSslError> const& errors);
 #endif
     void replyComplete();
 };

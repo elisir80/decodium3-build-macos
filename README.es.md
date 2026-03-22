@@ -1,33 +1,35 @@
-# Decodium 3 FT2 (Fork macOS/Linux) - 1.5.3
+# Decodium (Fork macOS/Linux) - 1.5.4
 
-Este fork empaqueta Decodium 3 FT2 para macOS y Linux AppImage, con fixes de cierre de QSO FT2/FT4/FT8, endurecimiento AutoCQ, actualizaciones de decoder FT2 desde upstream, recuperacion de audio al arrancar, soporte updater, controles web app alineados, traducciones UI completas y tooling de certificados Decodium mantenidos en este repositorio.
+Este fork empaqueta Decodium para macOS y Linux AppImage, con filtro FT2 anti-ghost, mejoras sync decoder en FT2/FT4/FT8, controles web app alineados, cobertura completa de idiomas UI/web, endurecimiento del downloader y proteccion de secure settings.
 
-Release estable actual: `1.5.3`.
+Release estable actual: `1.5.4`.
 
-## Cambios en 1.5.3 (`1.5.2 -> 1.5.3`)
+## Cambios en 1.5.4 (`1.5.3 -> 1.5.4`)
 
-- endurecido `Wait Features + AutoSeq` en FT4/FT8 para que una respuesta tardia o una estacion ocupada pause el ciclo TX actual en lugar de transmitir encima de un QSO ya activo.
-- restaurada la compatibilidad practica Linux con `CQRLOG wsjtx remote`, manteniendo el comportamiento historico de la listen port UDP y usando `WSJTX` como client id de compatibilidad.
-- corregida la alineacion de version de las builds locales: al cambiar `fork_release_version.txt`, la recompilacion actualiza de verdad la version del binario y no deja cadenas `1.5.x` obsoletas.
-- anadidas traducciones UI bundle reales en aleman y frances, con fallback limpio a ingles cuando en ajustes habia una lengua guardada no incluida realmente.
-- alineados a `1.5.3` los defaults release y la documentacion, incluido el default del build Linux experimental Hamlib.
+- anadido el filtro FT2 anti-ghost para decodes muy debiles, con trazas `ghostPass` / `ghostFilt` en `debug.txt`.
+- actualizado el sync decoder: FT2 `best 3 of 4 Costas`, FT4 `best 3 of 4` con sustraccion mas profunda y adaptativa, FT8 `best 2 of 3` con cuarto pase.
+- anadidos a la web app `Monitoring ON/OFF`, indicador FT2 `ASYNC` en dB y filtros `Hide CQ` / `Hide 73`.
+- la web app sigue ahora el idioma elegido en Decodium y cubre todas las lenguas bundle.
+- eliminada la entrada duplicada `English (UK)`, localizado el formato fecha UTC/Astro y mantenido `Decodium` quitando `v3.0 FT2 "Raptor"` del titulo visible al usuario.
+- endurecidos fallback/import de secure settings, descargas de archivos, logging de excepciones CAT, waits de arranque DXLab y defaults HTTPS de LoTW.
+- ampliada la cobertura automatizada con vectores RFC HOTP/TOTP y tests dedicados para downloader y secure settings.
 
 ## Artefactos Release
 
-- `decodium3-ft2-1.5.3-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-1.5.3-macos-tahoe-arm64.zip`
-- `decodium3-ft2-1.5.3-macos-tahoe-arm64-sha256.txt`
-- `decodium3-ft2-1.5.3-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-1.5.3-macos-sequoia-arm64.zip`
-- `decodium3-ft2-1.5.3-macos-sequoia-arm64-sha256.txt`
-- `decodium3-ft2-1.5.3-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-1.5.3-macos-sequoia-x86_64.zip`
-- `decodium3-ft2-1.5.3-macos-sequoia-x86_64-sha256.txt`
-- `decodium3-ft2-1.5.3-macos-monterey-x86_64.dmg` *(best effort/experimental, si se genera)*
-- `decodium3-ft2-1.5.3-macos-monterey-x86_64.zip` *(best effort/experimental, si se genera)*
-- `decodium3-ft2-1.5.3-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, si se genera)*
-- `decodium3-ft2-1.5.3-linux-x86_64.AppImage`
-- `decodium3-ft2-1.5.3-linux-x86_64.AppImage.sha256.txt`
+- `decodium3-ft2-1.5.4-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-1.5.4-macos-tahoe-arm64.zip`
+- `decodium3-ft2-1.5.4-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-1.5.4-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-1.5.4-macos-sequoia-arm64.zip`
+- `decodium3-ft2-1.5.4-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-1.5.4-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-1.5.4-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-1.5.4-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-1.5.4-macos-monterey-x86_64.dmg` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-1.5.4-macos-monterey-x86_64.zip` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-1.5.4-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, si se genera)*
+- `decodium3-ft2-1.5.4-linux-x86_64.AppImage`
+- `decodium3-ft2-1.5.4-linux-x86_64.AppImage.sha256.txt`
 
 ## Requisitos Minimos Linux
 
@@ -50,8 +52,6 @@ Software:
 ## Nota de Build Local Linux
 
 La AppImage publicada ya incluye el runtime Qt multimedia necesario. Si compilas Decodium localmente en Ubuntu/Debian, instala tambien los paquetes multimedia minimos del sistema; de lo contrario, las listas de dispositivos de audio pueden quedar vacias o deshabilitadas aunque la AppImage funcione correctamente.
-
-Paquetes minimos recomendados para builds locales Ubuntu/Debian:
 
 ```bash
 sudo apt update
@@ -91,6 +91,6 @@ cd squashfs-root
 - [README.md](README.md)
 - [README.en-GB.md](README.en-GB.md)
 - [README.it.md](README.it.md)
-- [RELEASE_NOTES_1.5.3.md](RELEASE_NOTES_1.5.3.md)
-- [doc/GITHUB_RELEASE_BODY_1.5.3.md](doc/GITHUB_RELEASE_BODY_1.5.3.md)
+- [RELEASE_NOTES_1.5.4.md](RELEASE_NOTES_1.5.4.md)
+- [doc/GITHUB_RELEASE_BODY_1.5.4.md](doc/GITHUB_RELEASE_BODY_1.5.4.md)
 - [CHANGELOG.md](CHANGELOG.md)

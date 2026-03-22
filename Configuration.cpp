@@ -219,6 +219,7 @@
 #include "logbook/logbook.h"
 #include "widgets/LazyFillComboBox.hpp"
 #include "Network/FileDownload.hpp"
+#include "SecureSettings.hpp"
 
 #include "ui_Configuration.h"
 #include "moc_Configuration.cpp"
@@ -296,317 +297,6 @@ namespace
   constexpr quint32 qrg_version {101}; // M.mm
   constexpr quint32 qrg_version_100 {100};
 
-  QString secure_settings_service (QString const& callsign)
-  {
-    auto profile = callsign.trimmed ().toUpper ();
-    if (profile.isEmpty ())
-      {
-        profile = QStringLiteral ("DEFAULT");
-      }
-    profile.replace (QRegularExpression {R"([^A-Z0-9._-])"}, QStringLiteral ("_"));
-    return QStringLiteral ("org.decodium3.ft2.%1").arg (profile);
-  }
-
-  bool secure_settings_backend_available ()
-  {
-#if defined (Q_OS_MACOS)
-    return QFileInfo::exists (QStringLiteral ("/usr/bin/security"));
-#elif defined (Q_OS_LINUX)
-    return !QStandardPaths::findExecutable (QStringLiteral ("secret-tool")).isEmpty ();
-#else
-    return false;
-#endif
-  }
-
-  QString trim_single_trailing_newline (QString text)
-  {
-    if (text.endsWith ('\n'))
-      {
-        text.chop (1);
-      }
-    if (text.endsWith ('\r'))
-      {
-        text.chop (1);
-      }
-    return text;
-  }
-
-  struct SecureLookupResult
-  {
-    bool backend_available {false};
-    bool found {false};
-    QString value;
-    QString error;
-  };
-
-  SecureLookupResult secure_settings_lookup (QString const& service, QString const& account)
-  {
-    SecureLookupResult result;
-    result.backend_available = secure_settings_backend_available ();
-    if (!result.backend_available)
-      {
-        return result;
-      }
-
-#if defined (Q_OS_MACOS)
-    QProcess p;
-    p.start (QStringLiteral ("/usr/bin/security"),
-             QStringList {
-               QStringLiteral ("find-generic-password"),
-               QStringLiteral ("-a"), account,
-               QStringLiteral ("-s"), service,
-               QStringLiteral ("-w")
-             });
-    if (!p.waitForFinished (5000))
-      {
-        result.error = QObject::tr ("macOS Keychain read timeout");
-        return result;
-      }
-    if (0 == p.exitCode ())
-      {
-        result.found = true;
-        result.value = trim_single_trailing_newline (QString::fromUtf8 (p.readAllStandardOutput ()));
-        return result;
-      }
-    auto stderr_text = QString::fromUtf8 (p.readAllStandardError ());
-    if (stderr_text.contains (QStringLiteral ("could not be found"), Qt::CaseInsensitive))
-      {
-        result.found = false;
-        return result;
-      }
-    result.error = trim_single_trailing_newline (stderr_text);
-    return result;
-#elif defined (Q_OS_LINUX)
-    auto const secret_tool = QStandardPaths::findExecutable (QStringLiteral ("secret-tool"));
-    if (secret_tool.isEmpty ())
-      {
-        result.backend_available = false;
-        return result;
-      }
-    QProcess p;
-    p.start (secret_tool,
-             QStringList {
-               QStringLiteral ("lookup"),
-               QStringLiteral ("service"), service,
-               QStringLiteral ("account"), account
-             });
-    if (!p.waitForFinished (5000))
-      {
-        result.error = QObject::tr ("secret-tool lookup timeout");
-        return result;
-      }
-    if (0 == p.exitCode ())
-      {
-        result.found = true;
-        result.value = trim_single_trailing_newline (QString::fromUtf8 (p.readAllStandardOutput ()));
-        return result;
-      }
-    result.found = false;
-    return result;
-#else
-    Q_UNUSED (service);
-    Q_UNUSED (account);
-    return result;
-#endif
-  }
-
-  bool secure_settings_store (QString const& service, QString const& account, QString const& value, QString * error = nullptr)
-  {
-    if (!secure_settings_backend_available ())
-      {
-        if (error) *error = QObject::tr ("secure backend unavailable");
-        return false;
-      }
-
-#if defined (Q_OS_MACOS)
-    QProcess p;
-    p.start (QStringLiteral ("/usr/bin/security"),
-             QStringList {
-               QStringLiteral ("add-generic-password"),
-               QStringLiteral ("-U"),
-               QStringLiteral ("-a"), account,
-               QStringLiteral ("-s"), service,
-               QStringLiteral ("-w"), value
-             });
-    if (!p.waitForFinished (5000))
-      {
-        if (error) *error = QObject::tr ("macOS Keychain write timeout");
-        return false;
-      }
-    if (0 != p.exitCode ())
-      {
-        if (error) *error = trim_single_trailing_newline (QString::fromUtf8 (p.readAllStandardError ()));
-        return false;
-      }
-    return true;
-#elif defined (Q_OS_LINUX)
-    auto const secret_tool = QStandardPaths::findExecutable (QStringLiteral ("secret-tool"));
-    if (secret_tool.isEmpty ())
-      {
-        if (error) *error = QObject::tr ("secret-tool not available");
-        return false;
-      }
-
-    QProcess p;
-    p.start (secret_tool,
-             QStringList {
-               QStringLiteral ("store"),
-               QStringLiteral ("--label"),
-               QStringLiteral ("Decodium Credentials"),
-               QStringLiteral ("service"), service,
-               QStringLiteral ("account"), account
-             });
-    if (!p.waitForStarted (3000))
-      {
-        if (error) *error = QObject::tr ("secret-tool store failed to start");
-        return false;
-      }
-    p.write (value.toUtf8 ());
-    p.closeWriteChannel ();
-    if (!p.waitForFinished (5000))
-      {
-        if (error) *error = QObject::tr ("secret-tool store timeout");
-        return false;
-      }
-    if (0 != p.exitCode ())
-      {
-        if (error) *error = trim_single_trailing_newline (QString::fromUtf8 (p.readAllStandardError ()));
-        return false;
-      }
-    return true;
-#else
-    Q_UNUSED (service);
-    Q_UNUSED (account);
-    Q_UNUSED (value);
-    if (error) *error = QObject::tr ("secure backend unsupported");
-    return false;
-#endif
-  }
-
-  bool secure_settings_remove (QString const& service, QString const& account, QString * error = nullptr)
-  {
-    if (!secure_settings_backend_available ())
-      {
-        return true;
-      }
-
-#if defined (Q_OS_MACOS)
-    QProcess p;
-    p.start (QStringLiteral ("/usr/bin/security"),
-             QStringList {
-               QStringLiteral ("delete-generic-password"),
-               QStringLiteral ("-a"), account,
-               QStringLiteral ("-s"), service
-             });
-    if (!p.waitForFinished (5000))
-      {
-        if (error) *error = QObject::tr ("macOS Keychain delete timeout");
-        return false;
-      }
-    if (0 == p.exitCode ())
-      {
-        return true;
-      }
-    auto const stderr_text = QString::fromUtf8 (p.readAllStandardError ());
-    if (stderr_text.contains (QStringLiteral ("could not be found"), Qt::CaseInsensitive))
-      {
-        return true;
-      }
-    if (error) *error = trim_single_trailing_newline (stderr_text);
-    return false;
-#elif defined (Q_OS_LINUX)
-    auto const secret_tool = QStandardPaths::findExecutable (QStringLiteral ("secret-tool"));
-    if (secret_tool.isEmpty ())
-      {
-        return true;
-      }
-    QProcess p;
-    p.start (secret_tool,
-             QStringList {
-               QStringLiteral ("clear"),
-               QStringLiteral ("service"), service,
-               QStringLiteral ("account"), account
-             });
-    if (!p.waitForFinished (5000))
-      {
-        if (error) *error = QObject::tr ("secret-tool clear timeout");
-        return false;
-      }
-    return true;
-#else
-    Q_UNUSED (service);
-    Q_UNUSED (account);
-    Q_UNUSED (error);
-    return true;
-#endif
-  }
-
-  QString secure_settings_load_or_import (QSettings * settings,
-                                          QString const& service,
-                                          QString const& setting_key,
-                                          QString const& plain_value)
-  {
-    auto plain = plain_value;
-    if (plain == QStringLiteral ("__secure__"))
-      {
-        plain.clear ();
-      }
-
-    auto const lookup = secure_settings_lookup (service, setting_key);
-    if (lookup.found)
-      {
-        return lookup.value;
-      }
-
-    if (!lookup.backend_available)
-      {
-        return plain;
-      }
-
-    if (!plain.isEmpty ())
-      {
-        QString store_error;
-        if (secure_settings_store (service, setting_key, plain, &store_error))
-          {
-            if (settings)
-              {
-                settings->setValue (setting_key, QStringLiteral ("__secure__"));
-              }
-          }
-        else if (!store_error.isEmpty ())
-          {
-            qWarning () << "Secure settings import failed for" << setting_key << ":" << store_error;
-          }
-      }
-    return plain;
-  }
-
-  QString secure_settings_value_for_write (QString const& service,
-                                           QString const& setting_key,
-                                           QString const& value)
-  {
-    if (!secure_settings_backend_available ())
-      {
-        return value;
-      }
-
-    if (value.isEmpty ())
-      {
-        secure_settings_remove (service, setting_key, nullptr);
-        return QString {};
-      }
-
-    QString error;
-    if (secure_settings_store (service, setting_key, value, &error))
-      {
-        return QStringLiteral ("__secure__");
-      }
-    if (!error.isEmpty ())
-      {
-        qWarning () << "Secure settings store failed for" << setting_key << ":" << error;
-      }
-    return value;
-  }
 }
 
 
@@ -3085,11 +2775,11 @@ void Configuration::impl::read_settings ()
   PWR_and_SWR_ = settings_->value ("PWRandSWR", false).toBool ();
   check_SWR_ = settings_->value ("CheckSWR", false).toBool ();
 
-  auto const secure_service = secure_settings_service (my_callsign_);
+  auto const secure_service = secure_settings::service (my_callsign_);
 
   OTPinterval_ = settings_->value ("OTPinterval", 1).toUInt ();
   OTPUrl_ = settings_->value ("OTPUrl", FoxVerifier::default_url()).toString ();
-  OTPSeed_ = secure_settings_load_or_import (
+  OTPSeed_ = secure_settings::load_or_import (
     settings_,
     secure_service,
     QStringLiteral ("OTPSeed"),
@@ -3276,7 +2966,7 @@ void Configuration::impl::read_settings ()
   data_mode_ = settings_->value ("DataMode", QVariant::fromValue (data_mode_none)).value<Configuration::DataMode> ();
   bLowSidelobes_ = settings_->value("LowSidelobes",true).toBool();
   prompt_to_log_ = settings_->value ("PromptToLog", false).toBool ();
-  lotw_pwd_ = secure_settings_load_or_import (
+  lotw_pwd_ = secure_settings::load_or_import (
     settings_,
     secure_service,
     QStringLiteral ("Lotw_pwd"),
@@ -3308,7 +2998,7 @@ void Configuration::impl::read_settings ()
     {
       remote_user_ = QStringLiteral ("admin");
     }
-  remote_token_ = secure_settings_load_or_import (
+  remote_token_ = secure_settings::load_or_import (
     settings_,
     secure_service,
     QStringLiteral ("RemoteToken"),
@@ -3390,7 +3080,7 @@ void Configuration::impl::read_settings ()
   bSpecialOp_ = settings_->value("SpecialOpActivity",false).toBool ();
   bCloudLog_ = settings_->value("CloudLog",false).toBool ();
   cloudLogApiUrl_ = settings_->value ("CloudLogApiUrl", QString {}).toString ();
-  cloudLogApiKey_ = secure_settings_load_or_import (
+  cloudLogApiKey_ = secure_settings::load_or_import (
     settings_,
     secure_service,
     QStringLiteral ("CloudLogApiKey"),
@@ -3497,7 +3187,7 @@ void Configuration::impl::find_audio_devices ()
 void Configuration::impl::write_settings ()
 {
   SettingsGroup g {settings_, "Configuration"};
-  auto const secure_service = secure_settings_service (my_callsign_);
+  auto const secure_service = secure_settings::service (my_callsign_);
 
   settings_->setValue ("MyCall", my_callsign_);
   settings_->setValue ("MyGrid", my_grid_);
@@ -3616,7 +3306,7 @@ void Configuration::impl::write_settings ()
   settings_->setValue ("PromptToLog", prompt_to_log_);
   settings_->setValue (
     "Lotw_pwd",
-    secure_settings_value_for_write (secure_service, QStringLiteral ("Lotw_pwd"), lotw_pwd_));      //avt 9/23/25
+    secure_settings::value_for_write (secure_service, QStringLiteral ("Lotw_pwd"), lotw_pwd_));      //avt 9/23/25
   settings_->setValue ("NonQsl", nonQsl_);      //avt 9/23/25
   settings_->setValue ("AutoLog", autoLog_);
   settings_->setValue ("ContestingOnly", contestingOnly_);
@@ -3633,7 +3323,7 @@ void Configuration::impl::write_settings ()
   settings_->setValue ("RemoteUser", remote_user_);
   settings_->setValue (
     "RemoteToken",
-    secure_settings_value_for_write (secure_service, QStringLiteral ("RemoteToken"), remote_token_));
+    secure_settings::value_for_write (secure_service, QStringLiteral ("RemoteToken"), remote_token_));
   settings_->setValue ("DXClusterHost", dx_cluster_host_);
   settings_->setValue ("DXClusterPort", dx_cluster_port_);
   settings_->setValue ("AutoSpotEnabled", auto_spot_enabled_);
@@ -3689,7 +3379,7 @@ void Configuration::impl::write_settings ()
   settings_->setValue ("CloudLogApiUrl", cloudLogApiUrl_);
   settings_->setValue (
     "CloudLogApiKey",
-    secure_settings_value_for_write (secure_service, QStringLiteral ("CloudLogApiKey"), cloudLogApiKey_));
+    secure_settings::value_for_write (secure_service, QStringLiteral ("CloudLogApiKey"), cloudLogApiKey_));
   settings_->setValue ("CloudLogStationID", cloudLogStationID_);
   settings_->setValue ("x2ToneSpacing", x2ToneSpacing_);
   settings_->setValue ("x4ToneSpacing", x4ToneSpacing_);
@@ -3721,7 +3411,7 @@ void Configuration::impl::write_settings ()
   settings_->setValue ("OTPUrl", OTPUrl_);
   settings_->setValue (
     "OTPSeed",
-    secure_settings_value_for_write (secure_service, QStringLiteral ("OTPSeed"), OTPSeed_));
+    secure_settings::value_for_write (secure_service, QStringLiteral ("OTPSeed"), OTPSeed_));
   settings_->setValue ("OTPEnabled", OTPEnabled_);
   settings_->setValue ("ShowOTP", ShowOTP_);
   settings_->setValue ("clear_DXgrid", clear_DXgrid_);

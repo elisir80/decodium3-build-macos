@@ -41,9 +41,14 @@ OTPGenerator::OTPGenerator(QObject *parent)
 
 QByteArray OTPGenerator::generateHOTP(const QByteArray &rawSecret, quint64 counter, int length)
 {
+  return generateHOTP(rawSecret, counter, length, QCryptographicHash::Sha1);
+}
+
+QByteArray OTPGenerator::generateHOTP(const QByteArray &rawSecret, quint64 counter, int length, QCryptographicHash::Algorithm algorithm)
+{
   quint64 const beCounter = qToBigEndian(counter);
   QByteArray data(reinterpret_cast<char const *>(&beCounter), sizeof(beCounter));
-  QMessageAuthenticationCode mac(QCryptographicHash::Sha1);
+  QMessageAuthenticationCode mac(algorithm);
   mac.setKey(rawSecret);
   mac.addData(data);
   QByteArray hmac = mac.result();
@@ -67,6 +72,12 @@ QByteArray OTPGenerator::generateTOTP(const QByteArray &rawSecret, int length)
   return generateHOTP(rawSecret, counter, length);
 }
 
+QByteArray OTPGenerator::generateTOTP(const QByteArray &rawSecret, QDateTime dt, int length, QCryptographicHash::Algorithm algorithm)
+{
+  const qint64 counter = dt.toMSecsSinceEpoch() / 30000;
+  return generateHOTP(rawSecret, counter, length, algorithm);
+}
+
 QString OTPGenerator::generateTOTP(const QString &secret, int length)
 {
   return generateTOTP(fromBase32(secret), length);
@@ -74,8 +85,7 @@ QString OTPGenerator::generateTOTP(const QString &secret, int length)
 
 QString OTPGenerator::generateTOTP(const QString &secret, QDateTime dt, int length)
 {
-  const qint64 counter = dt.toMSecsSinceEpoch() / 30000;
-  return generateHOTP(fromBase32(secret), counter, length);
+  return generateTOTP(fromBase32(secret), dt, length, QCryptographicHash::Sha1);
 }
 
 QByteArray OTPGenerator::fromBase32(const QString &input)

@@ -5,6 +5,7 @@
 #include <QLocale>
 #include <QThread>
 #include <QDateTime>
+#include <QElapsedTimer>
 
 #include "qt_helpers.hpp"
 #include "Network/NetworkServerLookup.hpp"
@@ -14,6 +15,7 @@
 namespace
 {
   char const * const commander_transceiver_name {"DX Lab Suite Commander"};
+  int constexpr commander_settle_backoff_ms {25};
 
   QString map_mode (Transceiver::MODE mode)
   {
@@ -81,22 +83,51 @@ int DXLabSuiteCommanderTransceiver::do_start ()
   // arbitrary but hopefully enough as the actual time required is rig
   // and Commander setting dependent
   int resolution {0};
-  QThread::msleep (250);
-  auto reply = command_with_reply ("<command:10>CmdGetFreq<parameters:0>");
-  if (0 == reply.indexOf ("<CmdFreq:"))
+  auto wait_for_frequency = [this] (int timeout_ms, Frequency baseline, bool require_change, Frequency * observed) {
+    QElapsedTimer timer;
+    timer.start ();
+    while (timer.elapsed () < timeout_ms)
+      {
+        try
+          {
+            auto reply = command_with_reply ("<command:10>CmdGetFreq<parameters:0>");
+            if (0 == reply.indexOf ("<CmdFreq:"))
+              {
+                auto candidate = string_to_frequency (reply.mid (reply.indexOf ('>') + 1));
+                if (candidate && (!require_change || candidate != baseline))
+                  {
+                    if (observed)
+                      {
+                        *observed = candidate;
+                      }
+                    return true;
+                  }
+              }
+          }
+        catch (std::exception const& e)
+          {
+            CAT_TRACE ("startup frequency query deferred:" << e.what ());
+          }
+        if (timer.elapsed () < timeout_ms)
+          {
+            QThread::msleep (commander_settle_backoff_ms);
+          }
+      }
+    return false;
+  };
+
+  Frequency f {0};
+  if (wait_for_frequency (1500, 0, false, &f))
     {
-      auto f = string_to_frequency (reply.mid (reply.indexOf ('>') + 1));
-      if (f && !(f % 10))
+      if (!(f % 10))
         {
           auto test_frequency = f - f % 100 + 55;
           auto f_string = frequency_to_string (test_frequency);
           auto params =  ("<xcvrfreq:%1>" + f_string).arg (f_string.size ());
           simple_command (("<command:10>CmdSetFreq<parameters:%1>" + params).arg (params.size ()));
-          QThread::msleep (250);
-          reply = command_with_reply ("<command:10>CmdGetFreq<parameters:0>");
-          if (0 == reply.indexOf ("<CmdFreq:"))
+          Frequency new_frequency {0};
+          if (wait_for_frequency (750, f, true, &new_frequency))
             {
-              auto new_frequency = string_to_frequency (reply.mid (reply.indexOf ('>') + 1));
               switch (static_cast<Radio::FrequencyDelta> (new_frequency - test_frequency))
                 {
                 case -5: resolution = -1; break;  // 10Hz truncated
@@ -111,10 +142,9 @@ int DXLabSuiteCommanderTransceiver::do_start ()
                   f_string = frequency_to_string (test_frequency);
                   params =  ("<xcvrfreq:%1>" + f_string).arg (f_string.size ());
                   simple_command (("<command:10>CmdSetFreq<parameters:%1>" + params).arg (params.size ()));
-                  QThread::msleep (2000);
-                  reply = command_with_reply ("<command:10>CmdGetFreq<parameters:0>");
-                  new_frequency = string_to_frequency (reply.mid (reply.indexOf ('>') + 1));
-                  if (9 == static_cast<Radio::FrequencyDelta> (new_frequency - test_frequency))
+                  auto previous_readback = new_frequency;
+                  if (wait_for_frequency (2500, previous_readback, true, &new_frequency)
+                      && 9 == static_cast<Radio::FrequencyDelta> (new_frequency - test_frequency))
                     {
                       resolution = 2;   // 20Hz rounded
                     }
@@ -129,7 +159,7 @@ int DXLabSuiteCommanderTransceiver::do_start ()
     {
       // Commander can be reachable while no rig is yet active.
       // Keep interface alive and let periodic polls recover automatically.
-      CAT_WARNING ("startup frequency reply not ready, keeping connection alive:" << reply);
+      CAT_WARNING ("startup frequency reply not ready after settle window, keeping connection alive");
     }
 
   try

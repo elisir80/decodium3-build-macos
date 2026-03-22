@@ -1,35 +1,37 @@
-# Documentation Notes (English) - 1.5.3
+# Documentation Notes (English) - 1.5.4
 
 This index groups the release-facing documentation for the current fork cycle.
 
-- Current release: `1.5.3`
-- Update cycle: `1.5.2 -> 1.5.3`
-- Primary focus: CQRLOG compatibility, FT4/FT8 Wait Features correctness, local version propagation, new bundled DE/FR translations, and release alignment.
+- Current release: `1.5.4`
+- Update cycle: `1.5.3 -> 1.5.4`
+- Primary focus: FT2 anti-ghost filtering, FT2/FT4/FT8 decoder sync refresh, web-app parity controls, full UI/web language alignment, and downloader/secure-settings hardening.
 
-## Key Technical Changes (`1.5.2 -> 1.5.3`)
+## Key Technical Changes (`1.5.3 -> 1.5.4`)
 
-- restored Linux `CQRLOG wsjtx remote` interoperability by keeping historical UDP listen-port behaviour and using `WSJTX` as the compatibility client id.
-- fixed local rebuild propagation so a changed `fork_release_version.txt` forces the right version into the compiled app.
-- tightened FT4/FT8 `Wait Features + AutoSeq` so busy-slot collisions now pause the current TX cycle instead of calling over an active QSO.
-- added bundled German and French UI translations and filtered the language menu to actual bundled translations only.
-- aligned release defaults and documentation to `1.5.3`, including the experimental Linux Hamlib workflow default.
+- added FT2 anti-ghost filtering for very weak malformed payloads, with diagnostic `ghostPass` / `ghostFilt` logging.
+- refreshed decoder sync logic across FT2, FT4, and FT8 with `best 3 of 4` / `best 2 of 3` Costas handling and deeper adaptive subtraction.
+- added web-app `Monitoring ON/OFF`, FT2 `ASYNC` dB display, and `Hide CQ` / `Hide 73` activity filters.
+- the web app now follows the desktop UI language and covers all bundled app languages.
+- removed the duplicate `English (UK)` menu entry and localized the UTC/Astro date format.
+- hardened secure settings fallback/import, file download redirects/size limits, CAT exception logging, DXLab startup waits, and LoTW HTTPS defaults.
+- extended automated coverage with RFC HOTP/TOTP vectors plus downloader and secure-settings tests.
 
 ## Release Artifacts
 
-- `decodium3-ft2-1.5.3-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-1.5.3-macos-tahoe-arm64.zip`
-- `decodium3-ft2-1.5.3-macos-tahoe-arm64-sha256.txt`
-- `decodium3-ft2-1.5.3-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-1.5.3-macos-sequoia-arm64.zip`
-- `decodium3-ft2-1.5.3-macos-sequoia-arm64-sha256.txt`
-- `decodium3-ft2-1.5.3-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-1.5.3-macos-sequoia-x86_64.zip`
-- `decodium3-ft2-1.5.3-macos-sequoia-x86_64-sha256.txt`
-- `decodium3-ft2-1.5.3-macos-monterey-x86_64.dmg` *(best effort/experimental, if generated)*
-- `decodium3-ft2-1.5.3-macos-monterey-x86_64.zip` *(best effort/experimental, if generated)*
-- `decodium3-ft2-1.5.3-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, if generated)*
-- `decodium3-ft2-1.5.3-linux-x86_64.AppImage`
-- `decodium3-ft2-1.5.3-linux-x86_64.AppImage.sha256.txt`
+- `decodium3-ft2-1.5.4-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-1.5.4-macos-tahoe-arm64.zip`
+- `decodium3-ft2-1.5.4-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-1.5.4-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-1.5.4-macos-sequoia-arm64.zip`
+- `decodium3-ft2-1.5.4-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-1.5.4-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-1.5.4-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-1.5.4-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-1.5.4-macos-monterey-x86_64.dmg` *(best effort/experimental, if generated)*
+- `decodium3-ft2-1.5.4-macos-monterey-x86_64.zip` *(best effort/experimental, if generated)*
+- `decodium3-ft2-1.5.4-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, if generated)*
+- `decodium3-ft2-1.5.4-linux-x86_64.AppImage`
+- `decodium3-ft2-1.5.4-linux-x86_64.AppImage.sha256.txt`
 
 ## Linux Minimum Requirements
 
@@ -81,6 +83,6 @@ cd squashfs-root
 - [README.en-GB.md](../README.en-GB.md)
 - [README.it.md](../README.it.md)
 - [README.es.md](../README.es.md)
-- [RELEASE_NOTES_1.5.3.md](../RELEASE_NOTES_1.5.3.md)
-- [doc/GITHUB_RELEASE_BODY_1.5.3.md](./GITHUB_RELEASE_BODY_1.5.3.md)
+- [RELEASE_NOTES_1.5.4.md](../RELEASE_NOTES_1.5.4.md)
+- [doc/GITHUB_RELEASE_BODY_1.5.4.md](./GITHUB_RELEASE_BODY_1.5.4.md)
 - [CHANGELOG.md](../CHANGELOG.md)

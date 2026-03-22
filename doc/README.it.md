@@ -1,35 +1,37 @@
-# Note di Documentazione (Italiano) - 1.5.3
+# Note di Documentazione (Italiano) - 1.5.4
 
 Questo indice raccoglie la documentazione di rilascio del ciclo corrente del fork.
 
-- Release corrente: `1.5.3`
-- Ciclo aggiornamento: `1.5.2 -> 1.5.3`
-- Focus principale: compatibilita' CQRLOG, correttezza Wait Features FT4/FT8, propagazione versione locale, nuove traduzioni bundle DE/FR e allineamento release.
+- Release corrente: `1.5.4`
+- Ciclo aggiornamento: `1.5.3 -> 1.5.4`
+- Focus principale: filtro FT2 anti-ghost, refresh sync decoder FT2/FT4/FT8, parita' della web app, allineamento completo UI/web delle lingue e hardening di downloader/secure settings.
 
-## Cambi Tecnici Principali (`1.5.2 -> 1.5.3`)
+## Cambi Tecnici Principali (`1.5.3 -> 1.5.4`)
 
-- ripristinata l'interoperabilita' Linux con `CQRLOG wsjtx remote`, mantenendo il comportamento storico della listen port UDP e usando `WSJTX` come client id di compatibilita'.
-- corretta la propagazione versione nelle build locali, cosi' un cambio in `fork_release_version.txt` forza la versione corretta nel binario compilato.
-- irrigidito `Wait Features + AutoSeq` in FT4/FT8, cosi' le collisioni su slot occupati mettono in pausa il ciclo TX corrente invece di chiamare sopra un QSO attivo.
-- aggiunte traduzioni UI bundle reali in tedesco e francese e filtrato il menu lingue alle sole traduzioni realmente incluse.
-- allineati a `1.5.3` i default release e la documentazione, incluso il default del workflow Linux Hamlib sperimentale.
+- aggiunto il filtro FT2 anti-ghost per payload molto deboli e malformati, con logging diagnostico `ghostPass` / `ghostFilt`.
+- aggiornato il sync decoder su FT2, FT4 e FT8 con logica Costas `best 3 of 4` / `best 2 of 3` e sottrazione adattiva piu' profonda.
+- aggiunti alla web app `Monitoring ON/OFF`, indicatore FT2 `ASYNC` in dB e filtri attivita' `Hide CQ` / `Hide 73`.
+- la web app segue ora la lingua scelta nell'app desktop e copre tutte le lingue bundle.
+- rimossa la voce duplicata `English (UK)` e localizzato il formato data UTC/Astro.
+- irrigiditi fallback/import secure settings, redirect/limiti size del downloader, logging eccezioni CAT, wait di startup DXLab e default HTTPS LoTW.
+- estesa la copertura automatizzata con vettori RFC HOTP/TOTP e test dedicati per downloader e secure settings.
 
 ## Artifact Release
 
-- `decodium3-ft2-1.5.3-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-1.5.3-macos-tahoe-arm64.zip`
-- `decodium3-ft2-1.5.3-macos-tahoe-arm64-sha256.txt`
-- `decodium3-ft2-1.5.3-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-1.5.3-macos-sequoia-arm64.zip`
-- `decodium3-ft2-1.5.3-macos-sequoia-arm64-sha256.txt`
-- `decodium3-ft2-1.5.3-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-1.5.3-macos-sequoia-x86_64.zip`
-- `decodium3-ft2-1.5.3-macos-sequoia-x86_64-sha256.txt`
-- `decodium3-ft2-1.5.3-macos-monterey-x86_64.dmg` *(best effort/sperimentale, se generato)*
-- `decodium3-ft2-1.5.3-macos-monterey-x86_64.zip` *(best effort/sperimentale, se generato)*
-- `decodium3-ft2-1.5.3-macos-monterey-x86_64-sha256.txt` *(best effort/sperimentale, se generato)*
-- `decodium3-ft2-1.5.3-linux-x86_64.AppImage`
-- `decodium3-ft2-1.5.3-linux-x86_64.AppImage.sha256.txt`
+- `decodium3-ft2-1.5.4-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-1.5.4-macos-tahoe-arm64.zip`
+- `decodium3-ft2-1.5.4-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-1.5.4-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-1.5.4-macos-sequoia-arm64.zip`
+- `decodium3-ft2-1.5.4-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-1.5.4-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-1.5.4-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-1.5.4-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-1.5.4-macos-monterey-x86_64.dmg` *(best effort/sperimentale, se generato)*
+- `decodium3-ft2-1.5.4-macos-monterey-x86_64.zip` *(best effort/sperimentale, se generato)*
+- `decodium3-ft2-1.5.4-macos-monterey-x86_64-sha256.txt` *(best effort/sperimentale, se generato)*
+- `decodium3-ft2-1.5.4-linux-x86_64.AppImage`
+- `decodium3-ft2-1.5.4-linux-x86_64.AppImage.sha256.txt`
 
 ## Requisiti Minimi Linux
 
@@ -79,6 +81,6 @@ cd squashfs-root
 - [README.en-GB.md](../README.en-GB.md)
 - [README.it.md](../README.it.md)
 - [README.es.md](../README.es.md)
-- [RELEASE_NOTES_1.5.3.md](../RELEASE_NOTES_1.5.3.md)
-- [doc/GITHUB_RELEASE_BODY_1.5.3.md](./GITHUB_RELEASE_BODY_1.5.3.md)
+- [RELEASE_NOTES_1.5.4.md](../RELEASE_NOTES_1.5.4.md)
+- [doc/GITHUB_RELEASE_BODY_1.5.4.md](./GITHUB_RELEASE_BODY_1.5.4.md)
 - [CHANGELOG.md](../CHANGELOG.md)

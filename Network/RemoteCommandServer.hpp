@@ -45,6 +45,8 @@ public:
     bool digitalMorseEnabled {false};
     bool quickQsoEnabled {false};
     int ft2QsoMessageCount {5};
+    qint32 asyncSnrDb {-99};
+    QString uiLanguage;
     bool monitoring {false};
     bool transmitting {false};
     QString myCall;
@@ -86,6 +88,7 @@ Q_SIGNALS:
   void setTxEnabledRequested(QString const& commandId, bool enabled);
   void setAutoCqRequested(QString const& commandId, bool enabled);
   void setAutoSpotRequested(QString const& commandId, bool enabled);
+  void setMonitoringRequested(QString const& commandId, bool enabled);
   void setAsyncL2Requested(QString const& commandId, bool enabled);
   void setDualCarrierRequested(QString const& commandId, bool enabled);
   void setAlt12Requested(QString const& commandId, bool enabled);

@@ -1,5 +1,94 @@
 # Changelog / Registro Modifiche
 
+## [1.5.4] - 2026-03-22
+
+### English
+
+Release focused on FT2/FT4/FT8 decoder quality, web-app parity, UI/language alignment, downloader and secure-settings hardening, and expanded release/test coverage.
+
+#### Added
+
+- Added FT2 anti-ghost filtering for very weak decodes, with `ghostPass` / `ghostFilt` tracing in `debug.txt`.
+- Added web-app `Monitoring ON/OFF`, FT2 `ASYNC` dB display, and `Hide CQ` / `Hide 73` activity filters.
+- Added full web-app localization coverage for all bundled UI languages, driven by the desktop app language.
+- Added the dedicated `SecureSettings` module.
+- Added downloader integration tests plus RFC HOTP/TOTP test vectors for `SHA1`, `SHA256`, and `SHA512`.
+
+#### Changed
+
+- FT2, FT4, and FT8 now use more robust Costas sync strategies and deeper/adaptive subtraction thresholds for weak-signal decoding.
+- UTC clock and Astro date/time output now follow the `Day Month Year` plus `UTC` format using the app-selected language.
+- User-facing title/version branding keeps `Decodium` and removes the old `v3.0 FT2 "Raptor"` title text.
+- The language menu now keeps a single `English` entry.
+- Release defaults, workflow defaults, and release documents are aligned to semantic version `1.5.4`.
+
+#### Fixed
+
+- Fixed very weak FT2 ghost or malformed decodes slipping through without a dedicated weak-signal sanity filter.
+- Fixed the web app missing live monitoring control, missing ASYNC dB feedback, and drifting to browser language instead of the app language.
+- Fixed secure-setting fallback/import edge cases and made LoTW default to `https`.
+- Fixed downloader acceptance of bad redirect schemes and unbounded large downloads.
+- Fixed silent CAT/transceiver exceptions and reduced blind DXLab startup waits.
+- Fixed Linux `GNU ld` unit-test link failures by correcting static-library order.
+
+### Italiano
+
+Release focalizzata su qualita' decoder FT2/FT4/FT8, parita' funzionale della web app, allineamento UI/lingue, hardening di downloader e secure settings, ed estensione della copertura test/release.
+
+#### Aggiunto
+
+- Aggiunto il filtro FT2 anti-ghost per decode molto deboli, con tracing `ghostPass` / `ghostFilt` in `debug.txt`.
+- Aggiunti alla web app `Monitoring ON/OFF`, indicatore FT2 `ASYNC` in dB e filtri attivita' `Hide CQ` / `Hide 73`.
+- Aggiunta copertura completa della localizzazione web app per tutte le lingue UI bundle, guidata dalla lingua selezionata nell'app desktop.
+- Aggiunto il modulo dedicato `SecureSettings`.
+- Aggiunti test integrazione downloader e vettori RFC HOTP/TOTP per `SHA1`, `SHA256` e `SHA512`.
+
+#### Modificato
+
+- FT2, FT4 e FT8 usano ora strategie Costas sync piu' robuste e soglie di sottrazione piu' profonde/adattive per il decoding weak-signal.
+- Orologio UTC e pannello Astro seguono ora il formato `Giorno Mese Anno` piu' `UTC`, usando la lingua selezionata nell'app.
+- Il branding titolo/versione lato utente mantiene `Decodium` e rimuove il vecchio testo `v3.0 FT2 "Raptor"`.
+- Il menu lingue mantiene ora una sola voce `English`.
+- Default release, default workflow e documentazione release sono allineati alla semver `1.5.4`.
+
+#### Corretto
+
+- Corretti i decode FT2 ghost o malformati molto deboli che passavano senza un filtro weak-signal dedicato.
+- Corretta la web app che non esponeva il controllo monitoring, non mostrava i dB ASYNC e usava la lingua del browser invece di quella dell'app.
+- Corretti i casi limite di fallback/import dei secure settings e portato LoTW di default a `https`.
+- Corretta l'accettazione nel downloader di redirect con scheme non validi e di download troppo grandi senza limite.
+- Corretti logging silenziosi delle eccezioni CAT/transceiver e ridotti i blind wait di startup DXLab.
+- Corretto il linking dei test su Linux con `GNU ld`, sistemando l'ordine delle librerie statiche.
+
+### Espanol
+
+Release centrada en calidad de decoder FT2/FT4/FT8, paridad funcional de la web app, alineacion UI/idiomas, endurecimiento de downloader y secure settings, y ampliacion de la cobertura test/release.
+
+#### Anadido
+
+- Anadido el filtro FT2 anti-ghost para decodes muy debiles, con trazas `ghostPass` / `ghostFilt` en `debug.txt`.
+- Anadidos a la web app `Monitoring ON/OFF`, indicador FT2 `ASYNC` en dB y filtros de actividad `Hide CQ` / `Hide 73`.
+- Anadida cobertura completa de localizacion web app para todas las lenguas UI bundle, guiada por el idioma seleccionado en la app de escritorio.
+- Anadido el modulo dedicado `SecureSettings`.
+- Anadidos tests de integracion del downloader y vectores RFC HOTP/TOTP para `SHA1`, `SHA256` y `SHA512`.
+
+#### Cambios
+
+- FT2, FT4 y FT8 usan ahora estrategias Costas sync mas robustas y umbrales de sustraccion mas profundos/adaptativos para decoding weak-signal.
+- Reloj UTC y panel Astro siguen ahora el formato `Dia Mes Ano` mas `UTC`, usando el idioma seleccionado en la app.
+- El branding titulo/version del lado del usuario mantiene `Decodium` y elimina el antiguo texto `v3.0 FT2 "Raptor"`.
+- El menu de idiomas mantiene ahora una sola entrada `English`.
+- Defaults release, defaults workflow y documentacion release quedan alineados a la semver `1.5.4`.
+
+#### Corregido
+
+- Corregidos decodes FT2 ghost o malformados muy debiles que pasaban sin un filtro weak-signal dedicado.
+- Corregida la web app que no exponia el control monitoring, no mostraba los dB ASYNC y usaba el idioma del navegador en vez del de la app.
+- Corregidos casos limite de fallback/import de secure settings y llevado LoTW por defecto a `https`.
+- Corregida la aceptacion en el downloader de redirects con scheme no valido y de descargas demasiado grandes sin limite.
+- Corregidos logs silenciosos de excepciones CAT/transceiver y reducidos los blind waits de arranque DXLab.
+- Corregido el enlazado de tests en Linux con `GNU ld`, ajustando el orden de las librerias estaticas.
+
 ## [1.5.3] - 2026-03-22
 
 ### English

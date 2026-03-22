@@ -58,13 +58,31 @@ void TransceiverBase::set (TransceiverState const& s,
 {
   CAT_TRACE ("#: " << s);
 
-  try {
-        do_txvolume (s.txvolume());
-  } catch(...) {printf("Setting tx attenuation failed");}
+  try
+    {
+      do_txvolume (s.txvolume ());
+    }
+  catch (std::exception const& e)
+    {
+      CAT_WARNING ("setting tx attenuation failed:" << e.what ());
+    }
+  catch (...)
+    {
+      CAT_WARNING ("setting tx attenuation failed: unexpected exception");
+    }
 
-  try {
-      do_volume (s.volume());
-  } catch(...) {printf("Setting rx attenuation failed");}
+  try
+    {
+      do_volume (s.volume ());
+    }
+  catch (std::exception const& e)
+    {
+      CAT_WARNING ("setting rx attenuation failed:" << e.what ());
+    }
+  catch (...)
+    {
+      CAT_WARNING ("setting rx attenuation failed: unexpected exception");
+    }
 
   QString message;
   try
@@ -208,7 +226,7 @@ void TransceiverBase::set (TransceiverState const& s,
     }
   catch (...)
     {
-      CAT_TRACE ("#: " << sequence_number << " " << sequence_number);
+      CAT_WARNING ("#: " << sequence_number << " unexpected exception in TransceiverBase::set");
       message = unexpected;
     }
   if (!message.isEmpty ())
@@ -231,12 +249,12 @@ void TransceiverBase::startup ()
     }
   catch (std::exception const& e)
     {
-      CAT_TRACE ("startup" << " what: " << e.what () << '\n');
+      CAT_WARNING ("startup failed:" << e.what ());
       message = e.what ();
     }
   catch (...)
     {
-      CAT_TRACE ("startup error: unexpected\n");
+      CAT_WARNING ("startup failed: unexpected exception");
       message = unexpected;
     }
   if (!message.isEmpty ())
@@ -264,10 +282,13 @@ void TransceiverBase::shutdown ()
               update_split(false); //w3sz tci
             }
         }
+      catch (std::exception const& e)
+        {
+          CAT_WARNING ("shutdown cleanup failed:" << e.what ());
+        }
       catch (...)
         {
-          CAT_TRACE ("shutdown\n");
-          // don't care about exceptions
+          CAT_WARNING ("shutdown cleanup failed: unexpected exception");
         }
     }
   do_stop();
@@ -286,12 +307,12 @@ void TransceiverBase::stop () noexcept
     }
   catch (std::exception const& e)
     {
-      CAT_TRACE ("stop" << " what: " << e.what ());
+      CAT_WARNING ("stop failed:" << e.what ());
       message = e.what ();
     }
   catch (...)
     {
-      CAT_TRACE ("stop");
+      CAT_WARNING ("stop unexpected exception");
       message = unexpected;
     }
   if (!message.isEmpty ())
@@ -378,7 +399,6 @@ void TransceiverBase::offline (QString const& reason)
     }
   catch (...)
     {
-      CAT_TRACE ("reason: " << reason);
-      // don't care
+      CAT_WARNING ("offline cleanup failed for reason:" << reason << " with unexpected exception");
     }
 }

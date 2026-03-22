@@ -2,6 +2,7 @@
 #include <QDateTime>
 #include <QDebug>
 
+#include "otpgenerator.h"
 #include "qt_helpers.hpp"
 
 class TestQtHelpers
@@ -204,6 +205,108 @@ private:
     QFETCH (bool, result);
 
     QCOMPARE (::is_MAC_ambiguous_multicast_address (QHostAddress {addr}), result);
+  }
+
+  Q_SLOT void hotp_rfc_4226_vectors ()
+  {
+    OTPGenerator generator;
+    QByteArray const secret {"12345678901234567890"};
+    QStringList const expected {
+      "755224",
+      "287082",
+      "359152",
+      "969429",
+      "338314",
+      "254676",
+      "287922",
+      "162583",
+      "399871",
+      "520489",
+    };
+
+    for (int counter = 0; counter < expected.size (); ++counter) {
+      QCOMPARE (QString::fromLatin1 (generator.generateHOTP (secret, counter, 6)), expected.at (counter));
+    }
+  }
+
+  Q_SLOT void totp_rfc_6238_sha1_vectors ()
+  {
+    OTPGenerator generator;
+    QString const secret {"GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"};
+
+    struct TotpVector
+    {
+      qint64 seconds;
+      char const * expected;
+    };
+
+    TotpVector const vectors[] {
+      {59, "94287082"},
+      {1111111109, "07081804"},
+      {1111111111, "14050471"},
+      {1234567890, "89005924"},
+      {2000000000, "69279037"},
+      {20000000000LL, "65353130"},
+    };
+
+    for (auto const& vector : vectors) {
+      QDateTime const dt = QDateTime::fromSecsSinceEpoch (vector.seconds, Qt::UTC);
+      QCOMPARE (generator.generateTOTP (secret, dt, 8), QString::fromLatin1 (vector.expected));
+    }
+  }
+
+  Q_SLOT void totp_rfc_6238_sha256_vectors ()
+  {
+    OTPGenerator generator;
+    QByteArray const secret {"12345678901234567890123456789012"};
+
+    struct TotpVector
+    {
+      qint64 seconds;
+      char const * expected;
+    };
+
+    TotpVector const vectors[] {
+      {59, "46119246"},
+      {1111111109, "68084774"},
+      {1111111111, "67062674"},
+      {1234567890, "91819424"},
+      {2000000000, "90698825"},
+      {20000000000LL, "77737706"},
+    };
+
+    for (auto const& vector : vectors) {
+      QDateTime const dt = QDateTime::fromSecsSinceEpoch (vector.seconds, Qt::UTC);
+      QCOMPARE (QString::fromLatin1 (generator.generateTOTP (secret, dt, 8, QCryptographicHash::Sha256)),
+                QString::fromLatin1 (vector.expected));
+    }
+  }
+
+  Q_SLOT void totp_rfc_6238_sha512_vectors ()
+  {
+    OTPGenerator generator;
+    QByteArray const secret {"1234567890123456789012345678901234567890123456789012345678901234"};
+
+    struct TotpVector
+    {
+      qint64 seconds;
+      char const * expected;
+    };
+
+    TotpVector const vectors[] {
+      {59, "90693936"},
+      {1111111109, "25091201"},
+      {1111111111, "99943326"},
+      {1234567890, "93441116"},
+      {2000000000, "38618901"},
+      {20000000000LL, "47863826"},
+    };
+
+    for (auto const& vector : vectors) {
+      QDateTime const dt = QDateTime::fromSecsSinceEpoch (vector.seconds, Qt::UTC);
+      QCOMPARE (QString::fromLatin1 (generator.generateTOTP (secret, dt, 8, QCryptographicHash::Sha512)),
+                QString::fromLatin1 (vector.expected));
+    }
   }
 };
 

@@ -88,7 +88,7 @@ QString fork_release_version ()
 
 QString program_title (QString const& revision)
 {
-  QString id {QString {"Decodium v3.0 FT2 \"Raptor\" | Fork by Salvatore Raccampo 9H1SR %1"}
+  QString id {QString {"Decodium | Fork by Salvatore Raccampo 9H1SR %1"}
                .arg (fork_release_version ())};
   return id + " " + revision;
 }

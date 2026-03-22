@@ -61,6 +61,7 @@
 #include <QComboBox>
 #include <QMessageBox>
 #include <QMenu>
+#include <QLocale>
 #include <QSplashScreen>
 #include <QUdpSocket>
 #include <QTcpSocket>
@@ -169,6 +170,53 @@ QVersionNumber parsed_release_version (QString const& version, bool * ok = nullp
       *ok = !normalized.isEmpty () && !parsed.isNull ();
     }
   return parsed;
+}
+
+QLocale ui_language_locale (QSettings const * settings)
+{
+  auto language = settings ? settings->value (QStringLiteral ("UILanguage")).toString ().trimmed () : QString {};
+  if (language.isEmpty ())
+    {
+      return QLocale::system ();
+    }
+
+  language.replace ('-', '_');
+  QLocale locale {language};
+  if (locale.name () == QStringLiteral ("C"))
+    {
+      return QLocale::system ();
+    }
+  return locale;
+}
+
+QString localized_utc_display (QDateTime const& utcDateTime, QSettings const * settings)
+{
+  auto locale = ui_language_locale (settings);
+  auto month = locale.standaloneMonthName (utcDateTime.date ().month (), QLocale::LongFormat).trimmed ();
+  if (month.isEmpty ())
+    {
+      month = locale.monthName (utcDateTime.date ().month (), QLocale::LongFormat).trimmed ();
+    }
+  if (month.isEmpty ())
+    {
+      month = QLocale::system ().standaloneMonthName (utcDateTime.date ().month (), QLocale::LongFormat).trimmed ();
+    }
+  if (month.isEmpty ())
+    {
+      month = QLocale::system ().monthName (utcDateTime.date ().month (), QLocale::LongFormat).trimmed ();
+    }
+  if (!month.isEmpty ())
+    {
+      month.replace (0, 1, month.left (1).toUpper ());
+    }
+
+  auto const dateLine = QStringLiteral ("%1 %2 %3")
+      .arg (utcDateTime.date ().day ())
+      .arg (month)
+      .arg (utcDateTime.date ().year ());
+  auto const timeLine = utcDateTime.time ().toString (QStringLiteral ("HH:mm:ss"))
+      + QStringLiteral (" UTC");
+  return dateLine + QStringLiteral ("\n") + timeLine;
 }
 }
 #include "EqualizationToolsDialog.hpp"
@@ -468,6 +516,18 @@ static QString canonical_decode_payload_for_dedupe (QString const& decodeLine, Q
   }
 
   return payload;
+}
+
+static QString sanitized_ft2_payload_for_filter (QString const& decodeLine)
+{
+  QString payload = udp_decode_message_text (decodeLine).trimmed ();
+  if (payload.isEmpty ()) {
+    return payload;
+  }
+
+  payload.replace (QRegularExpression {R"((?:\s+\?)?(?:\s+[AQ]\d|\s+[AQ]\*|\s+T)\s*$)"},
+                   QString {});
+  return payload.simplified ();
 }
 
 static void normalize_ft2_mode_marker (QString& line, QString const& currentMode)
@@ -948,6 +1008,151 @@ namespace
     token.remove (QChar {'<'});
     token.remove (QChar {'>'});
     return token.trimmed ();
+  }
+
+  bool ghost_filter_known_token (QString const& token)
+  {
+    if (token.isEmpty ()) {
+      return true;
+    }
+
+    auto const upper = token.trimmed ().toUpper ();
+    if (upper.isEmpty ()) {
+      return true;
+    }
+
+    if (upper.startsWith ("CQ")) return true;
+    if (upper == "DE" || upper == "QRZ" || upper == "R"
+        || upper == "RRR" || upper == "RR73"
+        || upper == "73" || upper == "TU" || upper == "TU;"
+        || upper == "TNX" || upper == "GL" || upper == "HNY"
+        || upper == "DX" || upper == "QSY" || upper == "PSE"
+        || upper == "TEST" || upper == "..." || upper == "<...>") {
+      return true;
+    }
+
+    static QRegularExpression const reportRx {R"(^(?:R)?[+-]?\d{1,2}$)"};
+    if (reportRx.match (upper).hasMatch ()) {
+      return true;
+    }
+
+    static QRegularExpression const numericTokenRx {R"(^\d+$)"};
+    if (numericTokenRx.match (upper).hasMatch ()) {
+      return true;
+    }
+
+    static QRegularExpression const gridRx {
+      R"(^(?:[A-R]{2}\d{2}(?:[A-X]{2})?|\d{2}[A-R]{2}(?:[A-X]{2})?)$)",
+      QRegularExpression::CaseInsensitiveOption
+    };
+    if (gridRx.match (upper).hasMatch ()) {
+      return true;
+    }
+
+    static QRegularExpression const asyncMarkerRx {
+      R"(^(?:\?|[AQ]\d|[AQ]\*|T|a\d|q\d)$)",
+      QRegularExpression::CaseInsensitiveOption
+    };
+    return asyncMarkerRx.match (upper).hasMatch ();
+  }
+
+  bool ghost_filter_valid_callsign_token (QString const& token, AD1CCty const * countries)
+  {
+    if (!countries) {
+      return true;
+    }
+
+    auto normalized = normalize_call_token (token).toUpper ();
+    if (normalized.isEmpty ()) {
+      return false;
+    }
+
+    if (normalized.startsWith ('<') && normalized.endsWith ('>')) {
+      return true;
+    }
+
+    if (normalized.size () < 3 || normalized.size () > 11) {
+      return false;
+    }
+
+    static QRegularExpression const callsignAlphabetRx {R"(^[A-Z0-9/]+$)"};
+    if (!callsignAlphabetRx.match (normalized).hasMatch ()) {
+      return false;
+    }
+
+    auto const base = Radio::base_callsign (normalized).trimmed ().toUpper ();
+    if (base.size () < 3 || base.size () > 11 || !Radio::is_callsign (base)) {
+      return false;
+    }
+
+    auto const record = countries->lookup (normalized);
+    return !record.entity_name.isEmpty ();
+  }
+
+  bool should_reject_ft2_ghost_decode (QString const& message, int snr, AD1CCty const * countries,
+                                       QString * details = nullptr)
+  {
+    if (!countries || snr > -20) {
+      return false;
+    }
+
+    DecodedText const decodedLine {message};
+    auto payload = sanitized_ft2_payload_for_filter (decodedLine.clean_string ());
+    if (payload.isEmpty () || payload.contains ("<DecodeFinished>")) {
+      return false;
+    }
+
+    auto payloadNoBrackets = payload;
+    payloadNoBrackets.remove ('<');
+    payloadNoBrackets.remove ('>');
+    auto const words = payloadNoBrackets.split (' ', SkipEmptyParts);
+    QStringList wordsUpper;
+    wordsUpper.reserve (words.size ());
+    for (auto const& word : words) {
+      wordsUpper << word.trimmed ().toUpper ();
+    }
+
+    bool const syntaxRejected =
+        !payload.contains ('<')
+        && !decodedLine.isStandardMessage ()
+        && !payload_is_73 (wordsUpper)
+        && !is_ft2_quick_tu_message (wordsUpper, "FT2")
+        && !is_ft2_quick_beacon_tu (wordsUpper, "FT2");
+
+    int callsignCandidates = 0;
+    int failedCandidates = 0;
+    QStringList candidateTokens;
+    QStringList failedTokens;
+
+    for (auto const& rawWord : words) {
+      auto const word = rawWord.trimmed ();
+      if (word.isEmpty ()) {
+        continue;
+      }
+      if ((word.startsWith ('<') && word.endsWith ('>')) || ghost_filter_known_token (word)) {
+        continue;
+      }
+
+      ++callsignCandidates;
+      candidateTokens << word;
+      if (!ghost_filter_valid_callsign_token (word, countries)) {
+        ++failedCandidates;
+        failedTokens << word;
+      }
+    }
+
+    if (details) {
+      *details = QString {"msg:%1 standard:%2 syntaxReject:%3 candidateCount:%4 invalidCount:%5 candidates:[%6] invalid:[%7]"}
+          .arg (payload,
+                decodedLine.isStandardMessage () ? "1" : "0",
+                syntaxRejected ? "1" : "0",
+                QString::number (callsignCandidates),
+                QString::number (failedCandidates),
+                candidateTokens.join (','),
+                failedTokens.join (','));
+    }
+
+    return syntaxRejected || (callsignCandidates > 0 && failedCandidates == callsignCandidates);
   }
 
   QString infer_partner_from_directed_message (QString const& message
@@ -1582,7 +1787,6 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
       {"zh", "中文"},
       {"zh_TW", "繁體中文"},
       {"ru", "Русский"},
-      {"en_GB", "English (UK)"},
     };
     auto * menuLang = new QMenu (tr ("Language"), this);
     QString currentLang = m_settings->value ("UILanguage").toString ();
@@ -2108,6 +2312,16 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
                 state.digitalMorseEnabled = ui && ui->cbDigitalMorse && ui->cbDigitalMorse->isChecked();
                 state.quickQsoEnabled = ui && ui->btnQuickQSO && ui->btnQuickQSO->isChecked();
                 state.ft2QsoMessageCount = ft2QsoMessageCount(m_ft2QsoMessageProfile);
+                state.asyncSnrDb = (m_mode == "FT2" && m_asyncVis) ? m_asyncVis->snr() : -99;
+                state.uiLanguage = m_settings ? m_settings->value(QStringLiteral("UILanguage")).toString().trimmed() : QString {};
+                if (state.uiLanguage.isEmpty())
+                  {
+                    state.uiLanguage = QLocale::system().name();
+                  }
+                if (state.uiLanguage.isEmpty())
+                  {
+                    state.uiLanguage = QStringLiteral("en");
+                  }
                 state.monitoring = m_monitoring;
                 state.transmitting = m_transmitting;
                 state.myCall = m_config.my_callsign();
@@ -2168,6 +2382,8 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
                     this, &MainWindow::onRemoteSetAutoCqRequested);
             connect(m_remoteCommandServer, &RemoteCommandServer::setAutoSpotRequested,
                     this, &MainWindow::onRemoteSetAutoSpotRequested);
+            connect(m_remoteCommandServer, &RemoteCommandServer::setMonitoringRequested,
+                    this, &MainWindow::onRemoteSetMonitoringRequested);
             connect(m_remoteCommandServer, &RemoteCommandServer::setAsyncL2Requested,
                     this, &MainWindow::onRemoteSetAsyncL2Requested);
             connect(m_remoteCommandServer, &RemoteCommandServer::setDualCarrierRequested,
@@ -9603,6 +9819,18 @@ void MainWindow::readFromStdout()                             //readFromStdout
     QString message0 {rawLine};
     DecodedText decodedtext0 {rawLine};
     DecodedText decodedtext {QString(rawLine).remove("TU; ")};
+    QString ghostFilterDetails;
+    bool const ft2GhostRejected =
+        (m_mode == "FT2")
+        && should_reject_ft2_ghost_decode (message0, decodedtext.snr (), m_logBook.countries (), &ghostFilterDetails);
+    if (ft2GhostRejected) {
+      debugToFile (QString {"ghostFilt   snr:%1 %2"}.arg (decodedtext.snr ()).arg (ghostFilterDetails));
+    } else if (m_mode == "FT2"
+               && decodedtext.snr () <= -20
+               && m_logBook.countries ()
+               && !ghostFilterDetails.isEmpty ()) {
+      debugToFile (QString {"ghostPass   snr:%1 %2"}.arg (decodedtext.snr ()).arg (ghostFilterDetails));
+    }
 
   // Don't allow a7 decodes during the first period and for non-contest messages when in any contest mode
   if ((!((no_a7_decodes && line_read.contains("a7") && !m_diskData) or (line_read.contains("a7") && SpecOp::NONE!=m_specOp
@@ -9640,24 +9868,10 @@ void MainWindow::readFromStdout()                             //readFromStdout
       and (!(m_mode=="FT2" &&
            (message0.contains("? a")                                              // AP low-confidence decodes
            || (decodedtext.snr() < -21 && decodedtext.isLowConfidence()))))       // very weak + uncertain
-      // FDR step 4: FT2 false decode filter.
-      // Reject callsigns with unknown cty.dat prefixes.
-      and (!(m_mode=="FT2" && [&]() -> bool {
-           auto const words = decodedtext.messageWords();
-           auto const * countries = m_logBook.countries();
-           if (!countries) return false;  // cty.dat not ready yet
-
-           for (int i = 2; i <= 3 && i < words.size(); ++i) {
-             QString w = words[i].toUpper().trimmed();
-             if (w.isEmpty() || w == "CQ" || w == "DE" || w == "QRZ"
-                 || w == "..." || w.startsWith("CQ")) continue;
-             if (w.length() > 11) return true;
-             auto const record = countries->lookup(w);
-             if (record.entity_name.isEmpty()) return true;
-           }
-
-           return false;
-      }()))
+      // FDR step 4: FT2 anti-ghost filter.
+      // Only act on very weak decodes and reject them only if every
+      // callsign-position token looks bogus.
+      and (!ft2GhostRejected)
       )
     {
     // DT Feedback Loop: collect DT only from verified decodes with good SNR
@@ -12763,8 +12977,7 @@ void MainWindow::guiUpdate()
     }
 
     QDateTime t = QDateTime::currentDateTimeUtc();
-    QString utc = t.date().toString("yyyy MMM dd") + "\n " +
-      t.time().toString() + " ";
+    QString utc = localized_utc_display (t, m_settings);
 //    QString utc = t.time().toString();      // UR for AL version use this and disable the 2 lines above
     ui->labUTC->setText(utc);
     if(m_bBestSPArmed and (m_dateTimeBestSP.secsTo(t) >= 120)) on_pbBestSP_clicked(); //BestSP timeout
@@ -25854,6 +26067,26 @@ void MainWindow::onRemoteSetAutoSpotRequested(QString const& commandId, bool ena
 {
   Q_UNUSED(commandId);
   setAutoSpotEnabled(enabled, true);
+}
+
+void MainWindow::onRemoteSetMonitoringRequested(QString const& commandId, bool enabled)
+{
+  Q_UNUSED(commandId);
+  if (!ui || !ui->monitorButton)
+    {
+      return;
+    }
+  if (enabled && m_transmitting)
+    {
+      showStatusMessage(tr("Remote Monitoring ignored: cannot enable while transmitting"));
+      return;
+    }
+  if (ui->monitorButton->isChecked() != enabled)
+    {
+      ui->monitorButton->setChecked(enabled);
+      on_monitorButton_clicked(enabled);
+    }
+  showStatusMessage(enabled ? tr("Remote Monitoring enabled") : tr("Remote Monitoring disabled"));
 }
 
 void MainWindow::onRemoteSetAsyncL2Requested(QString const& commandId, bool enabled)

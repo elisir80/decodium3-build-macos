@@ -3055,7 +3055,7 @@ Right click for insert and delete options.</string>
                <string>URL</string>
               </property>
               <property name="text">
-               <string>http://lotw.arrl.org/lotw-user-activity.csv</string>
+               <string>https://lotw.arrl.org/lotw-user-activity.csv</string>
               </property>
              </widget>
             </item>

@@ -5,6 +5,8 @@
 #include <QNetworkRequest>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
+#include <QSslError>
+#include <QSslSocket>
 #include <QFileInfo>
 #include <QDir>
 #include <QIODevice>
@@ -13,6 +15,10 @@
 
 namespace
 {
+int constexpr max_redirects {10};
+int constexpr transfer_timeout_ms {30000};
+qint64 constexpr max_download_bytes {64LL * 1024 * 1024};
+
 bool is_head_operation (QNetworkReply const * reply)
 {
   return reply && reply->operation () == QNetworkAccessManager::HeadOperation;
@@ -48,12 +54,64 @@ bool should_retry_head_with_get (QNetworkReply const * reply)
 
   return false;
 }
+
+bool is_supported_download_url (QUrl const& url)
+{
+  if (!url.isValid ())
+    {
+      return false;
+    }
+
+  auto const scheme = url.scheme ().toLower ();
+  return scheme == QStringLiteral ("http") || scheme == QStringLiteral ("https");
+}
+
+QString unsupported_download_reason (QUrl const& url)
+{
+  return QObject::tr ("Network Error:\nUnsupported download URL or scheme:\n%1")
+    .arg (url.toDisplayString ());
+}
+
+QString oversized_download_reason (QUrl const& url)
+{
+  return QObject::tr ("Network Error:\nDownloaded file exceeds limit of %1 MiB:\n%2")
+    .arg (max_download_bytes / (1024 * 1024))
+    .arg (url.toDisplayString ());
+}
+
+bool is_unsupported_redirect_target (QNetworkReply const * reply, QUrl * resolved_url = nullptr)
+{
+  if (!reply)
+    {
+      return false;
+    }
+
+  auto const redirect_url = reply->attribute (QNetworkRequest::RedirectionTargetAttribute).toUrl ();
+  if (redirect_url.isEmpty ())
+    {
+      return false;
+    }
+
+  auto const resolved = reply->url ().resolved (redirect_url);
+  if (!is_supported_download_url (resolved))
+    {
+      if (resolved_url)
+        {
+          *resolved_url = resolved;
+        }
+      return true;
+    }
+
+  return false;
+}
 }
 
 FileDownload::FileDownload() : QObject(nullptr)
 {
   redirect_count_ = 0;
   url_valid_ = false;
+  downloaded_bytes_ = 0;
+  size_limit_exceeded_ = false;
 }
 
 FileDownload::~FileDownload()
@@ -78,6 +136,24 @@ void FileDownload::errorOccurred(QNetworkReply::NetworkError code)
                .arg(failed_reply->url().toString()));
       return;
     }
+  if (size_limit_exceeded_ && failed_reply->error () == QNetworkReply::OperationCanceledError)
+    {
+      destfile_.cancelWriting ();
+      destfile_.commit ();
+      return;
+    }
+  QUrl rejected_redirect;
+  if (is_unsupported_redirect_target (failed_reply, &rejected_redirect))
+    {
+      auto const reason = unsupported_download_reason (rejected_redirect);
+      LOG_WARN (QString {"FileDownload [%1]: redirect rejected after network error -> %2"}
+                .arg (user_agent_)
+                .arg (rejected_redirect.toDisplayString ()));
+      Q_EMIT error (reason);
+      destfile_.cancelWriting ();
+      destfile_.commit ();
+      return;
+    }
   LOG_INFO(QString{"FileDownload [%1]: errorOccurred %2 -> %3"}.arg(user_agent_).arg(code).arg(failed_reply->errorString()));
   Q_EMIT error (failed_reply->errorString ());
   destfile_.cancelWriting ();
@@ -100,6 +176,24 @@ void FileDownload::obsoleteError()
       LOG_INFO(QString{"FileDownload [%1]: HEAD unsupported for %2, retrying with GET"}
                .arg(user_agent_)
                .arg(failed_reply->url().toString()));
+      return;
+    }
+  if (size_limit_exceeded_ && failed_reply->error () == QNetworkReply::OperationCanceledError)
+    {
+      destfile_.cancelWriting ();
+      destfile_.commit ();
+      return;
+    }
+  QUrl rejected_redirect;
+  if (is_unsupported_redirect_target (failed_reply, &rejected_redirect))
+    {
+      auto const reason = unsupported_download_reason (rejected_redirect);
+      LOG_WARN (QString {"FileDownload [%1]: redirect rejected after network error -> %2"}
+                .arg (user_agent_)
+                .arg (rejected_redirect.toDisplayString ()));
+      Q_EMIT error (reason);
+      destfile_.cancelWriting ();
+      destfile_.commit ();
       return;
     }
   LOG_INFO(QString{"FileDownload [%1]: error -> %2"}.arg(user_agent_).arg(failed_reply->errorString()));
@@ -129,7 +223,25 @@ void FileDownload::store()
       return;
     }
   if (destfile_.isOpen())
-    destfile_.write (source_reply->read (source_reply->bytesAvailable ()));
+    {
+      auto const data = source_reply->read (source_reply->bytesAvailable ());
+      downloaded_bytes_ += data.size ();
+      if (downloaded_bytes_ > max_download_bytes)
+        {
+          size_limit_exceeded_ = true;
+          auto const reason = oversized_download_reason (source_reply->url ());
+          LOG_WARN (QString {"FileDownload [%1]: %2"}.arg (user_agent_).arg (reason));
+          destfile_.cancelWriting ();
+          destfile_.commit ();
+          Q_EMIT error (reason);
+          if (source_reply->isRunning ())
+            {
+              source_reply->abort ();
+            }
+          return;
+        }
+      destfile_.write (data);
+    }
   else
     LOG_INFO(QString{ "FileDownload [%1]: file is not open."}.arg(user_agent_));
 }
@@ -161,22 +273,38 @@ void FileDownload::replyComplete()
 
   if (reply_error == QNetworkReply::NoError && !redirect_url.isEmpty ())
   {
-    if ("https" == redirect_url.scheme () && !QSslSocket::supportsSsl ())
+    auto const resolved_redirect_url = finished_url.resolved (redirect_url);
+    if (!is_supported_download_url (resolved_redirect_url))
     {
-      Q_EMIT download_error (tr ("Network Error - SSL/TLS support not installed, cannot fetch:\n\'%1\'")
-                                              .arg (redirect_url.toDisplayString ()));
+      auto const reason = unsupported_download_reason (resolved_redirect_url);
+      LOG_WARN (QString {"FileDownload [%1]: refusing redirect to unsupported URL %2"}
+                .arg (user_agent_)
+                .arg (resolved_redirect_url.toDisplayString ()));
+      Q_EMIT error (reason);
+      destfile_.cancelWriting ();
+      destfile_.commit ();
+      url_valid_ = false;
+      Q_EMIT load_finished ();
+    }
+    else if ("https" == resolved_redirect_url.scheme () && !QSslSocket::supportsSsl ())
+    {
+      Q_EMIT error (tr ("Network Error - SSL/TLS support not installed, cannot fetch:\n\'%1\'")
+                                     .arg (resolved_redirect_url.toDisplayString ()));
+      destfile_.cancelWriting ();
+      destfile_.commit ();
       url_valid_ = false; // reset
       Q_EMIT load_finished ();
     }
-    else if (++redirect_count_ < 10) // maintain sanity
+    else if (++redirect_count_ < max_redirects)
     {
-      // follow redirect
-      download (finished_url.resolved (redirect_url));
+      download (resolved_redirect_url);
     }
     else
     {
-      Q_EMIT download_error (tr ("Network Error - Too many redirects:\n\'%1\'")
-                                              .arg (redirect_url.toDisplayString ()));
+      Q_EMIT error (tr ("Network Error - Too many redirects:\n\'%1\'")
+                            .arg (resolved_redirect_url.toDisplayString ()));
+      destfile_.cancelWriting ();
+      destfile_.commit ();
       url_valid_ = false; // reset
       Q_EMIT load_finished ();
     }
@@ -192,7 +320,7 @@ void FileDownload::replyComplete()
     destfile_.commit();
     url_valid_ = false;     // reset
     // report errors that are not due to abort
-    if (QNetworkReply::OperationCanceledError != reply_error)
+    if (!size_limit_exceeded_ && QNetworkReply::OperationCanceledError != reply_error)
     {
       Q_EMIT download_error (tr ("Network Error:\n%1")
                                               .arg (finished_reply->errorString ()));
@@ -257,15 +385,35 @@ void FileDownload::downloadComplete(QNetworkReply *data)
 void FileDownload::start_download()
 {
   url_valid_ = false;
+  redirect_count_ = 0;
+  downloaded_bytes_ = 0;
+  size_limit_exceeded_ = false;
   download(QUrl(source_url_));
 }
 
 void FileDownload::download(QUrl qurl)
 {
   if (!manager_) {
-    Q_EMIT download_error(tr("Network Error:\nNetwork manager not configured"));
+    Q_EMIT error(tr("Network Error:\nNetwork manager not configured"));
     return;
   }
+
+  if (!is_supported_download_url (qurl))
+    {
+      auto const reason = unsupported_download_reason (qurl);
+      LOG_WARN (QString {"FileDownload [%1]: %2"}.arg (user_agent_).arg (reason));
+      Q_EMIT error (reason);
+      return;
+    }
+
+  if (qurl.scheme ().compare (QStringLiteral ("https"), Qt::CaseInsensitive) == 0 && !QSslSocket::supportsSsl ())
+    {
+      auto const reason = tr ("Network Error - SSL/TLS support not installed, cannot fetch:\n\'%1\'")
+        .arg (qurl.toDisplayString ());
+      LOG_WARN (QString {"FileDownload [%1]: %2"}.arg (user_agent_).arg (reason));
+      Q_EMIT error (reason);
+      return;
+    }
 
   request_.setUrl(qurl);
 
@@ -284,6 +432,9 @@ void FileDownload::download(QUrl qurl)
   request_.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                         QNetworkRequest::NoLessSafeRedirectPolicy);
 #endif
+#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+  request_.setTransferTimeout (transfer_timeout_ms);
+#endif
   request_.setRawHeader("Accept", "*/*");
   request_.setRawHeader ("User-Agent", user_agent_.toLocal8Bit());  // Must have a UA for some sites, like country-files
 
@@ -296,17 +447,22 @@ void FileDownload::download(QUrl qurl)
     reply_ = manager_->get (request_);
   }
   if (!reply_) {
-    Q_EMIT download_error(tr("Network Error:\nUnable to create request"));
+    Q_EMIT error(tr("Network Error:\nUnable to create request"));
     return;
   }
 
   QObject::connect(reply_, &QNetworkReply::downloadProgress, this, &FileDownload::downloadProgress, Qt::UniqueConnection);
   QObject::connect(reply_, &QNetworkReply::finished, this, &FileDownload::replyComplete, Qt::UniqueConnection);
+  QObject::connect(reply_, &QNetworkReply::redirected, this, &FileDownload::redirected, Qt::UniqueConnection);
 #if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
   QObject::connect(reply_, &QNetworkReply::errorOccurred,this, &FileDownload::errorOccurred, Qt::UniqueConnection);
 #else
   QObject::connect(reply_, QOverload<QNetworkReply::NetworkError>::of(&QNetworkReply::error), this, &FileDownload::obsoleteError, Qt::UniqueConnection);
 #endif
+#if QT_CONFIG(ssl)
+  QObject::connect(reply_, &QNetworkReply::sslErrors, this, &FileDownload::sslErrors, Qt::UniqueConnection);
+#endif
+  QObject::connect(reply_, &QObject::destroyed, this, [this] () { reply_ = nullptr; }, Qt::UniqueConnection);
   QObject::connect(reply_, &QNetworkReply::readyRead, this, &FileDownload::store, Qt::UniqueConnection);
 
   QFileInfo destination_file(destination_filename_);
@@ -326,6 +482,8 @@ void FileDownload::download(QUrl qurl)
   }
   
   if (url_valid_) {
+      downloaded_bytes_ = 0;
+      size_limit_exceeded_ = false;
       destfile_.setFileName(destination_file.absoluteFilePath());
       if (!destfile_.open(QSaveFile::WriteOnly | QIODevice::WriteOnly)) {
           auto const reason = tr("File System Error:\nCannot open file:\n%1\nError: %2")
@@ -342,8 +500,90 @@ void FileDownload::download(QUrl qurl)
   }
 }
 
+void FileDownload::redirected(QUrl const& url)
+{
+  auto const resolved = reply_ ? reply_->url ().resolved (url) : url;
+  if (!is_supported_download_url (resolved))
+    {
+      auto const reason = unsupported_download_reason (resolved);
+      LOG_WARN (QString {"FileDownload [%1]: redirect blocked to unsupported URL %2"}
+                .arg (user_agent_)
+                .arg (resolved.toDisplayString ()));
+      Q_EMIT error (reason);
+      if (reply_ && reply_->isRunning ())
+        {
+          reply_->abort ();
+        }
+      return;
+    }
+
+  if (resolved.scheme ().compare (QStringLiteral ("https"), Qt::CaseInsensitive) == 0 && !QSslSocket::supportsSsl ())
+    {
+      auto const reason = tr ("Network Error - SSL/TLS support not installed, cannot fetch:\n\'%1\'")
+        .arg (resolved.toDisplayString ());
+      LOG_WARN (QString {"FileDownload [%1]: %2"}.arg (user_agent_).arg (reason));
+      Q_EMIT error (reason);
+      if (reply_ && reply_->isRunning ())
+        {
+          reply_->abort ();
+        }
+    }
+}
+
+#if QT_CONFIG(ssl)
+void FileDownload::sslErrors(QList<QSslError> const& errors)
+{
+  if (!reply_)
+    {
+      return;
+    }
+
+  QString details;
+  for (auto const& error : errors)
+    {
+      if (!details.isEmpty ())
+        {
+          details += QStringLiteral ("; ");
+        }
+      details += error.errorString ();
+    }
+
+  LOG_WARN (QString {"FileDownload [%1]: refusing insecure TLS certificate for %2: %3"}
+            .arg (user_agent_)
+            .arg (reply_->url ().toDisplayString ())
+            .arg (details));
+
+  if (reply_->isRunning ())
+    {
+      reply_->abort ();
+    }
+}
+#endif
+
 void FileDownload::downloadProgress(qint64 received, qint64 total)
 {
+  if (total > max_download_bytes && reply_ && reply_->operation () == QNetworkAccessManager::GetOperation)
+    {
+      if (!size_limit_exceeded_)
+        {
+          size_limit_exceeded_ = true;
+          auto const reason = oversized_download_reason (reply_->url ());
+          LOG_WARN (QString {"FileDownload [%1]: %2"}.arg (user_agent_).arg (reason));
+          if (destfile_.isOpen ())
+            {
+              destfile_.cancelWriting ();
+              destfile_.commit ();
+            }
+          Q_EMIT error (reason);
+        }
+
+      if (reply_->isRunning ())
+        {
+          reply_->abort ();
+        }
+      return;
+    }
+
   LOG_DEBUG(QString{"FileDownload: [%1] Progress %2 from %3, total %4, so far %5"}.arg(user_agent_).arg(destination_filename_).arg(source_url_).arg(total).arg(received));
   Q_EMIT progress(QString{"%1 bytes downloaded"}.arg(received));
 }
