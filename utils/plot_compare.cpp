@@ -5,9 +5,9 @@
 #include <cstdio>
 #include <vector>
 
+#include "Detector/LegacyDspIoHelpers.hpp"
 #include "widgets/PlotLegacyHelpers.hpp"
 
-extern "C" void smo121_ (float x[], int* npts);
 extern "C" void flat4_ (float swide[], int* iz, int* nflatten);
 extern "C" void plotsave_ (float swide[], int* nw, int* nh, int* irow);
 
@@ -22,7 +22,7 @@ bool compare_smo121 (std::array<float, 16> const& input, int passes)
 
   for (int i = 0; i < passes; ++i)
     {
-      smo121_ (fortran_values.data (), &npts);
+      decodium::legacy::smooth121_inplace (fortran_values.data (), npts);
       decodium::plot::smooth121_inplace (cpp_values.data (), npts);
     }
 

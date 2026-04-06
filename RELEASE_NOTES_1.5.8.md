@@ -14,7 +14,7 @@ Scope: update cycle from `1.5.7` to `1.5.8`.
 - promoted native replacements for `encode77`, `hash22calc`, `msk144code`, `msk144sim`, `sfoxsim`, `sfrx`, `sftx`, `fst4sim`, `ldpcsim240_101`, and `ldpcsim240_74`.
 - fixed the macOS close-time crash caused by premature global `fftwf_cleanup()` while thread-local FFTW plans were still finalizing.
 - hardened `MainWindow::dataSink` and `fastSink` with safer frame clamping, guarded indexing, and cached writable-data-dir handling.
-- fixed Ubuntu/GCC 15 build failures around `_q65_mask`, `pack28`, legacy tool linkage to migrated symbols such as `four2a_`, and the MSK40 off-by-one bug in `decodeframe40_native`.
+- fixed Ubuntu/GCC 15 build failures around `_q65_mask`, `pack28`, legacy tool linkage to the migrated FFT compatibility bridge, and the MSK40 off-by-one bug in `decodeframe40_native`.
 - expanded `test_qt_helpers` and utility smoke coverage for shared DSP behavior, FST4 parity/oracle compatibility, and native Q65 compatibility entry points.
 - aligned local version metadata, workflow defaults, readmes, docs, changelog, release notes, and GitHub release body to `1.5.8`.
 
@@ -72,7 +72,7 @@ cd squashfs-root
 - promossi i sostituti nativi per `encode77`, `hash22calc`, `msk144code`, `msk144sim`, `sfoxsim`, `sfrx`, `sftx`, `fst4sim`, `ldpcsim240_101` e `ldpcsim240_74`.
 - corretto il crash macOS in chiusura causato da `fftwf_cleanup()` globale prematuro mentre i piani FFTW thread-local erano ancora in finalizzazione.
 - resi piu' robusti `MainWindow::dataSink` e `fastSink` con clamp dei frame piu' sicuro, indici protetti e gestione cache della writable-data-dir.
-- corretti i fallimenti Ubuntu/GCC 15 relativi a `_q65_mask`, `pack28`, link dei tool legacy verso simboli C++ migrati come `four2a_`, e il bug off-by-one MSK40 in `decodeframe40_native`.
+- corretti i fallimenti Ubuntu/GCC 15 relativi a `_q65_mask`, `pack28`, link dei tool legacy verso il bridge FFT di compatibilita` migrato in C++, e il bug off-by-one MSK40 in `decodeframe40_native`.
 - ampliata la copertura `test_qt_helpers` e smoke-test utility per comportamento DSP condiviso, compatibilita' FST4 parity/oracle e entry point Q65 nativi.
 - allineati a `1.5.8` metadati versione locali, default workflow, readme, documentazione, changelog, note release e body GitHub.
 
@@ -132,7 +132,7 @@ cd squashfs-root
 - promovidos reemplazos nativos para `encode77`, `hash22calc`, `msk144code`, `msk144sim`, `sfoxsim`, `sfrx`, `sftx`, `fst4sim`, `ldpcsim240_101` y `ldpcsim240_74`.
 - corregido el crash macOS al cerrar causado por `fftwf_cleanup()` global prematuro mientras los planes FFTW thread-local seguian finalizandose.
 - reforzados `MainWindow::dataSink` y `fastSink` con clamping de frames mas seguro, indices protegidos y manejo cache del directorio writable-data.
-- corregidos los fallos Ubuntu/GCC 15 relacionados con `_q65_mask`, `pack28`, enlace de herramientas legacy con simbolos C++ migrados como `four2a_`, y el bug off-by-one MSK40 en `decodeframe40_native`.
+- corregidos los fallos Ubuntu/GCC 15 relacionados con `_q65_mask`, `pack28`, enlace de herramientas legacy con el puente FFT de compatibilidad migrado a C++, y el bug off-by-one MSK40 en `decodeframe40_native`.
 - ampliada la cobertura `test_qt_helpers` y smoke-tests de utilidades para comportamiento DSP compartido, compatibilidad FST4 parity/oracle y puntos de entrada Q65 nativos.
 - alineados con `1.5.8` los metadatos locales de version, defaults de workflow, readmes, documentacion, changelog, notas release y body GitHub.
 

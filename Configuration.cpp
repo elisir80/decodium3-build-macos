@@ -2754,10 +2754,6 @@ void Configuration::impl::initialize_models ()
   ui_->udp_server_port_spin_box->setValue (udp_server_port_);
   ui_->udp_listen_port_spin_box->setValue (udp_listen_port_);
   load_network_interfaces (ui_->udp_interfaces_combo_box, udp_interface_names_);
-  if (!udp_interface_names_.size ())
-    {
-      udp_interface_names_ = get_selected_network_interfaces (ui_->udp_interfaces_combo_box);
-    }
   ui_->udp_TTL_spin_box->setValue (udp_TTL_);
   ui_->accept_udp_requests_check_box->setChecked (accept_udp_requests_);
   ui_->accept_udp_requests_check_box->setEnabled(true);
@@ -3959,8 +3955,17 @@ int Configuration::impl::exec ()
         rootVBox->setStretch (1, 0); // keep OK/Cancel visible at bottom
       }
 
+    // Preserve the user's resized dialog size across closes/relaunches.
+    // adjustSize() gives us the minimum layout-driven size, but must not
+    // shrink a geometry restored from settings.
+    QSize const restoredOrCurrentSize = size ();
     adjustSize ();
-    QSize const clamped = size ().boundedTo (QSize {maxWidth, maxHeight});
+    QSize const minimumLayoutSize = size ();
+    QSize const targetSize {
+      qMax (restoredOrCurrentSize.width (), minimumLayoutSize.width ()),
+      qMax (restoredOrCurrentSize.height (), minimumLayoutSize.height ())
+    };
+    QSize const clamped = targetSize.boundedTo (QSize {maxWidth, maxHeight});
     resize (clamped);
 
     int x = geometry ().x ();
@@ -5160,6 +5165,26 @@ void Configuration::impl::check_multicast (QHostAddress const& ha)
   ui_->udp_interfaces_combo_box->setVisible (is_multicast);
   ui_->udp_TTL_label->setVisible (is_multicast);
   ui_->udp_TTL_spin_box->setVisible (is_multicast);
+  if (is_multicast && udp_interface_names_.isEmpty ())
+    {
+      auto const selected = get_selected_network_interfaces (ui_->udp_interfaces_combo_box);
+      bool has_non_loopback {false};
+      for (auto const& if_name : selected)
+        {
+          if (if_name != loopback_interface_name_)
+            {
+              has_non_loopback = true;
+              break;
+            }
+        }
+
+      if (!has_non_loopback)
+        {
+          // With no saved interface preference yet, multicast should default
+          // to LAN-capable interfaces rather than loopback only.
+          load_network_interfaces (ui_->udp_interfaces_combo_box, {});
+        }
+    }
   if (isVisible ())
     {
       if (is_MAC_ambiguous_multicast_address (ha))
@@ -6389,6 +6414,8 @@ void Configuration::impl::load_audio_devices(QAudio::Mode mode, QComboBox * comb
 void Configuration::impl::load_network_interfaces (CheckableItemComboBox * combo_box, QStringList current)
 {
   combo_box->clear ();
+  bool const default_to_all_multicast_interfaces =
+      current.isEmpty () && is_multicast_address (QHostAddress {ui_->udp_server_line_edit->text ().trimmed ()});
   QStringList available_interface_names;
   for (auto const& net_if : QNetworkInterface::allInterfaces ())
     {
@@ -6403,13 +6430,13 @@ void Configuration::impl::load_network_interfaces (CheckableItemComboBox * combo
       // unavailable, so users do not lose their choice mid-session.
       if (usable || selected)
         {
-          bool check_it = selected;
+          bool check_it = selected || (default_to_all_multicast_interfaces && usable);
           if (is_loopback)
             {
               loopback_interface_name_ = net_if.name ();
               if (!current.size ())
                 {
-                  check_it = true;
+                  check_it = default_to_all_multicast_interfaces || check_it;
                 }
             }
           auto item = combo_box->addCheckItem (net_if.humanReadableName ()

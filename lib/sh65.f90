@@ -19,7 +19,7 @@ subroutine sh65(cx,n5,mode65,ntol,xdf,nspecial,snrdb)
      ia=ia+jstep
      ib=ia+NFFT-1
      c=cx(ia:ib)
-     call four2a(c,nfft,1,1,1)            !c2c FFT
+     call wsjt_fft_compat(c,nfft,1,1,1)            !c2c FFT
      do i=0,NFFT-1
         j=i
         if(j.gt.NH) j=j-NFFT

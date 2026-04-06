@@ -31,7 +31,7 @@ subroutine fspread_lorentz(cdat,fspread)
      cspread(nfft-i)=z
   enddo
 
-  call four2a(cspread,nfft,1,1,1)             !Transform to time domain
+  call wsjt_fft_compat(cspread,nfft,1,1,1)             !Transform to time domain
   
   sum=0.
   do i=0,nfft-1

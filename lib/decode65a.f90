@@ -77,7 +77,7 @@ subroutine decode65a(dd,npts,newdat,nqd,f0,nflip,mode65,ntrials,     &
            c5a(i)=0.
         endif
      enddo
-     call four2a(c5a,nfft,1,1,1)
+     call wsjt_fft_compat(c5a,nfft,1,1,1)
      do i=1,512
         jj=i
         if(i.gt.256) jj=i-512

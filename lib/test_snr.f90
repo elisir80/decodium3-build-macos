@@ -41,7 +41,7 @@ program test_snr
      read(10) id2(1:NMAX)
      x(1:NMAX)=fac*id2(1:NMAX)
      x(NMAX+1:)=0.     
-     call four2a(x,NFFT,1,-1,0)
+     call wsjt_fft_compat(x,NFFT,1,-1,0)
      do i=1,8192                             !Accumulate spectrum 0 - 3 kHz
         s(i)=s(i) + real(c(i))**2 + aimag(c(i))**2
      enddo

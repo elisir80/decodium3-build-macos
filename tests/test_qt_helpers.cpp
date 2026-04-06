@@ -20,6 +20,8 @@
 #include <fftw3.h>
 
 #include "Detector/FST4DecodeWorker.hpp"
+#include "Detector/FftCompat.hpp"
+#include "Detector/FtxQ65Decoder.hpp"
 #include "Detector/MSK144DecodeWorker.hpp"
 #include "Modulator/FtxMessageEncoder.hpp"
 #include "Modulator/FtxWaveformGenerator.hpp"
@@ -35,7 +37,6 @@ extern "C" void ftx_ft8_prepare_pass_c (int ndepth, int ipass, int ndecodes,
                                          int* lsubtract, int* run_pass);
 extern "C" void genmsk_128_90_ (char* msg, int* ichk, char* msgsent, int* itone, int* itype,
                                  size_t, size_t);
-extern "C" void ana64_ (short iwave[], int* npts, std::complex<float> c0[]);
 extern "C" void azdist_ (char* myGrid, char* hisGrid, double* utch, int* nAz, int* nEl,
                          int* nDmiles, int* nDkm, int* nHotAz, int* nHotABetter,
                          size_t, size_t);
@@ -267,7 +268,6 @@ extern "C" void fst4_async_decode_ (short iwave[], int* nutc, int* nqsoprogress,
                                     fortran_charlen_t_local, fortran_charlen_t_local,
                                     fortran_charlen_t_local);
 extern "C" void blanker_ (short iwave[], int* nz, int* ndropmax, int* npct, std::complex<float> c_bigfft[]);
-extern "C" void four2a_ (std::complex<float> a[], int* nfft, int* ndim, int* isign, int* iform);
 extern "C" void pctile_ (float x[], int* npts, int* npct, float* xpct);
 extern "C" void polyfit_ (double x[], double y[], double sigmay[], int* npts, int* nterms, int* mode,
                           double a[], double* chisqr);
@@ -1512,10 +1512,7 @@ private:
     int ndropmax = 1;
     int npct = 0;
     blanker_ (audio.data (), &nz, &ndropmax, &npct, bigfft.data ());
-    int ndim = 1;
-    int isign = -1;
-    int iform = 0;
-    four2a_ (bigfft.data (), &nfft1, &ndim, &isign, &iform);
+    decodium::fft_compat::forward_real (bigfft, nfft1);
 
     std::array<float, 200 * 5> cand_ref {};
     std::array<float, 200 * 5> cand_cpp {};
@@ -1658,25 +1655,21 @@ private:
     QVERIFY (std::fabs (bigfft[3].imag () - 7.0f) <= 1.0e-6f);
   }
 
-  Q_SLOT void shared_dsp_four2a_matches_expected_fft_shapes ()
+  Q_SLOT void shared_dsp_fft_matches_shapes ()
   {
     {
       std::complex<float> values[] {
           {1.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}, {0.0f, 0.0f}
       };
-      int nfft = 4;
-      int ndim = 1;
-      int isign = -1;
-      int iform = 1;
-      four2a_ (values, &nfft, &ndim, &isign, &iform);
+      int const nfft = 4;
+      decodium::fft_compat::forward_complex (values, nfft);
       for (auto const& value : values)
         {
           QVERIFY (std::fabs (value.real () - 1.0f) <= 1.0e-6f);
           QVERIFY (std::fabs (value.imag ()) <= 1.0e-6f);
         }
 
-      isign = 1;
-      four2a_ (values, &nfft, &ndim, &isign, &iform);
+      decodium::fft_compat::inverse_complex (values, nfft);
       QVERIFY (std::fabs (values[0].real () - 4.0f) <= 1.0e-5f);
       QVERIFY (std::fabs (values[0].imag ()) <= 1.0e-5f);
       for (int i = 1; i < 4; ++i)
@@ -1694,11 +1687,8 @@ private:
       real_values[2] = 3.0f;
       real_values[3] = 4.0f;
 
-      int nfft = 4;
-      int ndim = 1;
-      int isign = -1;
-      int iform = 0;
-      four2a_ (values, &nfft, &ndim, &isign, &iform);
+      int const nfft = 4;
+      decodium::fft_compat::forward_real_buffer (real_values, nfft);
       QVERIFY (std::fabs (values[0].real () - 10.0f) <= 1.0e-5f);
       QVERIFY (std::fabs (values[0].imag ()) <= 1.0e-5f);
       QVERIFY (std::fabs (values[1].real () + 2.0f) <= 1.0e-5f);
@@ -1706,20 +1696,14 @@ private:
       QVERIFY (std::fabs (values[2].real () + 2.0f) <= 1.0e-5f);
       QVERIFY (std::fabs (values[2].imag ()) <= 1.0e-5f);
 
-      isign = 1;
-      iform = -1;
-      four2a_ (values, &nfft, &ndim, &isign, &iform);
+      decodium::fft_compat::inverse_real_buffer (real_values, nfft);
       QVERIFY (std::fabs (real_values[0] - 4.0f) <= 1.0e-4f);
       QVERIFY (std::fabs (real_values[1] - 8.0f) <= 1.0e-4f);
       QVERIFY (std::fabs (real_values[2] - 12.0f) <= 1.0e-4f);
       QVERIFY (std::fabs (real_values[3] - 16.0f) <= 1.0e-4f);
     }
 
-    int cleanup_nfft = -1;
-    int cleanup_ndim = 1;
-    int cleanup_isign = 1;
-    int cleanup_iform = 1;
-    four2a_ (nullptr, &cleanup_nfft, &cleanup_ndim, &cleanup_isign, &cleanup_iform);
+    decodium::fft_compat::cleanup ();
   }
 
   Q_SLOT void fst4_crc24_matches_frozen_reference ()
@@ -2131,7 +2115,7 @@ private:
 
     int npts = kQ65Ana64Npts;
     std::vector<std::complex<float>> reference (kQ65Ana64Npts);
-    ana64_ (audio.data (), &npts, reference.data ());
+    QVERIFY (decodium::q65::ana64_transform (audio.data (), npts, reference));
 
     std::vector<float> real_out (kQ65Ana64Npts / 2);
     std::vector<float> imag_out (kQ65Ana64Npts / 2);

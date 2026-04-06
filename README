@@ -1,7 +1,7 @@
 Decodium 3 FT2 fork
 
 Current release:
- - v1.4.7
+ - 1.6.1
 
 Language readme files:
  - README.en-GB.md
@@ -13,6 +13,6 @@ Documentation indexes:
  - doc/README.en-GB.md
  - doc/README.it.md
  - doc/README.es.md
- - RELEASE_NOTES_v1.4.7.md
+ - RELEASE_NOTES_1.6.1.md
  - CHANGELOG.md
- - doc/GITHUB_RELEASE_BODY_v1.4.7.md
+ - doc/GITHUB_RELEASE_BODY_1.6.1.md

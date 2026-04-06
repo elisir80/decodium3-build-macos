@@ -1,18 +1,18 @@
-# Decodium (Fork macOS/Linux) - 1.6.0
+# Decodium (Fork macOS/Linux) - 1.6.1
 
-- Release stabile corrente: `1.6.0`
-- Ciclo aggiornamento: `1.5.9 -> 1.6.0`
+- Release stabile corrente: `1.6.1`
+- Ciclo aggiornamento: `1.6.0 -> 1.6.1`
 
-## Novita' 1.6.0 (`1.5.9 -> 1.6.0`)
+## Novita' 1.6.1 (`1.6.0 -> 1.6.1`)
 
-- promosso a C++ nativo il path runtime attivo JT65, inclusi orchestrazione decode, helper DSP/IO JT65 e rimozione dal build dei vecchi sorgenti Fortran JT65 del path attivo.
-- aggiunti i blocchi nativi JT9 fast/wide e una copertura piu' ampia di helper legacy DSP/IO e compare/regression per il lavoro residuo di migrazione JT.
-- corrette le risposte verso callsign non standard o special-event che venivano rigettate come `*** bad message ***`.
-- aggiunto il supporto release Linux AppImage `aarch64` con build path ARM64 basato su Debian Trixie e runner GitHub Actions ARM.
-- reso `build-arm.sh` sensibile alla versione, piu' adatto alla CI, ed esclusa permanentemente da git la cartella `build-arm-output/`.
-- corretto il falso positivo GCC 14 `stringop-overflow` in `LegacyDspIoHelpers.cpp` senza rompere le build macOS Clang.
-- corrette le regressioni di portabilita' GCC/libstdc++ in `jt9_wide_stage_compare.cpp` e `legacy_wsprio_compare.cpp`.
-- allineati metadati versione locali, default workflow, documentazione release e note GitHub alla semver `1.6.0`.
+- completata la migrazione nativa C++ mantenuta del runtime JT legacy attivo, coprendo i path decode JT4, JT9 e JT65.
+- promossi a implementazioni native Fortran-free i path runtime attivi Q65 e WSPR e completata la migrazione a C++ nativo del runtime/tool path Echo.
+- rimosso dalla superficie app/runtime mantenuta il naming legacy ABI residuo del path attivo, incluso lo storico naming FFT `four2a`.
+- ripuliti sorgenti Fortran obsoleti e file di compatibilita' da `lib/`, `qmap/libqmap/`, `map65/libm65/` e dal vecchio path tool Echo.
+- corrette regressioni Linux di build/startup in `mainwindow.cpp`, nell'inizializzazione differita dei client di rete, nella gestione `QSocketNotifier`, nel teardown logging Qt e nel link GNU ld dei target compare/sim.
+- corretto il blocco packaging macOS `Invalid Iconset` generando il file `.icns` con un helper Python deterministico.
+- mantenuta l'esclusione permanente di `build-arm-output/` dallo staging sorgenti e dal tracking git.
+- allineati metadati versione locali, default workflow, documentazione release e note GitHub alla semver `1.6.1`.
 
 ## Target Release
 
@@ -25,22 +25,22 @@
 
 ## Artifact Release
 
-- `decodium3-ft2-1.6.0-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-1.6.0-macos-tahoe-arm64.zip`
-- `decodium3-ft2-1.6.0-macos-tahoe-arm64-sha256.txt`
-- `decodium3-ft2-1.6.0-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-1.6.0-macos-sequoia-arm64.zip`
-- `decodium3-ft2-1.6.0-macos-sequoia-arm64-sha256.txt`
-- `decodium3-ft2-1.6.0-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-1.6.0-macos-sequoia-x86_64.zip`
-- `decodium3-ft2-1.6.0-macos-sequoia-x86_64-sha256.txt`
-- `decodium3-ft2-1.6.0-macos-monterey-x86_64.dmg` *(best effort/sperimentale, se generato)*
-- `decodium3-ft2-1.6.0-macos-monterey-x86_64.zip` *(best effort/sperimentale, se generato)*
-- `decodium3-ft2-1.6.0-macos-monterey-x86_64-sha256.txt` *(best effort/sperimentale, se generato)*
-- `decodium3-ft2-1.6.0-linux-x86_64.AppImage`
-- `decodium3-ft2-1.6.0-linux-x86_64.AppImage.sha256.txt`
-- `decodium3-ft2-1.6.0-linux-aarch64.AppImage`
-- `decodium3-ft2-1.6.0-linux-aarch64.AppImage.sha256.txt`
+- `decodium3-ft2-1.6.1-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-1.6.1-macos-tahoe-arm64.zip`
+- `decodium3-ft2-1.6.1-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-1.6.1-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-1.6.1-macos-sequoia-arm64.zip`
+- `decodium3-ft2-1.6.1-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-1.6.1-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-1.6.1-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-1.6.1-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-1.6.1-macos-monterey-x86_64.dmg` *(best effort/sperimentale, se generato)*
+- `decodium3-ft2-1.6.1-macos-monterey-x86_64.zip` *(best effort/sperimentale, se generato)*
+- `decodium3-ft2-1.6.1-macos-monterey-x86_64-sha256.txt` *(best effort/sperimentale, se generato)*
+- `decodium3-ft2-1.6.1-linux-x86_64.AppImage`
+- `decodium3-ft2-1.6.1-linux-x86_64.AppImage.sha256.txt`
+- `decodium3-ft2-1.6.1-linux-aarch64.AppImage`
+- `decodium3-ft2-1.6.1-linux-aarch64.AppImage.sha256.txt`
 
 ## Requisiti Minimi Linux
 
@@ -54,7 +54,7 @@ Hardware:
 
 Software:
 
-- sessione desktop X11 o Wayland capace di eseguire AppImage Qt5
+- distribuzione Linux 64-bit con sessione desktop X11 o Wayland capace di eseguire AppImage Qt5
 - AppImage Linux `x86_64`: `glibc >= 2.35`
 - AppImage Linux `aarch64`: `glibc >= 2.38` *(baseline Debian Trixie)*
 - `libfuse2` / FUSE2 per montare direttamente l'AppImage
@@ -85,5 +85,5 @@ cd squashfs-root
 - [README.md](README.md)
 - [README.en-GB.md](README.en-GB.md)
 - [README.es.md](README.es.md)
-- [RELEASE_NOTES_1.6.0.md](RELEASE_NOTES_1.6.0.md)
-- [doc/GITHUB_RELEASE_BODY_1.6.0.md](doc/GITHUB_RELEASE_BODY_1.6.0.md)
+- [RELEASE_NOTES_1.6.1.md](RELEASE_NOTES_1.6.1.md)
+- [doc/GITHUB_RELEASE_BODY_1.6.1.md](doc/GITHUB_RELEASE_BODY_1.6.1.md)

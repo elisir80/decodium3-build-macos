@@ -11,7 +11,6 @@ set (libq65_FSRCS
   fchisq0.f90
   fftbig.f90
   ftninit.f90
-#  ftnquit.f90
   geocentric.f90
   grid2deg.f90
   indexx.f90

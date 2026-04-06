@@ -59,7 +59,7 @@ subroutine timf2(x0,k,nfft,nwindow,nb,peaklimit,x1,     &
 
   x(0:nfft-1)=x0
   if(nwindow.eq.2) x(0:nfft-1)=w(0:nfft-1)*x(0:nfft-1)
-  call four2a(cx,nfft,1,-1,0)                       !First forward FFT, r2c
+  call wsjt_fft_compat(cx,nfft,1,-1,0)                       !First forward FFT, r2c
   cxt(0:nh)=cx(0:nh)
 
 ! Identify frequencies with strong signals.
@@ -110,8 +110,8 @@ subroutine timf2(x0,k,nfft,nwindow,nb,peaklimit,x1,     &
      endif
   enddo
 
-  call four2a(cxw,nfft,1,1,-1)           !Transform weak and strong back
-  call four2a(cxs,nfft,1,1,-1)           !to time domain, separately (c2r)
+  call wsjt_fft_compat(cxw,nfft,1,1,-1)           !Transform weak and strong back
+  call wsjt_fft_compat(cxs,nfft,1,1,-1)           !to time domain, separately (c2r)
 
   if(nwindow.eq.2) then
      xw(0:nh-1)=xw(0:nh-1)+xwov(0:nh-1)     !Add previous segment's 2nd half

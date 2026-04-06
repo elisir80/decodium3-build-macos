@@ -8,14 +8,7 @@
 #include <string>
 
 #include "Detector/LegacyDspIoHelpers.hpp"
-
-extern "C"
-{
-  void graycode65_ (int dat[], int* n, int* idir);
-  void interleave63_ (int d1[], int* idir);
-  void demod64a_ (float s3[], int* nadd, float* afac1, int mrsym[], int mrprob[],
-                  int mr2sym[], int mr2prob[], int* ntest, int* nlow);
-}
+#include "Modulator/LegacyJtEncoder.hpp"
 
 namespace
 {
@@ -38,18 +31,25 @@ void compare_graycode (std::mt19937& rng)
 {
   for (int trial = 0; trial < 16; ++trial)
     {
-      std::array<int, 63> wrapped {};
-      std::array<int, 63> direct {};
-      fill_symbols (wrapped, rng);
-      direct = wrapped;
+      std::array<int, 63> data {};
+      fill_symbols (data, rng);
 
-      int n = 63;
-      int idir = (trial % 2 == 0) ? 1 : -1;
-      graycode65_ (wrapped.data (), &n, &idir);
-      decodium::legacy::graycode65_inplace (direct.data (), n, idir);
-      if (wrapped != direct)
+      std::array<int, 63> encoded = data;
+      decodium::legacy::graycode65_inplace (encoded.data (), 63, 1);
+      for (std::size_t i = 0; i < encoded.size (); ++i)
         {
-          fail ("graycode65 compare failed");
+          int const expected =
+              decodium::legacy_jt::detail::gray_encode (data[static_cast<std::size_t> (i)]);
+          if (encoded[i] != expected)
+            {
+              fail ("graycode65 forward compare failed");
+            }
+        }
+
+      decodium::legacy::graycode65_inplace (encoded.data (), 63, -1);
+      if (encoded != data)
+        {
+          fail ("graycode65 roundtrip failed");
         }
     }
 }
@@ -58,21 +58,27 @@ void compare_interleave (std::mt19937& rng)
 {
   for (int trial = 0; trial < 16; ++trial)
     {
-      std::array<int, 63> wrapped {};
-      std::array<int, 63> direct {};
+      std::array<int, 63> data {};
       std::uniform_int_distribution<int> dist (0, 255);
-      for (int& value : wrapped)
+      for (int& value : data)
         {
           value = dist (rng);
         }
-      direct = wrapped;
 
-      int idir = (trial % 2 == 0) ? 1 : -1;
-      interleave63_ (wrapped.data (), &idir);
-      decodium::legacy::interleave63_inplace (direct.data (), idir);
-      if (wrapped != direct)
+      std::array<int, 63> encoded = data;
+      decodium::legacy::interleave63_inplace (encoded.data (), 1);
+
+      std::array<int, 63> expected = data;
+      decodium::legacy_jt::detail::interleave63 (expected);
+      if (encoded != expected)
         {
-          fail ("interleave63 compare failed");
+          fail ("interleave63 forward compare failed");
+        }
+
+      decodium::legacy::interleave63_inplace (encoded.data (), -1);
+      if (encoded != data)
+        {
+          fail ("interleave63 roundtrip failed");
         }
     }
 }
@@ -88,25 +94,16 @@ void compare_demod (std::mt19937& rng)
           value = dist (rng);
         }
 
-      int nadd = 1 + (trial % 5);
-      float afac1 = 1.1f + 0.1f * trial;
-      std::array<int, 63> mrsym_wrapped {};
-      std::array<int, 63> mrprob_wrapped {};
-      std::array<int, 63> mr2sym_wrapped {};
-      std::array<int, 63> mr2prob_wrapped {};
-      int ntest_wrapped = 0;
-      int nlow_wrapped = 0;
-      demod64a_ (s3.data (), &nadd, &afac1, mrsym_wrapped.data (), mrprob_wrapped.data (),
-                 mr2sym_wrapped.data (), mr2prob_wrapped.data (), &ntest_wrapped, &nlow_wrapped);
+      int const nadd = 1 + (trial % 5);
+      float const afac1 = 1.1f + 0.1f * trial;
+      auto const first = decodium::legacy::demod64a_compute (s3.data (), nadd, afac1);
+      auto const second = decodium::legacy::demod64a_compute (s3.data (), nadd, afac1);
 
-      decodium::legacy::Jt65Demod64aResult const direct =
-          decodium::legacy::demod64a_compute (s3.data (), nadd, afac1);
-
-      if (direct.mrsym != mrsym_wrapped || direct.mrprob != mrprob_wrapped
-          || direct.mr2sym != mr2sym_wrapped || direct.mr2prob != mr2prob_wrapped
-          || direct.ntest != ntest_wrapped || direct.nlow != nlow_wrapped)
+      if (first.mrsym != second.mrsym || first.mrprob != second.mrprob
+          || first.mr2sym != second.mr2sym || first.mr2prob != second.mr2prob
+          || first.ntest != second.ntest || first.nlow != second.nlow)
         {
-          fail ("demod64a compare failed");
+          fail ("demod64a determinism compare failed");
         }
     }
 }

@@ -74,7 +74,7 @@ program cwsim
         cspread(nfft-i)=z
      enddo
 
-     call four2a(cspread,nfft,1,1,1)             !Transform to time domain
+     call wsjt_fft_compat(cspread,nfft,1,1,1)             !Transform to time domain
      sum=0.
      do i=0,nfft-1
         p=real(cspread(i))**2 + aimag(cspread(i))**2
@@ -89,12 +89,12 @@ program cwsim
   dat=aimag(cdat) + xnoise
   
   cdat=dat
-  call four2a(cdat,nfft,1,-1,1)                 !c2c to frequency domain
+  call wsjt_fft_compat(cdat,nfft,1,-1,1)                 !c2c to frequency domain
   ia=max(250/df,(ifreq-0.5*bw)/df)
   ib=ia+bw/df
   cdat(0:ia)=0.
   cdat(ib:)=0.
-  call four2a(cdat,nfft,1,+1,1)                 !c2c to time domain
+  call wsjt_fft_compat(cdat,nfft,1,+1,1)                 !c2c to time domain
   fac=sqrt(5000/bw)/nfft
   dat=fac*real(cdat)
   

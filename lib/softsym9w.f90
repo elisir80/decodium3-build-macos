@@ -29,7 +29,7 @@ subroutine softsym9w(id2,npts,xdt0,f0,width,nsubmode,xdt1,snrdb,i1softsymbols)
         ia=i0 + (ii(j)-1)*nfft
         ib=ia+NFFT-1
         x=1.e-6*id2(ia:ib)
-        call four2a(x,nfft,1,-1,0)        !r2c FFT
+        call wsjt_fft_compat(x,nfft,1,-1,0)        !r2c FFT
         do k=1,NQ
            s(k)=s(k) + real(cx(k))**2 + aimag(cx(k))**2
         enddo
@@ -51,7 +51,7 @@ subroutine softsym9w(id2,npts,xdt0,f0,width,nsubmode,xdt1,snrdb,i1softsymbols)
      ia=i0pk + (j-1)*nfft
      ib=ia+NFFT-1
      x=1.e-6*id2(ia:ib)
-     call four2a(x,nfft,1,-1,0)        !r2c FFT
+     call wsjt_fft_compat(x,nfft,1,-1,0)        !r2c FFT
      do k=1,NQ
         s(k)=real(cx(k))**2 + aimag(cx(k))**2
      enddo

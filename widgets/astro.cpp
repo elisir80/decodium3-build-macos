@@ -304,6 +304,8 @@ auto Astro::astroUpdate(QDateTime const& t, QString const& mygrid, QString const
     correction.dop=m_dop;
     correction.width=width2;
   }
+  correction.fspread_self = width1;
+  correction.fspread_dx   = width2;
   //ibShift=2000000;
   
   if (ui_->cbEnableShift->isChecked()) {

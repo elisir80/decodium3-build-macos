@@ -163,14 +163,14 @@ subroutine symspec(k,nxpol,ndiskdat,nb,nbslider,idphi,nfsample,    &
         endif
      endif
 
-     call four2a(cx,NFFT,1,1,1)          !Second forward FFT (X)
+     call wsjt_fft_compat(cx,NFFT,1,1,1)          !Second forward FFT (X)
      if(iqadjust.eq.0) nadjx=0
      if(iqadjust.ne.0 .and. nadjx.lt.50) call iqcal(nadjx,cx,NFFT,    &
           gainx,phasex,zsumx,ipkx,rejectx0)
      if(iqapply.ne.0) call iqfix(cx,NFFT,gainx,phasex)
 
      if(nxpol.ne.0) then
-        call four2a(cy,NFFT,1,1,1)       !Second forward FFT (Y)
+        call wsjt_fft_compat(cy,NFFT,1,1,1)       !Second forward FFT (Y)
         if(iqadjust.eq.0) nadjy=0
         if(iqadjust.ne.0 .and. nadjy.lt.50) call iqcal(nadjy,cy,NFFT, &
              gainy,phasey,zsumy,ipky,rejecty)

@@ -1,4 +1,5 @@
 #include "Detector/JT9FastHelpers.hpp"
+#include "Detector/FftCompat.hpp"
 
 #include "Modulator/LegacyJtEncoder.hpp"
 
@@ -9,22 +10,8 @@
 #include <numeric>
 #include <vector>
 
-extern "C"
-{
-  void four2a_ (std::complex<float> a[], int* nfft, int* ndim, int* isign, int* iform, int);
-}
-
 namespace
 {
-
-void four2a_forward_real_buffer (float* buffer, int nfft)
-{
-  int ndim = 1;
-  int isign = -1;
-  int iform = 0;
-  four2a_ (reinterpret_cast<std::complex<float>*> (buffer), &nfft, &ndim, &isign, &iform, 0);
-}
-
 constexpr std::array<int, 16> kJt9SyncSymbols {{
   1, 2, 5, 10, 16, 23, 33, 35, 51, 52, 55, 60, 66, 73, 83, 85
 }};
@@ -92,7 +79,7 @@ void spec9f_compute (short const* id2, int npts, int nsps, std::vector<float>& s
           x[static_cast<std::size_t> (i)] = id2[ia + i];
         }
       std::fill (x.begin () + nh, x.end (), 0.0f);
-      four2a_forward_real_buffer (x.data (), nfft);
+      decodium::fft_compat::forward_real_buffer (x.data (), nfft);
       int const k = ((j - 1) % 340) + 1;
       (void) k;
       for (int i = 1; i <= nq; ++i)

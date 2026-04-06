@@ -13,11 +13,11 @@
 #include <numeric>
 #include <vector>
 
+#include "Detector/FftCompat.hpp"
 #include "Modulator/FtxFst4LdpcData.hpp"
 
 extern "C"
 {
-  void four2a_ (std::complex<float> a[], int* nfft, int* ndim, int* isign, int* iform);
   void gen_fst4wave_ (int* itone, int* nsym, int* nsps, int* nwave, float* fsample,
                       int* hmod, float* f0, int* icmplx, std::complex<float>* cwave, float* wave);
 }
@@ -646,10 +646,7 @@ void dopspread_native (std::array<int, 160> const& itone,
       g[static_cast<size_t> (i)] = Complex {};
     }
 
-  int ndim = 1;
-  int isign = -1;
-  int iform = 1;
-  four2a_ (g.data (), &nfft, &ndim, &isign, &iform);
+  decodium::fft_compat::forward_complex (g.data (), nfft);
 
   float const df = static_cast<float> (kFst4SampleRate) / nfft;
   int ia = static_cast<int> (1.0f / df);

@@ -1,7 +1,7 @@
 program chkfft
 
-! Tests and times one-dimensional FFTs computed by four2a().
-! An all-Fortran version of four2a() is available, but the preferred
+! Tests and times one-dimensional FFTs computed by wsjt_fft_compat().
+! An all-Fortran version of wsjt_fft_compat() is available, but the preferred
 ! version uses calls to the FFTW library.
 
   parameter (NMAX=8*1024*1024)            !Maximum FFT length
@@ -102,8 +102,8 @@ program chkfft
      if(nfft.gt.NMAX) go to 900
      a(1:nfft)=b(1:nfft)                !Copy test data into a()
      t0=second()
-     call four2a(a,nfft,ndim,-1,iformf) !Get planning time for forward FFT
-     call four2a(a,nfft,ndim,+1,iformb) !Get planning time for backward FFT
+     call wsjt_fft_compat(a,nfft,ndim,-1,iformf) !Get planning time for forward FFT
+     call wsjt_fft_compat(a,nfft,ndim,+1,iformb) !Get planning time for backward FFT
      t2=second()
      tplan=t2-t0                        !Total planning time for this length
      
@@ -112,8 +112,8 @@ program chkfft
         a(1:nfft)=b(1:nfft)             !Copy test data into a()
 
         t0=second()
-        call four2a(a,nfft,ndim,-1,iformf) !Forward FFT
-        call four2a(a,nfft,ndim,+1,iformb) !Backward FFT on same data
+        call wsjt_fft_compat(a,nfft,ndim,-1,iformf) !Forward FFT
+        call wsjt_fft_compat(a,nfft,ndim,+1,iformb) !Backward FFT on same data
         t1=second()
         total=total+t1-t0
         if(total.ge.1.0) go to 40       !Cut iterations short if t>1 s
@@ -149,7 +149,7 @@ program chkfft
         write(12,1060) ii,nfft,time,rms,freq,mflops,iter,tplan
 1060    format(i2,i8,f11.7,f12.8,f7.1,f8.1,i8,f6.1)
      endif
-     if(mod(ii,50).eq.0) call four2a(0,-1,0,0,0)
+     if(mod(ii,50).eq.0) call wsjt_fft_compat(0,-1,0,0,0)
   enddo
 
 900  continue 
@@ -160,5 +160,5 @@ program chkfft
 !1070 format(/'Exported FFTW wisdom')
   endif
 
-999 call four2a(0,-1,0,0,0)
+999 call wsjt_fft_compat(0,-1,0,0,0)
 end program chkfft

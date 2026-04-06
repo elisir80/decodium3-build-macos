@@ -51,6 +51,8 @@ public:
     double dop;
     double width;
     double techo;
+    double fspread_self {0.0};   // self Doppler spread (width1 from astrosub)
+    double fspread_dx   {0.0};   // DX Doppler spread   (width2 from astrosub)
   };
 
   Correction astroUpdate(QDateTime const& t,

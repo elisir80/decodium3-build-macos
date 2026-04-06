@@ -16,7 +16,7 @@ subroutine ps4(dat,nfft,s)
      dat2(i)=0.
   enddo
 
-  call four2a(c,nfft,1,-1,0)
+  call wsjt_fft_compat(c,nfft,1,-1,0)
 
   fac=1.0/nfft
   do i=1,nh

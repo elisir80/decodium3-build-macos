@@ -22,7 +22,7 @@ subroutine spec_qra65(c0,nsps,s3,LL,NN)
      ja=(k-1)*nsps
      jb=ja+nsps-1
      cs=fac*c0(ja:jb)
-     call four2a(cs,nsps,1,-1,1)             !c2c FFT to frequency
+     call wsjt_fft_compat(cs,nsps,1,-1,1)             !c2c FFT to frequency
      do ii=1,LL
         i=ii-65
         if(i.lt.0) i=i+nsps

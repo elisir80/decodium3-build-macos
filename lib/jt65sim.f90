@@ -275,7 +275,7 @@ program jt65sim
 !        s=real(cspread(0))**2 + aimag(cspread(0))**2
 !        write(13,3000) 1024,0.0,s,cspread(0)
 
-        call four2a(cspread,NFFT,1,1,1)             !Transform to time domain
+        call wsjt_fft_compat(cspread,NFFT,1,1,1)             !Transform to time domain
 
         sum=0.
         do i=0,NFFT-1

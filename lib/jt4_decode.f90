@@ -455,7 +455,7 @@ subroutine getsnr(dat,npts,mode4,dtx,decoded,nsnr)
         k=(j-1)*NSPS + i + istart
         if(k.ge.1 .and. k.le.npts) x(i)=dat(k)
      enddo        
-     call four2a(cx,NSPS,1,-1,0)        !r2c FFT
+     call wsjt_fft_compat(cx,NSPS,1,-1,0)        !r2c FFT
      do i=1,nh
         s(i)=real(cx(i))**2 + aimag(cx(i))**2
      enddo

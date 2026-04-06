@@ -1,5 +1,6 @@
 #include "Detector/JT9FastDecoder.hpp"
 
+#include "Detector/FanoSequentialDecoder.hpp"
 #include "Detector/JT9FastDecodeWorker.hpp"
 #include "Detector/JT9FastHelpers.hpp"
 #include "Modulator/LegacyJtEncoder.hpp"
@@ -12,13 +13,6 @@
 #include <cstdint>
 #include <cstdio>
 #include <vector>
-
-extern "C"
-{
-  int fano (unsigned int* metric, unsigned int* cycles, unsigned int* maxnp,
-            unsigned char* data, unsigned char* symbols, unsigned int nbits,
-            int mettab[2][256], int delta, unsigned int maxcycles);
-}
 
 namespace
 {
@@ -127,8 +121,10 @@ QByteArray decode_jt9fano_impl (std::array<std::int8_t, 207> const& soft, int li
   unsigned int metric = 0;
   unsigned int ncycles = 0;
   unsigned int maxnp = 0;
-  int const ierr = fano (&metric, &ncycles, &maxnp, decoded.data (), symbols.data (),
-                         nbits, mettab_c, ndelta, static_cast<unsigned int> (limit));
+  int const ierr = decodium::fano::sequential_decode (&metric, &ncycles, &maxnp,
+                                                      decoded.data (), symbols.data (),
+                                                      nbits, mettab_c, ndelta,
+                                                      static_cast<unsigned int> (limit));
   if (nlim)
     {
       *nlim = static_cast<int> (ncycles / encoded_bits);

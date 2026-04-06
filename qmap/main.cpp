@@ -6,13 +6,11 @@
 #endif
 #include <QApplication>
 
+#include "Detector/FftCompat.hpp"
 #include "revision_utils.hpp"
 #include "mainwindow.h"
 
 extern "C" {
-  // Fortran procedures we need
-  void four2a_ (_Complex float *, int * nfft, int * ndim, int * isign, int * iform, int len);
-
   void _gfortran_set_args(int argc, char *argv[]);
   void _gfortran_set_convert(int conv);
   void ftninit_(void);
@@ -41,11 +39,7 @@ int main(int argc, char *argv[])
   // clean up lazily initialized FFTW3 resources
   {
     int nfft {-1};
-    int ndim {1};
-    int isign {1};
-    int iform {1};
-    // free FFT plan resources
-    four2a_ (nullptr, &nfft, &ndim, &isign, &iform, 0);
+    decodium::fft_compat::cleanup ();
     fftbig_(nullptr, &nfft);
   }
   // Avoid global FFTW teardown before thread_local FFT plans are finalized.

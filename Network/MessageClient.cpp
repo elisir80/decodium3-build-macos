@@ -103,6 +103,85 @@ bool constant_time_equals (QByteArray const& a, QByteArray const& b)
     }
   return 0 == diff;
 }
+
+bool is_usable_multicast_interface (QNetworkInterface const& net_if)
+{
+  if (!net_if.isValid ())
+    {
+      return false;
+    }
+
+  auto const flags = net_if.flags ();
+  bool const is_loopback = flags.testFlag (QNetworkInterface::IsLoopBack);
+  bool const is_up = flags.testFlag (QNetworkInterface::IsUp);
+  bool const can_multicast = flags.testFlag (QNetworkInterface::CanMulticast);
+  return (is_up && can_multicast) || is_loopback;
+}
+
+bool is_loopback_interface (QNetworkInterface const& net_if)
+{
+  return net_if.flags ().testFlag (QNetworkInterface::IsLoopBack);
+}
+
+void normalize_multicast_interfaces (std::vector<QNetworkInterface> * interfaces)
+{
+  std::vector<QNetworkInterface> filtered;
+  QSet<QString> seen;
+  bool has_non_loopback {false};
+  bool has_loopback {false};
+
+  auto append_if_usable = [&] (QNetworkInterface const& net_if) {
+      if (!is_usable_multicast_interface (net_if) || seen.contains (net_if.name ()))
+        {
+          return;
+        }
+
+      filtered.push_back (net_if);
+      seen.insert (net_if.name ());
+      if (is_loopback_interface (net_if))
+        {
+          has_loopback = true;
+        }
+      else
+        {
+          has_non_loopback = true;
+        }
+    };
+
+  for (auto const& net_if : *interfaces)
+    {
+      append_if_usable (net_if);
+    }
+
+  // Multicast configured with an empty or loopback-only interface list is a
+  // poor default for DXKeeper-like LAN peers. Auto-extend to active multicast
+  // interfaces so group delivery still works cross-host.
+  if (!has_non_loopback)
+    {
+      for (auto const& net_if : QNetworkInterface::allInterfaces ())
+        {
+          if (is_loopback_interface (net_if))
+            {
+              continue;
+            }
+          append_if_usable (net_if);
+        }
+    }
+
+  if (filtered.empty ())
+    {
+      for (auto const& net_if : QNetworkInterface::allInterfaces ())
+        {
+          if (is_loopback_interface (net_if))
+            {
+              append_if_usable (net_if);
+              break;
+            }
+        }
+    }
+
+  *interfaces = std::move (filtered);
+}
 }
 
 class MessageClient::impl
@@ -217,6 +296,10 @@ void MessageClient::impl::set_server (QString const& server_name, QStringList co
     {
       network_interfaces_.push_back (QNetworkInterface::interfaceFromName (net_if_name));
     }
+  if (is_multicast_address (server_))
+    {
+      normalize_multicast_interfaces (&network_interfaces_);
+    }
   warned_untrusted_sender_ = false;
   warned_broadcast_control_ = false;
 
@@ -251,6 +334,10 @@ void MessageClient::impl::host_info_results (QHostInfo host_info)
         {
           server_ = server_addresses[0];
         }
+    }
+  if (is_multicast_address (server_))
+    {
+      normalize_multicast_interfaces (&network_interfaces_);
     }
   rebuild_trusted_senders ();
   start ();
@@ -901,7 +988,12 @@ MessageClient::MessageClient (QString const& id, QString const& version, QString
                                          Q_EMIT error (m_->errorString ());
                                        }
                                        });
-  m_->set_server (server_name, network_interface_names);
+  // Defer socket activation until the first event-loop turn. This keeps the
+  // object alive for early startup callers while avoiding notifier creation
+  // during widget construction on Linux.
+  QTimer::singleShot (0, this, [this, server_name, network_interface_names] {
+    m_->set_server (server_name, network_interface_names);
+  });
 }
 
 QHostAddress MessageClient::server_address () const

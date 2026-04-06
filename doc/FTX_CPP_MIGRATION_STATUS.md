@@ -99,7 +99,7 @@ Current default:
 What is still Fortran in or around the active Q65 path:
 
 - no Q65-specific Fortran remains on the active decode path
-- `Detector/FtxQ65Decoder.cpp` now also owns the old `ana64_` compatibility entrypoint, and `lib/ana64.f90` has been removed from the tree
+- `Detector/FtxQ65Decoder.cpp` now also owns the old Q65 analysis compatibility entrypoint, and `lib/ana64.f90` has been removed from the tree
 - `qmap` no longer uses Q65-specific Fortran frontend code:
   - `qmap/libqmap/q65c.f90`, `decode0.f90`, `qmapa.f90`, `q65b.f90`, `q65_sync.f90` and `getcand2.f90` have been removed from the tree and replaced by native code in `Detector/FtxQ65Frontend.cpp`
 - the active Map65-side Q65 path is now native/generic:

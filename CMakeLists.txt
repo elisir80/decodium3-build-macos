@@ -290,10 +290,14 @@ set (wsjt_qt_CXXSRCS
   Detector/FtxQ65Frontend.cpp
   Detector/FtxMap65Q65.cpp
   Detector/FtxQ65Support.cpp
+  Detector/FftCompat.cpp
   Detector/LegacyDspIoHelpers.cpp
+  Detector/FanoSequentialDecoder.cpp
+  Detector/JT4Decoder.cpp
   Detector/JT65Decoder.cpp
   Detector/JT9FastDecoder.cpp
   Detector/JT9FastHelpers.cpp
+  Detector/JT9NarrowDecoder.cpp
   Detector/JT9WideDecoder.cpp
   Modulator/FtxWaveformGenerator.cpp
   Modulator/FtxMessageEncoder.cpp
@@ -323,7 +327,10 @@ set (wsjtx_CXXSRCS
   Detector/MSK144DecodeWorker.cpp
   Detector/Q65DecodeWorker.cpp
   Detector/WSPRDecodeWorker.cpp
+  lib/wsprd/fano.c
+  lib/wsprd/tab.c
   lib/wsprd/wsprd_embedded.c
+  lib/wsprd/osdwspr.c
   lib/wsprd/wsprsim_utils.c
   lib/wsprd/wsprd_utils.c
   lib/wsprd/jelinek.c
@@ -421,11 +428,7 @@ set (wsjt_FSRCS
   lib/hashing.f90
   lib/iso_c_utilities.f90
   lib/jt4.f90
-  lib/jt4_decode.f90
-  lib/jt65_mod.f90
-  lib/jt65_mod6.f90 #ft8md
   lib/get_q3list.f90
-  lib/jt9_decode.f90
   lib/options.f90
   lib/packjt.f90
   lib/normalizebmet.f90
@@ -438,22 +441,19 @@ set (wsjt_FSRCS
 
   # remaining non-module sources
   lib/addit.f90
-  lib/afc65b.f90
-  lib/afc9.f90
   lib/ana932.f90
   lib/analytic.f90
   lib/astro.f90
   lib/astrosub.f90
   lib/astro0.f90
-  lib/avecho.f90
   lib/averms.f90
   lib/azdist.f90
   lib/bpdecode40.f90
   lib/bpdecode128_90.f90
   lib/baddata.f90
+  # JT9 legacy decode routines live in wsjt_fort_legacy_jt.
   lib/cablog.f90
   lib/calibrate.f90
-  lib/ccf2.f90
   lib/ccf65.f90
   lib/chkcall.f90
   lib/chkhist.f90
@@ -462,15 +462,10 @@ set (wsjt_FSRCS
   lib/coord.f90
   lib/db.f90
   lib/decode4.f90
-  lib/decode9w.f90
-  lib/decode_echo.f90
   lib/env_module.f90
   lib/deep4.f90
   lib/deg2grid.f90
   lib/degrade_snr.f90
-  lib/downsam9.f90
-  lib/echosim.f90
-  lib/echo_snr.f90
   lib/encode232.f90
   lib/encode4.f90
   lib/encode_128_90.f90
@@ -479,16 +474,10 @@ set (wsjt_FSRCS
   lib/extract4.f90
   lib/extractmessage77.f90
   lib/fano232.f90
-  lib/fast9.f90
-  lib/fast_decode.f90
   lib/fchisq.f90
-  lib/fchisq0.f90
-  lib/fchisq65.f90
   lib/fil3.f90
   lib/fil3c.f90
   lib/fil4.f90
-  lib/fil6521.f90
-  lib/filbig.f90
   lib/fitcal.f90
   lib/flat1.f90
   lib/flat1a.f90
@@ -497,7 +486,6 @@ set (wsjt_FSRCS
   lib/flat4.f90
   lib/flat65.f90
   lib/fmtmsg.f90
-  lib/foldspec9f.f90
   lib/fspread_lorentz.f90
 #  lib/ft8/foxgen_wrap.f90
   lib/freqcal.f90
@@ -505,7 +493,6 @@ set (wsjt_FSRCS
   lib/gen65.f90
   lib/gen9.f90
   lib/gen_cw_wave.f90
-  lib/gen_echocall.f90
   lib/genwave.f90
   lib/genwspr.f90
   lib/geodist.f90
@@ -513,20 +500,19 @@ set (wsjt_FSRCS
   lib/getmet4.f90
   lib/gfsk_pulse.f90
   lib/graycode.f90
+  lib/graycode65.f90
   lib/grayline.f90
   lib/grid2deg.f90
   lib/hash.f90
-  lib/hint65.f90
   lib/hspec.f90
   lib/indexx.f90
   lib/init_random_seed.f90
   lib/interleave4.f90
+  lib/interleave63.f90
   lib/interleave9.f90
   lib/inter_wspr.f90
   lib/jplsubs.f
-  lib/jt9fano.f90
   lib/libration.f90
-  lib/lorentzian.f90
   lib/lpf1.f90
   lib/mixlpf.f90
   lib/makepings.f90
@@ -534,11 +520,8 @@ set (wsjt_FSRCS
   lib/morse.f90
   lib/move.f90
   lib/nuttal_window.f90
-  lib/legacy_jt_async_decode.f90
   lib/77bit/my_hash.f90
-  lib/wsprd/osdwspr.f90
   lib/osd128_90.f90
-  lib/peakdt9.f90
   lib/peakup.f90
   lib/plotsave.f90
   lib/platanh.f90
@@ -547,33 +530,19 @@ set (wsjt_FSRCS
   lib/ps4.f90
   lib/refspectrum.f90
   lib/savec2.f90
-  lib/save_echo_params.f90
   lib/sec0.f90
   lib/sec_midn.f90
-  lib/sh65.f90
-  lib/sh65snr.f90
   lib/slasubs.f
   lib/sleep_msec.f90
   lib/slope.f90
   lib/smo.f90
-  lib/smo121.f90
-  lib/softsym.f90
-  lib/softsym9f.f90
-  lib/softsym9w.f90
-  lib/spec9f.f90
-  lib/subtract65.f90
   lib/sun.f90
   lib/symspec.f90
   lib/symspec2.f90
   lib/sync4.f90
-  lib/sync9.f90
-  lib/sync9f.f90
-  lib/sync9w.f90
-  lib/test_snr.f90
   lib/timf2.f90
   lib/tweak1.f90
   lib/twkfreq.f90
-  lib/twkfreq65.f90
   lib/update_recent_calls.f90
   lib/wav11.f90
   lib/wav12.f90
@@ -607,7 +576,6 @@ set (qra_CSRCS
 
 set (wsjt_CSRCS
   ${ka9q_CSRCS}
-  lib/ftrsd/ftrsdap.c
   lib/sgran.c
   lib/golay24_table.c
   lib/gran.c
@@ -615,8 +583,6 @@ set (wsjt_CSRCS
   lib/init_random_seed.c
   lib/ldpc32_table.c
   lib/wsprd/nhash.c
-  lib/wsprd/fano.c
-  lib/wsprd/tab.c
   lib/tab.c
   lib/tmoonsub.c
   lib/usleep.c
@@ -653,6 +619,7 @@ set (wsprsim_CSRCS
 
 set (wsprd_CSRCS
   lib/wsprd/wsprd.c
+  lib/wsprd/osdwspr.c
   lib/wsprd/wsprsim_utils.c
   lib/wsprd/wsprd_utils.c
   lib/wsprd/fano.c
@@ -783,10 +750,18 @@ if (APPLE)
     icons/Darwin/${CMAKE_PROJECT_NAME}.iconset/icon_512x512.png
     icons/Darwin/${CMAKE_PROJECT_NAME}.iconset/icon_512x512@2x.png
     )
+  find_program (WSJTX_PYTHON_EXECUTABLE NAMES python3 python)
+  if (NOT WSJTX_PYTHON_EXECUTABLE)
+    message (FATAL_ERROR "python3 is required to generate the macOS bundle icon")
+  endif ()
   add_custom_command (
     OUTPUT ${WSJTX_ICON_FILE}
-    COMMAND iconutil -c icns --output "${CMAKE_BINARY_DIR}/${WSJTX_ICON_FILE}" "${CMAKE_SOURCE_DIR}/icons/Darwin/${CMAKE_PROJECT_NAME}.iconset"
+    COMMAND ${WSJTX_PYTHON_EXECUTABLE}
+            "${CMAKE_SOURCE_DIR}/CMake/make_icns.py"
+            --iconset "${CMAKE_SOURCE_DIR}/icons/Darwin/${CMAKE_PROJECT_NAME}.iconset"
+            --output "${CMAKE_BINARY_DIR}/${WSJTX_ICON_FILE}"
     DEPENDS ${ICONSRCS}
+            "${CMAKE_SOURCE_DIR}/CMake/make_icns.py"
     COMMENT "Building Icons"
     )
 else ()
@@ -1134,6 +1109,7 @@ endif ()
 
 # build a library of package functionality (without and optionally with OpenMP support)
 add_library (wsjt_cxx STATIC ${wsjt_CSRCS} ${wsjt_CXXSRCS})
+target_include_directories (wsjt_cxx PRIVATE ${FFTW3_INCLUDE_DIRS})
 target_link_libraries (wsjt_cxx ${LIBM_LIBRARIES} Boost::log_setup ${FFTW3_LIBRARIES} ${LIBM_LIBRARIES})
 
 # build an OpenMP variant of the Fortran library routines
@@ -1186,17 +1162,18 @@ target_link_libraries (sumsim wsjt_fort wsjt_cxx)
 add_executable (cablog lib/cablog.f90)
 target_link_libraries (cablog)
 
-add_executable (test_snr lib/test_snr.f90)
-target_link_libraries (test_snr wsjt_fort)
-
 add_executable (q65sim utils/q65sim.cpp)
 link_wsjtx_cycle_group (q65sim wsjt_qt wsjt_cxx wsjt_fort)
 
-add_executable (EchoCallSim lib/EchoCallSim.f90)
-target_link_libraries (EchoCallSim wsjt_fort wsjt_cxx)
+add_executable (EchoCallSim
+  utils/EchoCallSim.cpp
+  utils/EchoToolSupport.cpp)
+link_wsjtx_cycle_group (EchoCallSim wsjt_qt wsjt_cxx wsjt_fort)
 
-add_executable (testEchoCall lib/testEchoCall.f90)
-target_link_libraries (testEchoCall wsjt_fort wsjt_cxx)
+add_executable (testEchoCall
+  utils/testEchoCall.cpp
+  utils/EchoToolSupport.cpp)
+link_wsjtx_cycle_group (testEchoCall wsjt_qt wsjt_cxx wsjt_fort)
 
 add_executable (cwsim lib/cwsim.f90)
 target_link_libraries (cwsim wsjt_fort wsjt_cxx)
@@ -1215,9 +1192,6 @@ target_link_libraries (q65params wsjt_qt wsjt_cxx)
 
 add_executable (jt49sim lib/jt49sim.f90)
 target_link_libraries (jt49sim wsjt_fort wsjt_cxx)
-
-add_executable (jt9sim lib/jt9sim.f90)
-target_link_libraries (jt9sim wsjt_fort wsjt_cxx)
 
 add_executable (rtty_spec utils/rtty_spec.cpp)
 link_wsjtx_cycle_group (rtty_spec wsjt_qt wsjt_cxx wsjt_fort)
@@ -1257,20 +1231,11 @@ target_link_libraries (jt9code wsjt_fort wsjt_cxx)
 add_executable (jt9_compare utils/jt9_compare.cpp)
 link_wsjtx_cycle_group (jt9_compare wsjt_qt wsjt_cxx wsjt_fort)
 
-add_executable (jt9_wide_compare utils/jt9_wide_compare.cpp)
-link_wsjtx_cycle_group (jt9_wide_compare wsjt_qt wsjt_cxx wsjt_fort)
-
-add_executable (jt9_wide_stage_compare utils/jt9_wide_stage_compare.cpp)
-link_wsjtx_cycle_group (jt9_wide_stage_compare wsjt_qt wsjt_cxx wsjt_fort)
-
 add_executable (jt4_compare utils/jt4_compare.cpp)
 link_wsjtx_cycle_group (jt4_compare wsjt_qt wsjt_cxx wsjt_fort)
 
 add_executable (wspr_compare utils/wspr_compare.cpp)
 link_wsjtx_cycle_group (wspr_compare wsjt_qt wsjt_cxx wsjt_fort)
-
-add_executable (txwave_compare utils/txwave_compare.cpp)
-link_wsjtx_cycle_group (txwave_compare wsjt_qt wsjt_cxx wsjt_fort)
 
 add_executable (plot_compare utils/plot_compare.cpp)
 link_wsjtx_cycle_group (plot_compare wsjt_qt wsjt_cxx wsjt_fort)
@@ -1278,23 +1243,6 @@ link_wsjtx_cycle_group (plot_compare wsjt_qt wsjt_cxx wsjt_fort)
 add_executable (indexx_compare utils/indexx_compare.cpp)
 link_wsjtx_cycle_group (indexx_compare wsjt_qt wsjt_cxx wsjt_fort)
 
-add_executable (legacy_dspio_compare utils/legacy_dspio_compare.cpp)
-link_wsjtx_cycle_group (legacy_dspio_compare wsjt_qt wsjt_cxx wsjt_fort)
-
-add_executable (legacy_spectrum_compare utils/legacy_spectrum_compare.cpp)
-link_wsjtx_cycle_group (legacy_spectrum_compare wsjt_qt wsjt_cxx wsjt_fort)
-
-add_executable (legacy_echo_compare utils/legacy_echo_compare.cpp)
-link_wsjtx_cycle_group (legacy_echo_compare wsjt_qt wsjt_cxx wsjt_fort)
-
-add_executable (legacy_wsprio_compare utils/legacy_wsprio_compare.cpp)
-link_wsjtx_cycle_group (legacy_wsprio_compare wsjt_qt wsjt_cxx wsjt_fort)
-
-add_executable (fast9_stage_compare utils/fast9_stage_compare.cpp)
-link_wsjtx_cycle_group (fast9_stage_compare wsjt_qt wsjt_cxx wsjt_fort)
-
-add_executable (fast9_decode_compare utils/fast9_decode_compare.cpp)
-link_wsjtx_cycle_group (fast9_decode_compare wsjt_qt wsjt_cxx wsjt_fort)
 
 add_executable (wsprcode lib/wsprcode/wsprcode.f90 lib/wsprcode/nhash.c)
 target_link_libraries (wsprcode wsjt_fort wsjt_cxx)
@@ -1323,8 +1271,10 @@ link_wsjtx_cycle_group (ft8code wsjt_qt wsjt_cxx wsjt_fort)
 add_executable (ft4code utils/ft4code.cpp)
 link_wsjtx_cycle_group (ft4code wsjt_qt wsjt_cxx wsjt_fort)
 
-add_executable (echosim lib/echosim.f90)
-target_link_libraries (echosim wsjt_fort wsjt_cxx)
+add_executable (echosim
+  utils/echosim.cpp
+  utils/EchoToolSupport.cpp)
+link_wsjtx_cycle_group (echosim wsjt_qt wsjt_cxx wsjt_fort)
 
 add_executable (ft8sim utils/ft8sim.cpp)
 link_wsjtx_cycle_group (ft8sim wsjt_qt wsjt_cxx wsjt_fort)
@@ -1380,7 +1330,7 @@ generate_version_info (wsprd_VERSION_RESOURCES
   ICON ${WSJTX_ICON_FILE}
   FILE_DESCRIPTION "WSPR mode decoder"
   )
-add_executable (wsprd ${wsprd_CSRCS} lib/indexx.f90 lib/wsprd/osdwspr.f90 ${wsprd_VERSION_RESOURCES})
+add_executable (wsprd ${wsprd_CSRCS} ${wsprd_VERSION_RESOURCES})
 target_include_directories (wsprd PRIVATE ${FFTW3_INCLUDE_DIRS})
 target_link_libraries (wsprd ${FFTW3_LIBRARIES} ${LIBM_LIBRARIES})
 if (APPLE AND CMAKE_C_COMPILER_ID MATCHES "Clang")
@@ -1528,6 +1478,7 @@ endif (WIN32)
 # Export both transitively so tools that still link only wsjt_fort continue to
 # resolve the native replacements when WSJT_BUILD_UTILS is enabled.
 target_link_libraries (wsjt_fort wsjt_qt wsjt_cxx)
+
 if (TARGET wsjt_fort_omp)
   target_link_libraries (wsjt_fort_omp wsjt_qt wsjt_cxx)
 endif ()

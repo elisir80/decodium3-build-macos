@@ -1,5 +1,85 @@
 # Changelog / Registro Modifiche
 
+## [1.6.1] - 2026-04-06
+
+### English
+
+Release focused on finishing the native C++ migration of the maintained legacy JT runtime, removing the last active-path Fortran/legacy-ABI residues from JT/Q65/WSPR/Echo, fixing Linux build/startup regressions, and aligning the public release surface to semantic version `1.6.1`.
+
+#### Added
+
+- Added native C++ JT4 and JT9 narrow decoder paths plus new compare utilities for JT4/JT9 decoder validation.
+- Added native C++ replacements for the Echo simulator/tooling path and a local `wsjt_fft_compat` bridge for legacy `map65/libm65` Makefile builds.
+- Added deterministic `.icns` generation through a Python helper so macOS release packaging no longer depends on `iconutil` accepting the iconset.
+
+#### Changed
+
+- JT4, JT9, and JT65 active runtime paths now run through the maintained native C++ decode stack, with the legacy Fortran decoder-orchestrator sources kept only for reference/compare targets where still needed.
+- Q65 and WSPR active runtime paths are now Fortran-free, and Echo has been fully promoted to a native C++ runtime/tool path.
+- The remaining active-path legacy ABI naming has been cleaned up from the maintained app/runtime surface, including the historical FFT `four2a` compatibility naming.
+- Obsolete Fortran sources and compatibility files have been removed from the maintained tree across `lib/`, `qmap/libqmap/`, `map65/libm65/`, and Echo-related utilities.
+- Local version metadata, workflow defaults, readmes, docs, changelog, release notes, GitHub release body, and repository description are aligned to semantic version `1.6.1`.
+
+#### Fixed
+
+- Fixed Linux x86_64 build failures in `mainwindow.cpp` caused by a broken deferred lambda path and mismatched symbols after the legacy JT migration work.
+- Fixed Linux startup/shutdown regressions around deferred `MessageClient` / `NtpClient` initialization, `QSocketNotifier` warning handling, and Qt logging teardown.
+- Fixed GNU ld link failures in legacy compare/sim targets such as `jt9sim`, `jt65_compare`, `jt65_sync_compare`, and `jt65_symspec_compare`.
+- Fixed macOS release packaging failures caused by `wsjtx.iconset: Invalid Iconset`.
+- Fixed the final legacy FFT cleanup path so `map65/libm65` no longer depends on `four2a.f90` even in the old Makefile builds.
+
+### Italiano
+
+Release focalizzata nel completare la migrazione nativa C++ del runtime JT legacy mantenuto, nel rimuovere gli ultimi residui Fortran/legacy-ABI del path attivo da JT/Q65/WSPR/Echo, nel correggere regressioni build/startup Linux e nell'allineare la superficie release pubblica alla semver `1.6.1`.
+
+#### Aggiunto
+
+- Aggiunti i path decoder nativi C++ JT4 e JT9 narrow e nuove utility compare per la validazione decoder JT4/JT9.
+- Aggiunti i sostituti nativi C++ per il path strumenti/simulatore Echo e un bridge locale `wsjt_fft_compat` per le build legacy `map65/libm65` via Makefile.
+- Aggiunta la generazione deterministica `.icns` tramite helper Python, cosi' il packaging release macOS non dipende piu' da `iconutil`.
+
+#### Modificato
+
+- I path runtime attivi JT4, JT9 e JT65 girano ora sul decode stack nativo C++ mantenuto, mentre i vecchi sorgenti orchestrator Fortran restano solo per target reference/compare dove ancora servono.
+- I path runtime attivi Q65 e WSPR sono ora Fortran-free, ed Echo e' stato promosso completamente a runtime/tool path nativo C++.
+- Ripulito dalla superficie app/runtime mantenuta il naming legacy ABI residuo del path attivo, incluso lo storico naming di compatibilita' FFT `four2a`.
+- Rimossi dal tree mantenuto sorgenti Fortran obsoleti e file di compatibilita' in `lib/`, `qmap/libqmap/`, `map65/libm65/` e nelle utility Echo correlate.
+- Metadati versione locali, default workflow, readme, documentazione, changelog, note release, body GitHub e descrizione repository sono allineati alla semver `1.6.1`.
+
+#### Corretto
+
+- Corretti i fallimenti di build Linux x86_64 in `mainwindow.cpp` causati da un path lambda differito rotto e da simboli non coerenti dopo il lavoro di migrazione JT legacy.
+- Corrette regressioni Linux in startup/chiusura legate all'inizializzazione differita di `MessageClient` / `NtpClient`, alla gestione del warning `QSocketNotifier` e al teardown del logging Qt.
+- Corrette le rotture GNU ld nei target legacy compare/sim come `jt9sim`, `jt65_compare`, `jt65_sync_compare` e `jt65_symspec_compare`.
+- Corretti i fallimenti packaging release macOS causati da `wsjtx.iconset: Invalid Iconset`.
+- Corretto il cleanup finale FFT legacy cosi' `map65/libm65` non dipende piu' da `four2a.f90` nemmeno nelle vecchie build Makefile.
+
+### Espanol
+
+Release centrada en completar la migracion nativa C++ del runtime JT legacy mantenido, eliminar los ultimos residuos Fortran/legacy-ABI del camino activo de JT/Q65/WSPR/Echo, corregir regresiones de build/startup Linux y alinear la superficie release publica con la semver `1.6.1`.
+
+#### Anadido
+
+- Anadidos los caminos decoder nativos C++ JT4 y JT9 narrow y nuevas utilidades compare para validar los decoders JT4/JT9.
+- Anadidos los reemplazos nativos C++ para el camino de herramientas/simulador Echo y un bridge local `wsjt_fft_compat` para las builds legacy `map65/libm65` con Makefile.
+- Anadida la generacion determinista `.icns` mediante un helper Python para que el packaging release macOS ya no dependa de `iconutil`.
+
+#### Cambios
+
+- Los caminos runtime activos JT4, JT9 y JT65 corren ahora por el stack decode nativo C++ mantenido, mientras las viejas fuentes orchestrator Fortran quedan solo para targets reference/compare donde aun se necesitan.
+- Los caminos runtime activos Q65 y WSPR son ahora Fortran-free, y Echo ha sido promovido completamente a un camino runtime/tools nativo C++.
+- Se ha limpiado de la superficie app/runtime mantenida el naming legacy ABI restante del camino activo, incluido el historico naming FFT `four2a`.
+- Se han eliminado del arbol mantenido fuentes Fortran obsoletas y ficheros de compatibilidad en `lib/`, `qmap/libqmap/`, `map65/libm65/` y utilidades Echo relacionadas.
+- Metadatos locales de version, defaults de workflow, readmes, documentacion, changelog, notas release, body GitHub y descripcion del repositorio quedan alineados con la semver `1.6.1`.
+
+#### Corregido
+
+- Corregidos los fallos de build Linux x86_64 en `mainwindow.cpp` causados por un camino lambda diferido roto y simbolos incoherentes tras el trabajo de migracion JT legacy.
+- Corregidas las regresiones Linux de arranque/cierre ligadas a la inicializacion diferida de `MessageClient` / `NtpClient`, al manejo del warning `QSocketNotifier` y al teardown del logging Qt.
+- Corregidos los fallos GNU ld en targets legacy compare/sim como `jt9sim`, `jt65_compare`, `jt65_sync_compare` y `jt65_symspec_compare`.
+- Corregidos los fallos de packaging release macOS causados por `wsjtx.iconset: Invalid Iconset`.
+- Corregida la limpieza FFT legacy final para que `map65/libm65` ya no dependa de `four2a.f90` ni siquiera en las builds antiguas con Makefile.
+
 ## [1.6.0] - 2026-04-03
 
 ### English
@@ -174,7 +254,7 @@ Release focused on completing the promoted native C++ runtime for the FTX family
 
 - Fixed macOS shutdown crashes triggered by premature global FFTW cleanup while thread-local FFTW plans were still finalizing.
 - Fixed `MainWindow::dataSink` / `fastSink` frame clamping and writable-data-dir handling to avoid crash-prone invalid indices and hot-path `QDir` reconstruction.
-- Fixed Linux/GCC 15 build breaks involving `_q65_mask`, `pack28`, legacy tool linkage to migrated symbols such as `four2a_`, and the MSK40 off-by-one bug in `decodeframe40_native`.
+- Fixed Linux/GCC 15 build breaks involving `_q65_mask`, `pack28`, legacy tool linkage to the migrated FFT compatibility bridge, and the MSK40 off-by-one bug in `decodeframe40_native`.
 - Fixed full-build regressions by keeping legacy tools/tests linked against the migrated C++ runtime symbols.
 
 ### Italiano
@@ -198,7 +278,7 @@ Release focalizzata sul completamento del runtime promosso nativo C++ per la fam
 
 - Corretto il crash macOS in chiusura causato dal cleanup FFTW globale prematuro mentre i piani FFTW thread-local erano ancora in finalizzazione.
 - Corretti `MainWindow::dataSink` / `fastSink` nel clamp dei frame e nella gestione della writable-data-dir per evitare indici invalidi e ricostruzioni `QDir` nel path caldo.
-- Corretti i fallimenti Linux/GCC 15 relativi a `_q65_mask`, `pack28`, link dei tool legacy verso simboli C++ migrati come `four2a_`, e il bug off-by-one MSK40 in `decodeframe40_native`.
+- Corretti i fallimenti Linux/GCC 15 relativi a `_q65_mask`, `pack28`, link dei tool legacy verso il bridge FFT di compatibilita` migrato in C++, e il bug off-by-one MSK40 in `decodeframe40_native`.
 - Corrette regressioni di full-build mantenendo tool/test legacy linkati ai simboli del runtime C++ migrato.
 
 ### Espanol
@@ -222,7 +302,7 @@ Release centrada en completar el runtime promovido nativo C++ para la familia FT
 
 - Corregido el crash macOS al cerrar causado por el cleanup FFTW global prematuro mientras los planes FFTW thread-local seguian finalizandose.
 - Corregidos `MainWindow::dataSink` / `fastSink` en el clamping de frames y en el manejo de writable-data-dir para evitar indices invalidos y reconstrucciones `QDir` en la ruta caliente.
-- Corregidos los fallos Linux/GCC 15 relacionados con `_q65_mask`, `pack28`, enlace de herramientas legacy con simbolos C++ migrados como `four2a_`, y el bug off-by-one MSK40 en `decodeframe40_native`.
+- Corregidos los fallos Linux/GCC 15 relacionados con `_q65_mask`, `pack28`, enlace de herramientas legacy con el puente FFT de compatibilidad migrado a C++, y el bug off-by-one MSK40 en `decodeframe40_native`.
 - Corregidas regresiones de full-build manteniendo herramientas/tests legacy enlazados con los simbolos del runtime C++ migrado.
 
 ## [1.5.7] - 2026-03-30

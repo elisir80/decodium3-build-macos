@@ -101,7 +101,7 @@ subroutine decode1a(dd,newdat,f0,nflip,mode65,nfsample,xpol,            &
            j=min(j+1,NMAX/64)
            c5a(i)=aa*cx(j) + bb*cy(j)
         enddo
-        call four2a(c5a,nfft,1,1,1)
+        call wsjt_fft_compat(c5a,nfft,1,1,1)
         if(n.eq.1) then
            do i=1,66
 !                  s2(i,k)=real(c5a(i))**2 + aimag(c5a(i))**2

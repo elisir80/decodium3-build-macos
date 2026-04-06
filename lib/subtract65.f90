@@ -87,17 +87,17 @@ subroutine subtract65(dd,npts,f0,dt)
         if(j.lt.1) j=j+nfft
         cw(j)=window(i)/sum
      enddo
-     call four2a(cw,nfft,1,-1,1)
+     call wsjt_fft_compat(cw,nfft,1,-1,1)
      first=.false.
   endif
 
   nz=561708
   cfilt(1:nz)=camp(1:nz)
   cfilt(nz+1:nfft)=0.
-  call four2a(cfilt,nfft,1,-1,1)
+  call wsjt_fft_compat(cfilt,nfft,1,-1,1)
   fac=1.0/float(nfft)
   cfilt(1:nfft)=fac*cfilt(1:nfft)*cw(1:nfft)
-  call four2a(cfilt,nfft,1,1,1)
+  call wsjt_fft_compat(cfilt,nfft,1,1,1)
   call timer('subtr_2 ',1)
 
 ! Subtract the reconstructed signal

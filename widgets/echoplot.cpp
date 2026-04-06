@@ -1,6 +1,6 @@
 #include "echoplot.h"
+#include "Detector/LegacyDspIoHelpers.hpp"
 #include "PlotLegacyHelpers.hpp"
-#include "commons.h"
 #include <math.h>
 #include <QPainter>
 #include <QPen>
@@ -104,13 +104,14 @@ void EPlotter::draw()                           //draw()
   QPoint LineBuf[MAX_SCREENSIZE];
 
   if(m_binsPerPixel==0) m_binsPerPixel=1;
+  auto const& plot_state = decodium::legacy::echo_plot_state ();
   j=0;
   for(i=0; i<4096/m_binsPerPixel; i++) {
     blue[i]=0.0;
     red[i]=0.0;
     for(int k=0; k<m_binsPerPixel; k++) {
-      blue[i]+=echocom_.blue[j];
-      red[i]+=echocom_.red[j];
+      blue[i]+=plot_state.blue[static_cast<std::size_t> (j)];
+      red[i]+=plot_state.red[static_cast<std::size_t> (j)];
       j++;
     }
   }

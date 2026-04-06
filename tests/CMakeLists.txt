@@ -60,9 +60,6 @@ if (WSJT_BUILD_UTILS)
   add_test (NAME test_q65_usage COMMAND $<TARGET_FILE:test_q65>)
   set_tests_properties (test_q65_usage PROPERTIES PASS_REGULAR_EXPRESSION "Usage:")
 
-  add_test (NAME test_snr_usage COMMAND $<TARGET_FILE:test_snr>)
-  set_tests_properties (test_snr_usage PROPERTIES PASS_REGULAR_EXPRESSION "Usage:")
-
   add_test (NAME testEchoCall_usage COMMAND $<TARGET_FILE:testEchoCall>)
   set_tests_properties (testEchoCall_usage PROPERTIES PASS_REGULAR_EXPRESSION "Usage:")
 

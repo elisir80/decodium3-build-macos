@@ -39,7 +39,7 @@ subroutine m65a
      ! Save FFTW wisdom and free memory
      wisfile=trim(cwd)//'/m65_wisdom.dat'// C_NULL_CHAR
      if(len(trim(wisfile)).gt.0) iret=fftwf_export_wisdom_to_filename(wisfile)
-     call four2a(a,-1,1,1,1)
+     call wsjt_fft_compat(a,-1,1,1,1)
      call filbig(a,-1,1,0.0,0,0,0,0,0) !used for FFT plans
      call fftwf_cleanup_threads()
      call fftwf_cleanup()

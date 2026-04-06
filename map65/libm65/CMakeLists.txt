@@ -32,7 +32,6 @@ set (libm65_FSRCS
   fil6521.f90
   filbig.f90
   fmtmsg.f90
-  four2a.f90
   ftninit.f90
   ftnquit.f90
   gen65.f90
@@ -132,10 +131,7 @@ add_executable (m65 m65.f90 m65a.f90)
 target_link_libraries (m65 m65impl ${FFTW3_LIBRARIES})
 
 add_executable (mapsim mapsim.cpp)
-target_link_libraries (mapsim m65impl ${FFTW3_LIBRARIES})
-
-#add_executable (synctest synctest.f90)
-#target_link_libraries (synctest m65impl ${FFTW3_LIBRARIES})
+target_link_libraries (mapsim m65impl wsjt_qt ${FFTW3_LIBRARIES})
 
 if (WIN32)
   install (

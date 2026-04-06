@@ -36,9 +36,9 @@ subroutine wav12(d2,d1,npts,nbitsam2)
 
   x(1:jz)=d2(1:jz)
   x(jz+1:)=0.0
-  call four2a(cx,nfft1,1,-1,0)                    !Forwarxd FFT, r2c
+  call wsjt_fft_compat(cx,nfft1,1,-1,0)                    !Forwarxd FFT, r2c
   cx(nfft1/2:)=0.0
-  call four2a(cx,nfft2,1,1,-1)                   !Inverse FFT, c2r
+  call wsjt_fft_compat(cx,nfft2,1,1,-1)                   !Inverse FFT, c2r
 
   npts=jz*12000.0/11025.0
   fac=1.e-6

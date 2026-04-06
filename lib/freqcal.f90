@@ -30,7 +30,7 @@ subroutine freqcal(id2,k,nkhz,noffset,ntol,line)
   k0=k
      
   x=w*id2(k-NFFT:k-1)              !Apply window
-  call four2a(x,NFFT,1,-1,0)       !Compute spectrum, r2c
+  call wsjt_fft_compat(x,NFFT,1,-1,0)       !Compute spectrum, r2c
   df=fs/NFFT
   if (ntol.gt.noffset) then
      ia=0

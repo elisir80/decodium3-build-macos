@@ -13,6 +13,8 @@
 #include <string>
 #include <vector>
 
+#include "Detector/FftCompat.hpp"
+
 extern "C"
 {
 void cgen65_ (char* message, int* mode65, double* samfac, int* nsendingsh, char* msgsent,
@@ -23,7 +25,6 @@ void gen_q65_cwave_ (char* msg, int* ntxFreq, int* ntone_spacing, char* msgsent,
                      fortran_charlen_t len2);
 float gran_ ();
 float rran_ ();
-void four2a_ (std::complex<float> a[], int* nfft, int* ndim, int* isign, int* iform);
 }
 
 namespace
@@ -111,11 +112,7 @@ void dopspread (std::vector<std::complex<float>>& cwave, float fspread)
         }
     }
 
-  int ndim = 1;
-  int isign = 1;
-  int iform = 1;
-  int nfft_arg = nfft;
-  four2a_ (cspread.data (), &nfft_arg, &ndim, &isign, &iform);
+  decodium::fft_compat::inverse_complex (cspread.data (), nfft);
 
   double sum = 0.0;
   for (std::complex<float> const& value : cspread)

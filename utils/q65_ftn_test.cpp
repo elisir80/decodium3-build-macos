@@ -14,7 +14,6 @@ extern "C"
 {
 void q65_encode_message_ (char* msg0, char* msgsent, int* payload, int* codeword, int* itone,
                           fortran_charlen_t len1, fortran_charlen_t len2);
-void q65_enc_ (int x[], int y[]);
 void q65_intrinsics_ff_ (float s3[], int* submode, float* b90ts, int* fading_model,
                          float s3prob[]);
 void q65_dec_ (float s3[], float s3prob[], int apmask[], int apsymbols[], int* maxiters,

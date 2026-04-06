@@ -27,7 +27,7 @@ integer function savec2(c2name,ntrseconds,f0m1500)
   c1(0:npts-1)=fac*c0(0:npts-1)
   c1(npts:nfft1-1)=0.
 
-  call four2a(c1,nfft1,1,1,1)                 !Complex FFT to frequency domain
+  call wsjt_fft_compat(c1,nfft1,1,1,1)                 !Complex FFT to frequency domain
 
 ! Select the desired frequency range
   nfft2=65536
@@ -41,7 +41,7 @@ integer function savec2(c2name,ntrseconds,f0m1500)
      c2(nh2+1:nfft2-1)=c1(i0-nh2+1:i0-1)
   endif
 
-  call four2a(c2,nfft2,1,-1,1)      !Shorter complex FFT, back to time domain
+  call wsjt_fft_compat(c2,nfft2,1,-1,1)      !Shorter complex FFT, back to time domain
 
 ! Write complex time-domain data to disk.
   i1=index(c2name,'.c2')

@@ -45,9 +45,9 @@
 #include "wsprsim_utils.h"
 #include "wsprd_embedded.h"
 
-#define max(x,y) ((x) > (y) ? (x) : (y))
+void wsprd_osd_decode(float [], unsigned char [], int *, unsigned char [], int *, float *);
 
-extern void osdwspr_ (float [], unsigned char [], int *, unsigned char [], int *, float *);
+#define max(x,y) ((x) > (y) ? (x) : (y))
 
 // Possible PATIENCE options: FFTW_ESTIMATE, FFTW_ESTIMATE_PATIENT,
 // FFTW_MEASURE, FFTW_PATIENT, FFTW_EXHAUSTIVE
@@ -1402,7 +1402,7 @@ int wsprd_run(int argc, char *argv[])
                                 fsymbs[i]=symbols[i]-128.0;
                             }
                             t0 = clock();
-                            osdwspr_(fsymbs,apmask,&ndepth,cw,&nhardmin,&dmin);
+                            wsprd_osd_decode(fsymbs,apmask,&ndepth,cw,&nhardmin,&dmin);
                             tosd += (float)(clock()-t0)/CLOCKS_PER_SEC;
                             
                             for(i=0; i<162; i++) {

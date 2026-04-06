@@ -30,7 +30,7 @@ OBJS1 = trimlist.o display.o getdphi.o pctile.o ccf65.o \
 	grid2k.o getpfx2.o qra64b.o qra64c.o twkfreq_xy.o qra64zap.o \
 	deg2grid.o getpfx1.o k2grid.o ftrsd2.o graycode65.o \
 	wrapkarn.o nchar.o init_rs.o encode_rs.o decode_rs.o \
-	four2a.o rfile3a.o grid2deg.o pfxdump.o dpol.o sync64.o spec64.o \
+	wsjt_fft_compat.o rfile3a.o grid2deg.o pfxdump.o dpol.o sync64.o spec64.o \
 	astro.o tm2.o sun.o moondop.o coord.o tmoonsub.o \
 	geocentric.o moon2.o toxyz.o dot.o dcoord.o f77_wisdom.o \
 	gen65.o chkmsg.o astrosub.o astro0.o recvpkt.o symspec.o \

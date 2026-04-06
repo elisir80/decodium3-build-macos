@@ -15,11 +15,7 @@
 #include <numeric>
 #include <vector>
 
-extern "C"
-{
-  void four2a_ (std::complex<float> a[], int* nfft, int* ndim, int* isign, int* iform, int);
-  void pctile_ (float x[], int* npts, int* npct, float* xpct);
-}
+#include <fftw3.h>
 
 namespace
 {
@@ -76,27 +72,27 @@ QByteArray trim_trailing_spaces (QByteArray bytes)
   return bytes;
 }
 
-void four2a_forward_real_buffer (float* buffer, int nfft)
+void fftw_forward_real_buffer (float* buffer, int nfft)
 {
-  int ndim = 1;
-  int isign = -1;
-  int iform = 0;
-  four2a_ (reinterpret_cast<std::complex<float>*> (buffer), &nfft, &ndim, &isign, &iform, 0);
+  // In-place r2c FFT; buffer must be at least nfft+2 floats.
+  auto* cx = reinterpret_cast<fftwf_complex*> (buffer);
+  fftwf_plan p = fftwf_plan_dft_r2c_1d (nfft, buffer, cx, FFTW_ESTIMATE);
+  fftwf_execute (p);
+  fftwf_destroy_plan (p);
 }
 
 float percentile_value (float const* values, int count, int pct)
 {
   if (!values || count <= 0 || pct < 0 || pct > 100)
-    {
-      return 1.0f;
-    }
-
+    return 1.0f;
   std::vector<float> work (values, values + count);
-  float xpct = 1.0f;
-  int npts = count;
-  int npct = pct;
-  pctile_ (work.data (), &npts, &npct, &xpct);
-  return xpct;
+  std::sort (work.begin (), work.end ());
+  int j = static_cast<int> (std::lround (count * 0.01 * pct));
+  if (j < 1)
+    j = 1;
+  if (j > count)
+    j = count;
+  return work[static_cast<std::size_t> (j - 1)];
 }
 
 float db_value (float ratio)
@@ -443,7 +439,7 @@ decodium::jt9wide::detail::SoftsymResult softsym9w_compute (QVector<short> const
       {
         real[static_cast<std::size_t> (i)] = 1.0e-6f * audio.at (start + i);
       }
-    four2a_forward_real_buffer (real.data (), kWideNfft);
+    fftw_forward_real_buffer (real.data (), kWideNfft);
     for (int k = 1; k <= kWideNq; ++k)
       {
         auto const value = spectrum[k];

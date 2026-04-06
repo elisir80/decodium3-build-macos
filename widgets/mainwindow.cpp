@@ -1195,8 +1195,10 @@ namespace
       return true;
     }
 
-    return grid_regexp.match (normalized).hasMatch ()
-        && !Radio::is_callsign (normalized);
+    // For decode-pane double-clicks, Maidenhead locators must never arm TX,
+    // even though Radio::is_callsign() is intentionally loose and accepts
+    // tokens like "JN56" as plausible callsigns.
+    return grid_regexp.match (normalized).hasMatch ();
   }
 
   bool ghost_filter_known_token (QString const& token)
@@ -2000,7 +2002,6 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   setUnifiedTitleAndToolBarOnMac (true);
   createStatusBar();
   ensureUpdateCheckAction ();
-
   m_applicationStateChangedConnection =
       connect (qApp, &QGuiApplication::applicationStateChanged,
                this, &MainWindow::onApplicationStateChanged);
@@ -2283,55 +2284,33 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
           m_config.set_CTY_DAT_version(cty_version);
           showStatusMessage (tr ("Scanned logbook, %1 worked-before records created. CTY: %2").arg (record_count).arg (cty_version));  //avt 9/24/25
         }
-    //avt 10/1/25
     m_logbookRead = true;
     updateLotwCtrls();
-    debugToFile("finished_loa m_logbookRead:true");
+    debugToFile("finished_load_lotw_config m_logbookRead:true");
     });
 
   // Network message handlers
   m_messageClient->enable (m_config.accept_udp_requests ());
   connect (m_messageClient, &MessageClient::clear_decodes, [this] (quint8 window) {
       ++window;
-      if (window & 1)
-        {
-          ui->decodedTextBrowser->erase ();
-        }
-      if (window & 2)
-        {
-          ui->decodedTextBrowser2->erase ();
-        }
+      if (window & 1) ui->decodedTextBrowser->erase ();
+      if (window & 2) ui->decodedTextBrowser2->erase ();
     });
   connect (m_messageClient, &MessageClient::reply, this, &MainWindow::replyToCQ);
   connect (m_messageClient, &MessageClient::close, this, &MainWindow::close);
   connect (m_messageClient, &MessageClient::replay, this, &MainWindow::replayDecodes);
   connect (m_messageClient, &MessageClient::location, this, &MainWindow::locationChange);
   connect (m_messageClient, &MessageClient::halt_tx, [this] (bool auto_only) {
-      if (auto_only) {
-        if (m_autoButtonState) {    //avt 10/2/25
-          ui->autoButton->click();
-        }
-      } else {
-        ui->stopTxButton->click();
-      }
+      if (auto_only) { if (m_autoButtonState) ui->autoButton->click(); }
+      else { ui->stopTxButton->click(); }
     });
   connect (m_messageClient, &MessageClient::error, this, &MainWindow::networkError);
   connect (m_messageClient, &MessageClient::free_text, [this] (QString const& text, bool send) {
       tx_watchdog (false);
-      // send + non-empty text means set and send the free text
-      // message, !send + non-empty text means set the current free
-      // text message, send + empty text means send the current free
-      // text message without change, !send + empty text means clear
-      // the current free text message
       if (0 == ui->tabWidget->currentIndex ()) {
-        if (!text.isEmpty ()) {
-          ui->tx5->setCurrentText (text);
-        }
-        if (send) {
-          ui->txb5->click ();
-        } else if (text.isEmpty ()) {
-          ui->tx5->setCurrentText (text);
-        }
+        if (!text.isEmpty ()) ui->tx5->setCurrentText (text);
+        if (send) ui->txb5->click ();
+        else if (text.isEmpty ()) ui->tx5->setCurrentText (text);
       }
       QApplication::alert (this);
     });
@@ -2340,175 +2319,179 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   connect (m_messageClient, &MessageClient::switch_configuration, m_multi_settings, &MultiSettings::select_configuration);
   connect (m_messageClient, &MessageClient::configure, this, &MainWindow::remote_configure);
 
-  connect (m_messageClient, &MessageClient::setup_tx, [this] (int newTxMsgIdx, QString const& msg, bool param0, bool param1, QString const& check, quint32 offset) {    //avt 11/16/20
-      if (!m_externalCtrl) {
-        m_dblClk = false; //avt 1/1/21
-        m_checkCmd = "";  //avt 1/1/21
-        m_dxCall = "";    //avt 11/12/21
-        m_bOffset = false;//avt 11/13/21
-        m_txHaltClk = false;  //avt 12/18/21
-        m_txEnableClk = false;  //avt 1/28/24
-        m_enableButtonNotify = true;  //avt 1/23/24
-        showStatusMessage("Controller initiated"); //avt 12/16/21
-        debugToFile(QString{});
-        debugToFile("setup        Controller initiated");
-        m_externalCtrl = true;    //avt 11/19/20 configure for external controller special cases
-        initExternalCtrl();       //disable Call 1st and Auto buttons 
-
-        setMyContinent();
-        statusUpdate ();
-        //QApplication::beep();    //for debug
-      }
-
-      if (newTxMsgIdx) {          //perform some QSO state action (mostly)
-
-        if (newTxMsgIdx == 6 || newTxMsgIdx == 4) {   //set up some kind of CQ, set options
-          debugToFile("setupCq");   //avt 2/2/24
-          //misc setup actions (*affects QSO state*)
-          ui->tx1->setEnabled(!param0);   //avt 1/1/21 set/clear skip grid msg
-          if (param1 != m_send_RR73) on_txrb4_doubleClicked();   //avt 1/5/24 set/clear use of RR73 msg
-          //*now* set QSO state
-          if (!msg.isEmpty()) {   //set up directed CQ
-            ui->tx6->setText(msg);
-          } else {
-            genCQMsg();           //set up std CQ
-          }
-          m_bCallingCQ = true;  //allows tail-enders to be picked up
-          m_ntx = 6;
-          m_bAutoReply = false;
-          m_QSOProgress = CALLING;
-          ui->txrb6->setChecked(true);
-
-          if (newTxMsgIdx == 4) {
-            m_enableButtonNotify = false; //avt 2/2/24
-            process_autoButton(true);
-            m_enableButtonNotify = true; //avt 2/2/24
-          }
-          debugToFile(QString{"setupCq      statusUpdate, m_auto:%1 autoButton m_autoButtonState:%2"}.arg(m_auto).arg(m_autoButtonState));
-          statusUpdate();                 //used as confirmation of UDP requests enabled
-          return;
-        }
-
-        //avt 12/7/23 enable debug logging
-        if (newTxMsgIdx == 5) {   
-          m_debugLog = true;
+  connect (m_messageClient, &MessageClient::setup_tx, [this] (int newTxMsgIdx, QString const& msg, bool param0, bool param1, QString const& check, quint32 offset) {
+        if (!m_externalCtrl) {
+          m_dblClk = false; //avt 1/1/21
+          m_checkCmd = "";  //avt 1/1/21
+          m_dxCall = "";    //avt 11/12/21
+          m_bOffset = false;//avt 11/13/21
+          m_txHaltClk = false;  //avt 12/18/21
+          m_txEnableClk = false;  //avt 1/28/24
+          m_enableButtonNotify = true;  //avt 1/23/24
+          showStatusMessage("Controller initiated"); //avt 12/16/21
           debugToFile(QString{});
-          debugToFile("setupCq      Logging enabled");
-          return;
+          debugToFile("setup        Controller initiated");
+          m_externalCtrl = true;    //avt 11/19/20 configure for external controller special cases
+          initExternalCtrl();       //disable Call 1st and Auto buttons
+
+          setMyContinent();
+          statusUpdate ();
         }
 
-        if (newTxMsgIdx == 7) {           //ack req avt 12/16/21
-          m_checkCmd = check;             //used as confirmation of cmd
-          if (param0) statusUpdate();   //param0 = replyReqd, used as confirmation of UDP requests enabled
-          if (param1) {                  //param1 = enableTimeout
-            externalCtrlTimer.start(60000);  //(re)start external controller heartbeat detect timer, chgd to 60 sec avt 12/28/23
-          } else {
-            externalCtrlTimer.stop();     //stop external controller heartbeat detect timer
-          }
-          return;
-        }
+        if (newTxMsgIdx) {          //perform some QSO state action (mostly)
 
-        if (newTxMsgIdx == 8) {           //disable Tx
-          debugToFile(QString{});
-          debugToFile("setupCq      disableTx");
-          m_enableButtonNotify = false; //avt 1/23/24
-          process_autoButton(false);
-          ui->autoButton->setChecked(param0);
-          m_autoButtonState = param0;   //avt 10/2/25
-          m_enableButtonNotify = true; //avt 1/23/24
-          //debugToFile(QString{"             m_auto:%1 autoButton m_autoButtonState:%2"}.arg(m_auto).arg(m_autoButtonState));
-          check_button_color();     //avt 10/2/25
-          return;
-        }
-
-        if (newTxMsgIdx == 9) {           //enable Tx
-          debugToFile(QString{});
-          debugToFile("setupCq      enable Tx");
-          m_enableButtonNotify = false; //avt 1/23/24
-          process_autoButton(true);
-          ui->autoButton->setChecked(param0);
-          m_autoButtonState = param0;   //avt 10/2/25
-          m_enableButtonNotify = true; //avt 1/23/24
-          //debugToFile(QString{"             m_auto:%1 autoButton m_autoButtonState:%2"}.arg(m_auto).arg(m_autoButtonState));
-          check_button_color();     //avt 10/2/25
-          return;
-        }
-
-        if (newTxMsgIdx == 12) {          //avt 12/31/21 halt tx
-          debugToFile(QString{});
-          debugToFile("setupCq      haltTx");
-          m_enableButtonNotify = false; //avt 1/23/24
-          on_stopTxButton_clicked();      //avt 12/31/21
-          m_enableButtonNotify = true; //avt 1/23/24
-          debugToFile(QString{"             m_auto:%1 autoButton m_autoButtonState:%2"}.arg(m_auto).arg(m_autoButtonState));
-          return;                         //avt 1/25/22
-        }
-
-        if (newTxMsgIdx == 10) {            //change options
-          ui->tx1->setEnabled(!param0);   //avt 10/26/21 set/clear skip grid msg
-          if (param1 != m_send_RR73) on_txrb4_doubleClicked();  //avt 10/26/21 set/clear use of RR73 msg
-          if (offset) {                     //avt 11/12/21 set offset frequency
-            ui->TxFreqSpinBox->setValue(offset);    //avt 11/12/21
-            ui->cbHoldTxFreq->setChecked(true);     //avt 11/13/21
-            ui->cbHoldTxFreq->setEnabled(false);    //avt 11/13/21
-          }
-          m_bOffset = offset > 0;           //avt 11/13/21
-          return;                           //avt 1/25/22
-        }
-
-        if (newTxMsgIdx == 11) {          //avt 12/31/21 enable monitoring
-          if (!m_monitoring) on_monitorButton_clicked(true);        //avt 12/31/21
-          return;                         //avt 1/25/22
-        }
-
-        if (newTxMsgIdx == 13) {          //avt 6/9/22 reset watchdog timer
-          tx_watchdog(false);
-          return;
-        }
-
-        if (newTxMsgIdx == 14) {          //avt 2/1/24
-          m_listenMode = param0;
-          ui->txFirstCheckBox->setEnabled(!m_listenMode);
-          ui->genStdMsgsPushButton->setEnabled(!m_listenMode);   //avt 2/2/24
-          debugToFile(QString{"setup        listenMode:%1"}.arg(m_listenMode));  //avt 2/2/24
-          return;
-        }
-
-        if (newTxMsgIdx == 255) {         //avt 1/1/21
-          //do logging with explicit values that may be unrelated to current QSO
-          auto const& parts = msg.split ('$');
-          if (parts.size() != 4) {
-            MessageBox::warning_message (this, tr ("Error"), tr ("parts != 4"));
-          }
-
-          //                  call,     grid,     band,     mode,     ADIF);
-          if (!m_logBook.add (parts[0], parts[1], parts[2], parts[3], check.toUtf8())) {
-            MessageBox::warning_message (this, tr ("Log file error"), tr ("Cannot open \"%1\"").arg (m_logBook.path ()));
-          }
-          
-          logIncremental(parts[0], check);
-
-          // Log to N1MM Logger
-          if (m_config.broadcast_to_n1mm () && m_config.valid_n1mm_info ()) {
-            QUdpSocket sock;
-            if (-1 == sock.writeDatagram (check.toUtf8() + " <eor>", QHostAddress {m_config.n1mm_server_name ()}, m_config.n1mm_server_port ())) {
-              MessageBox::warning_message (this, tr ("Error sending log to N1MM"), tr ("Write returned \"%1\"").arg (sock.errorString ()));
+          if (newTxMsgIdx == 6 || newTxMsgIdx == 4) {   //set up some kind of CQ, set options
+            debugToFile("setupCq");   //avt 2/2/24
+            //misc setup actions (*affects QSO state*)
+            ui->tx1->setEnabled(!param0);   //avt 1/1/21 set/clear skip grid msg
+            if (param1 != m_send_RR73) on_txrb4_doubleClicked();   //avt 1/5/24 set/clear use of RR73 msg
+            //*now* set QSO state
+            if (!msg.isEmpty()) {   //set up directed CQ
+              ui->tx6->setText(msg);
+            } else {
+              genCQMsg();           //set up std CQ
             }
+            m_bCallingCQ = true;  //allows tail-enders to be picked up
+            m_ntx = 6;
+            m_bAutoReply = false;
+            m_QSOProgress = CALLING;
+            ui->txrb6->setChecked(true);
+
+            if (newTxMsgIdx == 4) {
+              m_enableButtonNotify = false; //avt 2/2/24
+              process_autoButton(true);
+              m_enableButtonNotify = true; //avt 2/2/24
+            }
+            debugToFile(QString{"setupCq      statusUpdate, m_auto:%1 autoButton m_autoButtonState:%2"}.arg(m_auto).arg(m_autoButtonState));
+            statusUpdate();                 //used as confirmation of UDP requests enabled
+            return;
           }
-          return;                         //avt 1/25/22
+
+          //avt 12/7/23 enable debug logging
+          if (newTxMsgIdx == 5) {
+            m_debugLog = true;
+            debugToFile(QString{});
+            debugToFile("setupCq      Logging enabled");
+            return;
+          }
+
+          if (newTxMsgIdx == 7) {           //ack req avt 12/16/21
+            m_checkCmd = check;             //used as confirmation of cmd
+            if (param0) statusUpdate();   //param0 = replyReqd, used as confirmation of UDP requests enabled
+            if (param1) {                  //param1 = enableTimeout
+              externalCtrlTimer.start(60000);  //(re)start external controller heartbeat detect timer, chgd to 60 sec avt 12/28/23
+            } else {
+              externalCtrlTimer.stop();     //stop external controller heartbeat detect timer
+            }
+            return;
+          }
+
+          if (newTxMsgIdx == 8) {           //disable Tx
+            debugToFile(QString{});
+            debugToFile("setupCq      disableTx");
+            m_enableButtonNotify = false; //avt 1/23/24
+            process_autoButton(false);
+            ui->autoButton->setChecked(param0);
+            m_autoButtonState = param0;   //avt 10/2/25
+            m_enableButtonNotify = true; //avt 1/23/24
+            check_button_color();     //avt 10/2/25
+            return;
+          }
+
+          if (newTxMsgIdx == 9) {           //enable Tx
+            debugToFile(QString{});
+            debugToFile("setupCq      enable Tx");
+            m_enableButtonNotify = false; //avt 1/23/24
+            process_autoButton(true);
+            ui->autoButton->setChecked(param0);
+            m_autoButtonState = param0;   //avt 10/2/25
+            m_enableButtonNotify = true; //avt 1/23/24
+            check_button_color();     //avt 10/2/25
+            return;
+          }
+
+          if (newTxMsgIdx == 12) {          //avt 12/31/21 halt tx
+            debugToFile(QString{});
+            debugToFile("setupCq      haltTx");
+            m_enableButtonNotify = false; //avt 1/23/24
+            on_stopTxButton_clicked();      //avt 12/31/21
+            m_enableButtonNotify = true; //avt 1/23/24
+            debugToFile(QString{"             m_auto:%1 autoButton m_autoButtonState:%2"}.arg(m_auto).arg(m_autoButtonState));
+            return;                         //avt 1/25/22
+          }
+
+          if (newTxMsgIdx == 10) {            //change options
+            ui->tx1->setEnabled(!param0);   //avt 10/26/21 set/clear skip grid msg
+            if (param1 != m_send_RR73) on_txrb4_doubleClicked();  //avt 10/26/21 set/clear use of RR73 msg
+            if (offset) {                     //avt 11/12/21 set offset frequency
+              ui->TxFreqSpinBox->setValue(offset);    //avt 11/12/21
+              ui->cbHoldTxFreq->setChecked(true);     //avt 11/13/21
+              ui->cbHoldTxFreq->setEnabled(false);    //avt 11/13/21
+            }
+            m_bOffset = offset > 0;           //avt 11/13/21
+            return;                           //avt 1/25/22
+          }
+
+          if (newTxMsgIdx == 11) {          //avt 12/31/21 enable monitoring
+            if (!m_monitoring) on_monitorButton_clicked(true);        //avt 12/31/21
+            return;                         //avt 1/25/22
+          }
+
+          if (newTxMsgIdx == 13) {          //avt 6/9/22 reset watchdog timer
+            tx_watchdog(false);
+            return;
+          }
+
+          if (newTxMsgIdx == 14) {          //avt 2/1/24
+            m_listenMode = param0;
+            ui->txFirstCheckBox->setEnabled(!m_listenMode);
+            ui->genStdMsgsPushButton->setEnabled(!m_listenMode);   //avt 2/2/24
+            debugToFile(QString{"setup        listenMode:%1"}.arg(m_listenMode));  //avt 2/2/24
+            return;
+          }
+
+          if (newTxMsgIdx == 255) {         //avt 1/1/21
+            //do logging with explicit values that may be unrelated to current QSO
+            auto const& parts = msg.split ('$');
+            if (parts.size() != 4) {
+              MessageBox::warning_message (this, tr ("Error"), tr ("parts != 4"));
+            }
+
+            //                  call,     grid,     band,     mode,     ADIF);
+            if (!m_logBook.add (parts[0], parts[1], parts[2], parts[3], check.toUtf8())) {
+              MessageBox::warning_message (this, tr ("Log file error"), tr ("Cannot open \"%1\"").arg (m_logBook.path ()));
+            }
+
+            logIncremental(parts[0], check);
+
+            // Log to N1MM Logger
+            if (m_config.broadcast_to_n1mm () && m_config.valid_n1mm_info ()) {
+              QUdpSocket sock;
+              if (-1 == sock.writeDatagram (check.toUtf8() + " <eor>", QHostAddress {m_config.n1mm_server_name ()}, m_config.n1mm_server_port ())) {
+                MessageBox::warning_message (this, tr ("Error sending log to N1MM"), tr ("Write returned \"%1\"").arg (sock.errorString ()));
+              }
+            }
+            return;                         //avt 1/25/22
+          }
         }
-      }
-      else      //special cmd
-      {
-        externalCtrlTimer.stop(); //avt 12/16/21
-        m_externalCtrl = false;    //avt 12/4/20 de-init, WSJT-X back to normal operation
-        initExternalCtrl();
-        debugToFile(QString{});
-        debugToFile("setupCq      Controller terminated");
-        showStatusMessage("Controller terminated");
-        return;
-      }
+        else      //special cmd
+        {
+          externalCtrlTimer.stop(); //avt 12/16/21
+          m_externalCtrl = false;    //avt 12/4/20 de-init, WSJT-X back to normal operation
+          initExternalCtrl();
+          debugToFile(QString{});
+          debugToFile("setupCq      Controller terminated");
+          showStatusMessage("Controller terminated");
+          return;
+        }
     });
+
+  connect (&m_config, &Configuration::udp_server_changed, m_messageClient, &MessageClient::set_server);
+  connect (&m_config, &Configuration::udp_server_port_changed, m_messageClient, &MessageClient::set_server_port);
+  connect (&m_config, &Configuration::udp_TTL_changed, m_messageClient, &MessageClient::set_TTL);
+  connect (&m_config, &Configuration::accept_udp_requests_changed, m_messageClient, &MessageClient::enable);
+  connect (&m_config, &Configuration::udp_listen_port_changed, m_messageClient, &MessageClient::set_listen_port);
+  m_messageClient->set_listen_port (m_config.udp_listen_port ());
 
   m_autoSpotEnabled = m_settings
     ? m_settings->value(QStringLiteral("AutoSpotEnabled"), m_config.auto_spot_enabled()).toBool()
@@ -2988,12 +2971,6 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
       connect (&m_config, &Configuration::transceiver_TCIframesWritten, this, &MainWindow::dataSink);
   connect (&m_config, &Configuration::transceiver_TCImodActive, this, &MainWindow::tci_mod_active);
   connect (&m_config, &Configuration::transceiver_failure, this, &MainWindow::handle_transceiver_failure);
-  connect (&m_config, &Configuration::udp_server_changed, m_messageClient, &MessageClient::set_server);
-  connect (&m_config, &Configuration::udp_server_port_changed, m_messageClient, &MessageClient::set_server_port);
-  connect (&m_config, &Configuration::udp_TTL_changed, m_messageClient, &MessageClient::set_TTL);
-  connect (&m_config, &Configuration::accept_udp_requests_changed, m_messageClient, &MessageClient::enable);
-  connect (&m_config, &Configuration::udp_listen_port_changed, m_messageClient, &MessageClient::set_listen_port);
-  m_messageClient->set_listen_port (m_config.udp_listen_port ());
   connect (&m_config, &Configuration::enumerating_audio_devices, [this] () {
                                                                    showStatusMessage (tr ("Enumerating audio devices"));
                                                                  });
@@ -3110,14 +3087,16 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   scheduleStartupUpdateCheck ();
 
   // Start NTP sync after settings are loaded
-  if (!m_ntpCustomServer.isEmpty()) {
-    m_ntpClient->setCustomServer(m_ntpCustomServer);
-  }
-  if (m_ntpEnabled) {
-    m_ntpClient->setInitialOffset(m_ntpOffset_ms);
-    m_ntpClient->setEnabled(true);
-    // NTP offset displayed in TimeSyncPanel only — not injected into Detector
-  }
+  QTimer::singleShot (0, this, [this] {
+    if (!m_ntpCustomServer.isEmpty()) {
+      m_ntpClient->setCustomServer(m_ntpCustomServer);
+    }
+    if (m_ntpEnabled) {
+      m_ntpClient->setInitialOffset(m_ntpOffset_ms);
+      m_ntpClient->setEnabled(true);
+      // NTP offset displayed in TimeSyncPanel only — not injected into Detector
+    }
+  });
 
   // Auto-launch ChronoGPS if enabled in settings
   {
@@ -4902,7 +4881,6 @@ void MainWindow::dataSink(qint64 frames)
       float sigdb=0.0;
       float dfreq=0.0;
       float width=m_fSpread;
-      echocom_.nclearave=m_nclearave;
       int nDop=m_fAudioShift;
       if(m_astroWidget && m_astroWidget->DopplerMethod()==2) nDop=0;   //Using CFOM
       int nDopTotal=m_fDop;
@@ -4923,7 +4901,9 @@ void MainWindow::dataSink(qint64 frames)
       QString txcall=ui->leEchoMessage->text();
       auto const echo_result = decodium::legacy::avecho_update (dec_data.d2, nDop, nfrit, nauto,
                                                                 ndf, navg, f1, width, m_diskData,
-                                                                bEchoCall, txcall);
+                                                                bEchoCall, txcall, m_nclearave,
+                                                                static_cast<float> (m_fSpreadSelf),
+                                                                static_cast<float> (m_fSpreadDx));
       nqual = echo_result.nqual;
       xlevel = echo_result.xlevel;
       sigdb = echo_result.sigdb;
@@ -4955,13 +4935,14 @@ void MainWindow::dataSink(qint64 frames)
         }
         int n=t0.toInt();
         int nsec=((n/10000)*3600) + (((n/100)%100)*60) + (n%100);
-        if(!m_echoRunning or echocom_.nsum<2) m_echoSec0=nsec;
+        auto const& echo_state = decodium::legacy::echo_plot_state ();
+        if(!m_echoRunning or echo_state.nsum<2) m_echoSec0=nsec;
         float hour=n/10000 + ((n/100)%100)/60.0 + (n%100)/3600.0;
         m_echoRunning=true;
         if(ndf<0 or ndf>30) ndf=0;
         QString t;
         t = t.asprintf("%7.4f  %5.2f %7d %7.1f %5d %5d %6d %6.1f %7.1f %5.2f %3d",hour,xlevel,
-                       nDopTotal,width,echocom_.nsum,nqual,qRound(dfreq),sigdb,dBerr,xdt,ndf);
+                       nDopTotal,width,echo_state.nsum,nqual,qRound(dfreq),sigdb,dBerr,xdt,ndf);
         t = t0 + t + "  " + rxcall;
         if(!bEchoCall) t=t.left(78);
         if(ui) ui->decodedTextBrowser->insertText(t);
@@ -7242,7 +7223,7 @@ void MainWindow::process_autoButton (bool checked)   //manually or by controller
   m_bEchoTxOK=false;
   if(m_mode=="Echo" and m_auto) {
     m_nclearave=1;
-    echocom_.nsum=0;
+    decodium::legacy::echo_plot_state ().nsum=0;
   }
   m_tAutoOn=QDateTime::currentMSecsSinceEpoch()/1000;
   if(m_mode=="Echo") m_echoRunning=false;
@@ -9411,7 +9392,7 @@ void MainWindow::on_ClrAvgButton_clicked()
 {
   m_nclearave=1;
   if(m_mode=="Echo") {
-    echocom_.nsum=0;
+    decodium::legacy::echo_plot_state ().nsum=0;
     m_echoGraph->clearAvg();
     m_wideGraph->restartTotalPower();
   } else {
@@ -13044,7 +13025,10 @@ void MainWindow::on_EraseButton_clicked ()
 
 void MainWindow::band_activity_cleared ()
 {
-  m_messageClient->decodes_cleared ();
+  if (m_messageClient)
+    {
+      m_messageClient->decodes_cleared ();
+    }
   m_decodeDedupeCache.clear ();
   m_decodeDedupeLastPruneMs = 0;
   m_asyncDedupeSet.clear ();
@@ -23010,6 +22994,8 @@ void MainWindow::astroUpdate ()
     m_fDop=correction.dop;
     m_fSpread=correction.width;
     m_tEcho=correction.techo;
+    m_fSpreadSelf=correction.fspread_self;
+    m_fSpreadDx=correction.fspread_dx;
 
     if (m_transmitting && !m_config.tx_QSY_allowed ()) return;  // No Tx Doppler correction if rig can't do it
     if (!m_astroWidget->doppler_tracking() or m_astroWidget->DopplerMethod()==0) {

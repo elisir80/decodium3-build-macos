@@ -113,19 +113,6 @@ typedef struct dec_data {
 extern "C" {
 #endif
 
-extern struct {
-  float syellow[NSMAX];
-  float ref[3457];
-  float filter[3457];
-} spectra_;
-
-extern struct {
-  int   nclearave;
-  int   nsum;
-  float blue[4096];
-  float red[4096];
-} echocom_;
-
 typedef struct foxcom_block {
   float wave[(160+2)*134400*4]; /* (nsym+2)*nsps scaled up to 48kHz */
   int   nslots;

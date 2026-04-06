@@ -18,6 +18,7 @@
 
 #include <fftw3.h>
 
+#include "Detector/FftCompat.hpp"
 #include "Modulator/FtxMessageEncoder.hpp"
 
 extern "C"
@@ -25,7 +26,6 @@ extern "C"
 float gran_ ();
 float rran_ ();
 void watterson_ (fftwf_complex* c, int* npts, int* nsig, float* fs, float* delay, float* fspread);
-void four2a_ (std::complex<float>* a, int* nfft, int* ndim, int* isign, int* iform);
 void lorentzian_fading_ (std::complex<float>* c, int* npts, float* fs, float* fspread);
 void gen_fst4wave_ (int* itone, int* nsym, int* nsps, int* nwave, float* fsample,
                     int* hmod, float* f0, int* icmplx, std::complex<float>* cwave, float* wave);
@@ -237,11 +237,7 @@ extern "C" void lorentzian_fading_ (std::complex<float>* c, int* npts, float* fs
         }
     }
 
-  int nfft = total;
-  int ndim = 1;
-  int isign = 1;
-  int iform = 1;
-  four2a_ (cspread.data (), &nfft, &ndim, &isign, &iform);
+  decodium::fft_compat::inverse_complex (cspread.data (), total);
 
   float power = 0.0f;
   for (std::complex<float> const& value : cspread)

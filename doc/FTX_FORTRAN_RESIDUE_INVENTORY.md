@@ -77,7 +77,7 @@ Non-runtime residue:
 
 Promoted to native C++:
 
-- `Detector/FtxQ65Decoder.cpp` now also owns the legacy compatibility exports `ana64_` and `ftx_q65_ana64_c`
+- `Detector/FtxQ65Decoder.cpp` now also owns the legacy Q65 analysis compatibility exports
 - `lib/ana64.f90` has been removed from the tree
 
 ## MSK144

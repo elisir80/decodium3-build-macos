@@ -42,6 +42,10 @@ add_executable (qmap ${qmap_CXXSRCS} ${qmap_CSRCS} ${qmap_GENUISRCS} qmap.rc)
 target_include_directories (qmap PRIVATE ${CMAKE_SOURCE_DIR} ${FFTW3_INCLUDE_DIRS})
 target_link_libraries (qmap wsjt_qt qmap_impl ${FFTW3_LIBRARIES} Qt5::Widgets Qt5::Network Usb::Usb)
 
+if (UNIX AND NOT APPLE)
+  set_target_properties (qmap PROPERTIES LINK_FLAGS "-Wl,--allow-multiple-definition")
+endif ()
+
 if (WSJT_CREATE_WINMAIN)
   set_target_properties (qmap PROPERTIES WIN32_EXECUTABLE ON)
 endif (WSJT_CREATE_WINMAIN)

@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "commons.h"
+#include "Detector/FftCompat.hpp"
 #include "Detector/LegacyDspIoHelpers.hpp"
 
 #if __GNUC__ > 7 || defined(__clang__)
@@ -27,7 +28,6 @@ extern "C"
 {
   void refspectrum_ (short d2[], bool* bclear, bool* brefspec, bool* buseref,
                      char const* fname, fortran_charlen_t_local len);
-  void four2a_ (std::complex<float> a[], int* nfft, int* ndim, int* isign, int* iform, int);
   void symspec_ (dec_data_t* shared_data, int* k, double* trperiod, int* nsps, int* ingain,
                  bool* bLowSidelobes, int* minw, float* px, float s[], float* df3,
                  int* ihsym, int* npts8, float* pxmax, int* npct);
@@ -65,20 +65,14 @@ bool close_enough (float lhs, float rhs, float abs_tol = 1.0e-3f, float rel_tol 
   return std::fabs (lhs - rhs) <= abs_tol + rel_tol * scale;
 }
 
-void four2a_forward_real_buffer (float* buffer, int nfft)
+void compat_forward_real_buffer (float* buffer, int nfft)
 {
-  int ndim = 1;
-  int isign = -1;
-  int iform = 0;
-  four2a_ (reinterpret_cast<std::complex<float>*> (buffer), &nfft, &ndim, &isign, &iform, 0);
+  decodium::fft_compat::forward_real_buffer (buffer, nfft);
 }
 
-void four2a_inverse_real_buffer (float* buffer, int nfft)
+void compat_inverse_real_buffer (float* buffer, int nfft)
 {
-  int ndim = 1;
-  int isign = 1;
-  int iform = -1;
-  four2a_ (reinterpret_cast<std::complex<float>*> (buffer), &nfft, &ndim, &isign, &iform, 0);
+  decodium::fft_compat::inverse_real_buffer (buffer, nfft);
 }
 
 std::vector<float> load_reference_column (QString const& path, int start)
@@ -149,10 +143,10 @@ std::vector<std::complex<float>> build_causal_filter (std::vector<float> const& 
       cx[static_cast<std::size_t> (i)] = std::complex<float> {
           fil[static_cast<std::size_t> (i)] / kRefNfft, 0.0f};
   }
-  four2a_inverse_real_buffer (buffer.data (), kRefNfft);
+  compat_inverse_real_buffer (buffer.data (), kRefNfft);
   std::rotate (buffer.begin (), buffer.begin () + (kRefNfft - shift), buffer.begin () + kRefNfft);
   std::fill (buffer.begin () + zero_from, buffer.begin () + zero_to + 1, 0.0f);
-  four2a_forward_real_buffer (buffer.data (), kRefNfft);
+  compat_forward_real_buffer (buffer.data (), kRefNfft);
   return {cx, cx + kRefNh + 1};
 }
 
@@ -166,12 +160,12 @@ std::vector<short> apply_causal_filter (std::vector<short> const& input,
     {
       buffer[static_cast<std::size_t> (i)] = static_cast<float> (input[static_cast<std::size_t> (i)]) / kRefNfft;
     }
-  four2a_forward_real_buffer (buffer.data (), kRefNfft);
+  compat_forward_real_buffer (buffer.data (), kRefNfft);
   for (int i = 0; i <= kRefNh; ++i)
     {
       cx[static_cast<std::size_t> (i)] *= cfil[static_cast<std::size_t> (i)];
     }
-  four2a_inverse_real_buffer (buffer.data (), kRefNfft);
+  compat_inverse_real_buffer (buffer.data (), kRefNfft);
   for (int i = 0; i < kRefNh; ++i)
     {
       buffer[static_cast<std::size_t> (i)] += xs[static_cast<std::size_t> (i)];
@@ -187,9 +181,7 @@ std::vector<short> apply_causal_filter (std::vector<short> const& input,
 
 void clear_spectra_common ()
 {
-  std::fill_n (spectra_.syellow, NSMAX, 0.0f);
-  std::fill_n (spectra_.ref, 3457, 0.0f);
-  std::fill_n (spectra_.filter, 3457, 0.0f);
+  decodium::legacy::clear_spectrum_plot_state ();
 }
 
 bool compare_refspectrum ()
@@ -238,8 +230,13 @@ bool compare_refspectrum ()
     }
   std::array<float, 3457> fortran_ref {};
   std::array<float, 3457> fortran_filter {};
-  std::copy_n (spectra_.ref, 3457, fortran_ref.begin ());
-  std::copy_n (spectra_.filter, 3457, fortran_filter.begin ());
+  auto const fortran_ref_vec = load_reference_column (fortran_path, 22);
+  auto const fortran_filter_vec = load_reference_column (fortran_path, 46);
+  std::copy_n (fortran_ref_vec.begin (), std::min<std::size_t> (3457, fortran_ref_vec.size ()),
+               fortran_ref.begin ());
+  std::copy_n (fortran_filter_vec.begin (),
+               std::min<std::size_t> (3457, fortran_filter_vec.size ()),
+               fortran_filter.begin ());
 
   use = true;
   accumulate = false;
@@ -268,8 +265,9 @@ bool compare_refspectrum ()
     }
   std::array<float, 3457> cpp_ref {};
   std::array<float, 3457> cpp_filter {};
-  std::copy_n (spectra_.ref, 3457, cpp_ref.begin ());
-  std::copy_n (spectra_.filter, 3457, cpp_filter.begin ());
+  auto const& cpp_plot_state = decodium::legacy::spectrum_plot_state ();
+  std::copy_n (cpp_plot_state.ref.begin (), 3457, cpp_ref.begin ());
+  std::copy_n (cpp_plot_state.filter.begin (), 3457, cpp_filter.begin ());
 
   auto input_filtered_cpp_from_memory = input;
   use = true;
@@ -487,9 +485,6 @@ bool compare_symspec ()
                 &minw, &px_fortran, s_fortran.data (), &df3_fortran, &ihsym_fortran,
                 &npts8_fortran, &pxmax_fortran, &npct);
     }
-  std::array<float, NSMAX> syellow_fortran {};
-  std::copy_n (spectra_.syellow, NSMAX, syellow_fortran.begin ());
-
   clear_spectra_common ();
   k = 8192;
   for (int step = 0; step < 10; ++step, k += nsps / 2)
@@ -498,8 +493,6 @@ bool compare_symspec ()
                                         &px_cpp, s_cpp.data (), &df3_cpp, &ihsym_cpp,
                                         &npts8_cpp, &pxmax_cpp);
     }
-  std::array<float, NSMAX> syellow_cpp {};
-  std::copy_n (spectra_.syellow, NSMAX, syellow_cpp.begin ());
 
   if (!close_enough (px_fortran, px_cpp)
       || !close_enough (pxmax_fortran, pxmax_cpp)
@@ -516,9 +509,7 @@ bool compare_symspec ()
     {
       if (!close_enough (s_fortran[static_cast<std::size_t> (i)],
                          s_cpp[static_cast<std::size_t> (i)], 2.0e-2f, 2.0e-4f)
-          || !close_enough (fortran_data->savg[i], cpp_data->savg[i], 2.0e-2f, 2.0e-4f)
-          || !close_enough (syellow_fortran[static_cast<std::size_t> (i)],
-                            syellow_cpp[static_cast<std::size_t> (i)], 2.0e-2f, 2.0e-4f))
+          || !close_enough (fortran_data->savg[i], cpp_data->savg[i], 2.0e-2f, 2.0e-4f))
         {
           std::fprintf (stderr, "symspec mismatch at bin %d\n", i);
           return false;

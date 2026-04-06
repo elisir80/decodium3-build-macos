@@ -105,7 +105,7 @@ subroutine symspec(k,ndiskdat,nb,nbslider,nfsample,    &
 
   ihsym=ihsym+1
   cx=w*cx00                           !Apply window for 2nd forward FFT
-  call four2a(cx,NFFT,1,1,1)          !Second forward FFT (X)
+  call wsjt_fft_compat(cx,NFFT,1,1,1)          !Second forward FFT (X)
   n=min(400,ihsym)
   do i=1,NFFT
      sx=real(cx(i))**2 + aimag(cx(i))**2

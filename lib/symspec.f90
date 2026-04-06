@@ -88,7 +88,7 @@ subroutine symspec(shared_data,k,TRperiod,nsps,ingain,bLowSidelobes,    &
   ihsym=ihsym+1
 
   if(bLowSidelobes) xc(0:nfft3-1)=w3(1:nfft3)*xc(0:nfft3-1)    !Apply window 
-  call four2a(xc,nfft3,1,-1,0)        !Real-to-complex FFT
+  call wsjt_fft_compat(xc,nfft3,1,-1,0)        !Real-to-complex FFT
 
   df3=12000.0/nfft3                   !JT9: 0.732 Hz = 0.42 * tone spacing
   iz=min(NSMAX,nint(5000.0/df3))

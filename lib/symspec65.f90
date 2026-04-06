@@ -46,7 +46,7 @@ subroutine symspec65(dd,npts,nqsym,savg)
   do j=1,nqsym
      i0=(j-1)*qstep
      x=fac1*w*dd(i0+1:i0+NFFT)
-     call four2a(c,NFFT,1,-1,0)                !r2c forward FFT
+     call wsjt_fft_compat(c,NFFT,1,-1,0)                !r2c forward FFT
      do i=1,NSZ
         s=real(c(i))**2 + aimag(c(i))**2
         ss(j,i)=s

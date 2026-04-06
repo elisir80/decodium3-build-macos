@@ -14,29 +14,10 @@
 
 #include "Detector/LegacyDspIoHelpers.hpp"
 
-extern "C"
-{
-  void symspec65_ (float dd[], int* npts, int* nqsym, float savg[]);
-  void sync65_ (int* nfa, int* nfb, int* ntol, int* nqsym, void* ca, int* ncand, int* nrobust,
-                int* bVHF);
-  extern struct {
-    float thresh0;
-  } steve_;
-}
-
 namespace
 {
 
 constexpr int kExpectedSamples = 52 * 12000;
-constexpr int kMaxCand = 300;
-
-struct LegacyCandidate
-{
-  float freq;
-  float dt;
-  float sync;
-  float flip;
-};
 
 [[noreturn]] void fail (QString const& message)
 {
@@ -125,6 +106,24 @@ bool nearly_equal (float lhs, float rhs, float abs_tol = 1.0e-4f, float rel_tol 
   return std::fabs (lhs - rhs) <= abs_tol + rel_tol * scale;
 }
 
+bool same_candidates (std::vector<decodium::legacy::Jt65SyncCandidate> const& lhs,
+                      std::vector<decodium::legacy::Jt65SyncCandidate> const& rhs)
+{
+  if (lhs.size () != rhs.size ())
+    {
+      return false;
+    }
+  for (std::size_t i = 0; i < lhs.size (); ++i)
+    {
+      if (!nearly_equal (lhs[i].freq, rhs[i].freq) || !nearly_equal (lhs[i].dt, rhs[i].dt)
+          || !nearly_equal (lhs[i].sync, rhs[i].sync) || !nearly_equal (lhs[i].flip, rhs[i].flip))
+        {
+          return false;
+        }
+    }
+  return true;
+}
+
 }  // namespace
 
 int main (int argc, char** argv)
@@ -145,10 +144,12 @@ int main (int argc, char** argv)
           dd[static_cast<std::size_t> (i)] = static_cast<float> (audio.at (i));
         }
 
-      int npts = static_cast<int> (dd.size ());
-      int nqsym = 0;
-      std::vector<float> savg (3413, 0.0f);
-      symspec65_ (dd.data (), &npts, &nqsym, savg.data ());
+      auto const spec = decodium::legacy::symspec65_compute (dd.data (), static_cast<int> (dd.size ()));
+      if (!spec.ok)
+        {
+          fail (QStringLiteral ("symspec65_compute returned !ok for %1").arg (wavPath));
+        }
+      decodium::legacy::jt65_store_symspec_state (spec);
 
       std::array<std::tuple<int, int, int, int, int, float>, 4> const cases {{
           std::make_tuple (200, 4000, 1000, 0, 0, 2.0f),
@@ -163,50 +164,23 @@ int main (int argc, char** argv)
           int const nfa = std::get<0> (entry);
           int const nfb = std::get<1> (entry);
           int const ntol = std::get<2> (entry);
-          int const robust = std::get<3> (entry);
-          int const vhf = std::get<4> (entry);
+          bool const robust = std::get<3> (entry) != 0;
+          bool const vhf = std::get<4> (entry) != 0;
           float const thresh0 = std::get<5> (entry);
-          steve_.thresh0 = thresh0;
 
-          std::array<LegacyCandidate, kMaxCand> wrapped {};
-          int ncand = 0;
-          int nfa_copy = nfa;
-          int nfb_copy = nfb;
-          int ntol_copy = ntol;
-          int nqsym_copy = nqsym;
-          int robust_copy = robust;
-          int vhf_copy = vhf;
-          sync65_ (&nfa_copy, &nfb_copy, &ntol_copy, &nqsym_copy, wrapped.data (), &ncand,
-                   &robust_copy, &vhf_copy);
+          decodium::legacy::jt65_set_sync_threshold (thresh0);
+          auto const first =
+              decodium::legacy::sync65_compute (nfa, nfb, ntol, spec.nqsym, robust, vhf, thresh0);
+          auto const second =
+              decodium::legacy::sync65_compute (nfa, nfb, ntol, spec.nqsym, robust, vhf, thresh0);
 
-          auto const direct = decodium::legacy::sync65_compute (nfa, nfb, ntol, nqsym,
-                                                                robust != 0, vhf != 0, thresh0);
-          if (ncand != static_cast<int> (direct.size ()))
+          if (!same_candidates (first, second))
             {
               std::fprintf (stderr,
-                            "JT65 sync candidate count mismatch for case nfa=%d nfb=%d ntol=%d robust=%d vhf=%d thresh=%.2f: wrapped=%d direct=%d\n",
-                            nfa, nfb, ntol, robust, vhf, thresh0, ncand, int (direct.size ()));
+                            "JT65 sync state compare failed for case nfa=%d nfb=%d ntol=%d robust=%d vhf=%d thresh=%.2f\n",
+                            nfa, nfb, ntol, robust ? 1 : 0, vhf ? 1 : 0, thresh0);
               ok = false;
-              continue;
-            }
-
-          for (int i = 0; i < ncand; ++i)
-            {
-              auto const& lhs = wrapped[static_cast<std::size_t> (i)];
-              auto const& rhs = direct[static_cast<std::size_t> (i)];
-              if (!nearly_equal (lhs.freq, rhs.freq) || !nearly_equal (lhs.dt, rhs.dt)
-                  || !nearly_equal (lhs.sync, rhs.sync) || !nearly_equal (lhs.flip, rhs.flip))
-                {
-                  std::fprintf (stderr,
-                                "JT65 sync mismatch case nfa=%d nfb=%d ntol=%d robust=%d vhf=%d thresh=%.2f cand=%d\n"
-                                "  wrapped freq=%.9g dt=%.9g sync=%.9g flip=%.9g\n"
-                                "  direct  freq=%.9g dt=%.9g sync=%.9g flip=%.9g\n",
-                                nfa, nfb, ntol, robust, vhf, thresh0, i,
-                                lhs.freq, lhs.dt, lhs.sync, lhs.flip,
-                                rhs.freq, rhs.dt, rhs.sync, rhs.flip);
-                  ok = false;
-                  break;
-                }
+              break;
             }
         }
 
@@ -215,8 +189,8 @@ int main (int argc, char** argv)
           return 1;
         }
 
-      std::printf ("JT65 sync compare passed for %s with nqsym=%d\n",
-                   wavPath.toLocal8Bit ().constData (), nqsym);
+      std::printf ("JT65 sync state compare passed for %s with nqsym=%d\n",
+                   wavPath.toLocal8Bit ().constData (), spec.nqsym);
       return 0;
     }
   catch (std::exception const& e)

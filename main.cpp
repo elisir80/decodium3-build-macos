@@ -49,17 +49,13 @@
 #include "WSJTXLogging.hpp"
 #include "MultiSettings.hpp"
 #include "widgets/mainwindow.h"
+#include "Detector/FftCompat.hpp"
 #include "commons.h"
 #include "lib/init_random_seed.h"
 #include "Radio.hpp"
 #include "models/FrequencyList.hpp"
 #include "widgets/SplashScreen.hpp"
 #include "widgets/MessageBox.hpp"       // last to avoid nasty MS macro definitions
-
-extern "C" {
-  // Fortran procedures we need
-  void four2a_(_Complex float *, int * nfft, int * ndim, int * isign, int * iform, int len);
-}
 
 namespace
 {
@@ -119,17 +115,17 @@ int main(int argc, char *argv[])
 {
   init_random_seed ();
 
-  // make the Qt type magic happen
-  Radio::register_types ();
-  register_types ();
-
   // Read optional file to disable highDPI scaling
   QFile f("DisableHighDpiScaling");
   if (!f.exists()) QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
 
-  auto const env = QProcessEnvironment::systemEnvironment ();
-
   ExceptionCatchingApplication a(argc, argv);
+
+  // make the Qt type magic happen
+  Radio::register_types ();
+  register_types ();
+
+  auto const env = QProcessEnvironment::systemEnvironment ();
   QApplication::setStyle(QStyleFactory::create("Fusion"));
   try
     {
@@ -419,12 +415,7 @@ int main(int argc, char *argv[])
 
       // clean up lazily initialized resources
       {
-        int nfft {-1};
-        int ndim {1};
-        int isign {1};
-        int iform {1};
-        // free FFT plan resources
-        four2a_ (nullptr, &nfft, &ndim, &isign, &iform, 0);
+        decodium::fft_compat::cleanup ();
       }
       // Do not call global FFTW cleanup here. Several decode paths keep
       // thread_local FFTW plans whose destructors run later during TLS

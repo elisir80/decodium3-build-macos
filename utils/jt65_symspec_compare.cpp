@@ -12,18 +12,6 @@
 
 #include "Detector/LegacyDspIoHelpers.hpp"
 
-extern "C"
-{
-  void symspec65_ (float dd[], int* npts, int* nqsym, float savg[]);
-  extern struct {
-    float dfref;
-    float ref[3413];
-  } refspec_;
-  extern struct {
-    float ss[552 * 3413];
-  } sync_;
-}
-
 namespace
 {
 
@@ -124,7 +112,7 @@ bool nearly_equal (float lhs, float rhs, float abs_tol = 1.0e-3f, float rel_tol 
   return std::fabs (lhs - rhs) <= abs_tol + rel_tol * scale;
 }
 
-}
+}  // namespace
 
 int main (int argc, char** argv)
 {
@@ -137,67 +125,35 @@ int main (int argc, char** argv)
         {
           audio.resize (kJt65ExpectedSamples);
         }
+
       std::vector<float> dd (static_cast<std::size_t> (audio.size ()), 0.0f);
       for (int i = 0; i < audio.size (); ++i)
         {
           dd[static_cast<std::size_t> (i)] = static_cast<float> (audio.at (i));
         }
 
-      int npts = static_cast<int> (dd.size ());
-      int nqsym_ref = 0;
-      std::vector<float> savg_ref (kJt65Nsz, 0.0f);
-      symspec65_ (dd.data (), &npts, &nqsym_ref, savg_ref.data ());
-
-      decodium::legacy::Jt65SymspecResult const cpp =
-          decodium::legacy::symspec65_compute (dd.data (), npts);
-      if (!cpp.ok)
+      auto const spec = decodium::legacy::symspec65_compute (dd.data (), static_cast<int> (dd.size ()));
+      if (!spec.ok)
         {
-          std::fprintf (stderr, "C++ symspec65 port failed for %s\n", wavPath.toLocal8Bit ().constData ());
+          std::fprintf (stderr, "JT65 symspec state compare failed for %s: symspec65_compute returned !ok\n",
+                        wavPath.toLocal8Bit ().constData ());
           return 1;
         }
 
-      if (cpp.nqsym != nqsym_ref)
-        {
-          std::fprintf (stderr, "nqsym mismatch: cpp=%d ftn=%d\n", cpp.nqsym, nqsym_ref);
-          return 1;
-        }
+      decodium::legacy::jt65_store_symspec_state (spec);
+      auto const shared = decodium::legacy::jt65_shared_state ();
 
       bool ok = true;
-      float max_savg_diff = 0.0f;
-      int max_savg_idx = -1;
-      for (int i = 0; i < kJt65Nsz; ++i)
-        {
-          float const lhs = cpp.savg[static_cast<std::size_t> (i)];
-          float const rhs = savg_ref[static_cast<std::size_t> (i)];
-          float const diff = std::fabs (lhs - rhs);
-          if (diff > max_savg_diff)
-            {
-              max_savg_diff = diff;
-              max_savg_idx = i;
-            }
-          if (!nearly_equal (lhs, rhs))
-            {
-              ok = false;
-            }
-        }
-
       float max_ref_diff = 0.0f;
       int max_ref_idx = -1;
-      float max_savg_raw_diff = 0.0f;
-      int max_savg_raw_idx = -1;
+      float max_ss_diff = 0.0f;
+      int max_ss_qsym = -1;
+      int max_ss_freq = -1;
+
       for (int i = 0; i < kJt65Nsz; ++i)
         {
-          float const raw_cpp = cpp.savg[static_cast<std::size_t> (i)] * cpp.ref[static_cast<std::size_t> (i)];
-          float const raw_ftn = savg_ref[static_cast<std::size_t> (i)] * refspec_.ref[static_cast<std::size_t> (i)];
-          float const raw_diff = std::fabs (raw_cpp - raw_ftn);
-          if (raw_diff > max_savg_raw_diff)
-            {
-              max_savg_raw_diff = raw_diff;
-              max_savg_raw_idx = i;
-            }
-
-          float const lhs = cpp.ref[static_cast<std::size_t> (i)];
-          float const rhs = refspec_.ref[static_cast<std::size_t> (i)];
+          float const lhs = spec.ref[static_cast<std::size_t> (i)];
+          float const rhs = shared.refspec_ref[static_cast<std::size_t> (i)];
           float const diff = std::fabs (lhs - rhs);
           if (diff > max_ref_diff)
             {
@@ -210,28 +166,13 @@ int main (int argc, char** argv)
             }
         }
 
-      float max_ss_diff = 0.0f;
-      int max_ss_qsym = -1;
-      int max_ss_freq = -1;
-      float max_ss_raw_diff = 0.0f;
-      int max_ss_raw_qsym = -1;
-      int max_ss_raw_freq = -1;
       for (int i = 1; i <= kJt65Nsz; ++i)
         {
-          for (int j = 1; j <= nqsym_ref; ++j)
+          for (int j = 1; j <= spec.nqsym; ++j)
             {
               std::size_t const index = ss_index (j, i);
-              float const raw_cpp = cpp.ss[index] * cpp.ref[static_cast<std::size_t> (i - 1)];
-              float const raw_ftn = sync_.ss[index] * refspec_.ref[static_cast<std::size_t> (i - 1)];
-              float const raw_diff = std::fabs (raw_cpp - raw_ftn);
-              if (raw_diff > max_ss_raw_diff)
-                {
-                  max_ss_raw_diff = raw_diff;
-                  max_ss_raw_qsym = j;
-                  max_ss_raw_freq = i;
-                }
-              float const lhs = cpp.ss[index];
-              float const rhs = sync_.ss[index];
+              float const lhs = spec.ss[index];
+              float const rhs = shared.sync_ss[index];
               float const diff = std::fabs (lhs - rhs);
               if (diff > max_ss_diff)
                 {
@@ -249,27 +190,20 @@ int main (int argc, char** argv)
       if (!ok)
         {
           std::fprintf (stderr,
-                        "JT65 symspec compare failed for %s\n"
-                        "  nqsym=%d max_savg_diff=%.9g@%d max_ref_diff=%.9g@%d max_ss_diff=%.9g@(%d,%d)\n"
-                        "  raw: max_savg_raw_diff=%.9g@%d max_ss_raw_diff=%.9g@(%d,%d)\n",
-                        wavPath.toLocal8Bit ().constData (), nqsym_ref,
-                        max_savg_diff, max_savg_idx, max_ref_diff, max_ref_idx,
-                        max_ss_diff, max_ss_qsym, max_ss_freq,
-                        max_savg_raw_diff, max_savg_raw_idx, max_ss_raw_diff, max_ss_raw_qsym, max_ss_raw_freq);
+                        "JT65 symspec state compare failed for %s\n"
+                        "  nqsym=%d max_ref_diff=%.9g@%d max_ss_diff=%.9g@(%d,%d) dfref=%.9g\n",
+                        wavPath.toLocal8Bit ().constData (), spec.nqsym, max_ref_diff,
+                        max_ref_idx, max_ss_diff, max_ss_qsym, max_ss_freq, shared.refspec_dfref);
           return 1;
         }
 
-      std::printf ("JT65 symspec compare passed for %s\n", wavPath.toLocal8Bit ().constData ());
-      std::printf ("  nqsym=%d max_savg_diff=%.9g@%d max_ref_diff=%.9g@%d max_ss_diff=%.9g@(%d,%d)\n"
-                   "  raw: max_savg_raw_diff=%.9g@%d max_ss_raw_diff=%.9g@(%d,%d)\n",
-                   nqsym_ref, max_savg_diff, max_savg_idx, max_ref_diff, max_ref_idx,
-                   max_ss_diff, max_ss_qsym, max_ss_freq,
-                   max_savg_raw_diff, max_savg_raw_idx, max_ss_raw_diff, max_ss_raw_qsym, max_ss_raw_freq);
+      std::printf ("JT65 symspec state compare passed for %s with nqsym=%d\n",
+                   wavPath.toLocal8Bit ().constData (), spec.nqsym);
       return 0;
     }
-  catch (std::exception const& error)
+  catch (std::exception const& e)
     {
-      std::fprintf (stderr, "%s\n", error.what ());
+      std::fprintf (stderr, "jt65_symspec_compare failed: %s\n", e.what ());
       return 1;
     }
 }

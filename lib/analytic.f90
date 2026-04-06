@@ -60,7 +60,7 @@ subroutine analytic(d,npts,nfft,c,pc,beq)
   fac=2.0/nfft
   c(1:npts)=fac*d(1:npts)
   c(npts+1:nfft)=0.
-  call four2a(c,nfft,1,-1,1)               !Forward c2c FFT
+  call wsjt_fft_compat(c,nfft,1,-1,1)               !Forward c2c FFT
 
   if( beq ) then
     c(1:nh+1)=h(1:nh+1)*corr(1:nh+1)*c(1:nh+1)
@@ -70,6 +70,6 @@ subroutine analytic(d,npts,nfft,c,pc,beq)
 
   c(1)=0.5*c(1)                            !Half of DC term
   c(nh+2:nfft)=0.                          !Zero the negative frequencies
-  call four2a(c,nfft,1,1,1)                !Inverse c2c FFT
+  call wsjt_fft_compat(c,nfft,1,1,1)                !Inverse c2c FFT
   return
 end subroutine analytic

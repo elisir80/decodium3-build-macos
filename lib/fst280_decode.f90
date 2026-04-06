@@ -129,7 +129,7 @@ contains
 ! and also for downconverting/downsampling each candidate.
    r_data(1:nfft1)=iwave(1:nfft1)
    r_data(nfft1+1:nfft1+2)=0.0
-   call four2a(r_data,nfft1,1,-1,0)
+   call wsjt_fft_compat(r_data,nfft1,1,-1,0)
    c_bigfft=cmplx(r_data(1:nfft1+2:2),r_data(2:nfft1+2:2))
 
 ! Get first approximation of candidate frequencies
@@ -473,7 +473,7 @@ contains
       if(i0-i.ge.0) c1(nfft2-i)=c_bigfft(i0-i)
    enddo
    c1=c1/nfft2
-   call four2a(c1,nfft2,1,1,1)            !c2c FFT back to time domain
+   call wsjt_fft_compat(c1,nfft2,1,1,1)            !c2c FFT back to time domain
    return
 
  end subroutine fst280_downsample

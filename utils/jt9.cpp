@@ -738,6 +738,7 @@ namespace
     request.hiscall = QByteArray {params.hiscall, 12};
     request.hisgrid = QByteArray {params.hisgrid, 6};
     request.tempDir = tempDir.toLocal8Bit ();
+    request.dataDir = QDir::currentPath ().toLocal8Bit ();
     return run_worker (worker, &decodium::legacyjt::LegacyJtDecodeWorker::decodeReady, request);
   }
 

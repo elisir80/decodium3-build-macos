@@ -1,6 +1,7 @@
 // -*- Mode: C++ -*-
 #include "wsjtx_config.h"
 #include "Detector/FST4DecodeWorker.hpp"
+#include "Detector/FftCompat.hpp"
 #include "Detector/FtxFst4Ldpc.hpp"
 
 #include <algorithm>
@@ -21,7 +22,6 @@
 
 extern "C"
 {
-  void four2a_ (std::complex<float> a[], int* nfft, int* ndim, int* isign, int* iform);
   void blanker_ (short iwave[], int* nz, int* ndropmax, int* npct, std::complex<float> c_bigfft[]);
   void pctile_ (float x[], int* npts, int* npct, float* xpct);
   void polyfit_ (double x[], double y[], double sigmay[], int* npts, int* nterms, int* mode,
@@ -846,11 +846,7 @@ namespace
       {
         value *= scale;
       }
-    int nfft = cfg.nfft2;
-    int ndim = 1;
-    int isign = 1;
-    int iform = 1;
-    four2a_ (out.data (), &nfft, &ndim, &isign, &iform);
+    decodium::fft_compat::inverse_complex (out.data (), cfg.nfft2);
   }
 
   Complex correlate (std::vector<Complex> const& data, int dataOffset,
@@ -1243,11 +1239,7 @@ std::vector<DecodedLine> decodeFst4Lines (DecodeRequest const& request)
       int nz = cfg.nfft1;
       int ndropmax = 1;
       blanker_ (localAudio.data (), &nz, &ndropmax, &npct, bigfft.data ());
-      int nfft = cfg.nfft1;
-      int ndim = 1;
-      int isign = -1;
-      int iform = 0;
-      four2a_ (bigfft.data (), &nfft, &ndim, &isign, &iform);
+      decodium::fft_compat::forward_real (bigfft, cfg.nfft1);
 
       auto candidates = get_candidates_fst4_cpp (bigfft, cfg, hmod, fa, fb, nfa, nfb, minsync);
       for (auto& candidate : candidates)
@@ -2026,11 +2018,7 @@ extern "C" int ftx_fst4_debug_first_candidate_c (short const* audio, int audio_s
   int ndropmax = 1;
   int npct = 0;
   blanker_ (localAudio.data (), &nz, &ndropmax, &npct, bigfft.data ());
-  int nfft = cfg.nfft1;
-  int ndim = 1;
-  int isign = -1;
-  int iform = 0;
-  four2a_ (bigfft.data (), &nfft, &ndim, &isign, &iform);
+  decodium::fft_compat::forward_real (bigfft, cfg.nfft1);
 
   auto candidates = get_candidates_fst4_cpp (bigfft, cfg, hmod, fa, fb, nfa, nfb, minsync);
   if (candidates.empty ())

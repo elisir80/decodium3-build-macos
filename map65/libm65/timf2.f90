@@ -65,12 +65,12 @@ subroutine timf2(k,nxpol,nfft,nwindow,nb,peaklimit,iqadjust,iqapply,faclim, &
 
   cx(0:nfft-1)=cx0
   if(nwindow.eq.2) cx(0:nfft-1)=w(0:nfft-1)*cx(0:nfft-1)
-  call four2a(cx,nfft,1,1,1)                       !First forward FFT (X)
+  call wsjt_fft_compat(cx,nfft,1,1,1)                       !First forward FFT (X)
 
   if(nxpol.ne.0) then
      cy(0:nfft-1)=cy0
      if(nwindow.eq.2) cy(0:nfft-1)=w(0:nfft-1)*cy(0:nfft-1)
-     call four2a(cy,nfft,1,1,1)                    !First forward FFT (Y)
+     call wsjt_fft_compat(cy,nfft,1,1,1)                    !First forward FFT (Y)
   endif
 
   if(iqapply.ne.0) then                            !Apply I/Q corrections (X)
@@ -165,12 +165,12 @@ subroutine timf2(k,nxpol,nfft,nwindow,nb,peaklimit,iqadjust,iqapply,faclim, &
      endif
   enddo
 
-  call four2a(cxw,nfft,1,-1,1)                 !Transform weak and strong X
-  call four2a(cxs,nfft,1,-1,1)                 !back to time domain, separately
+  call wsjt_fft_compat(cxw,nfft,1,-1,1)                 !Transform weak and strong X
+  call wsjt_fft_compat(cxs,nfft,1,-1,1)                 !back to time domain, separately
 
   if(nxpol.ne.0) then
-     call four2a(cyw,nfft,1,-1,1)              !Transform weak and strong Y
-     call four2a(cys,nfft,1,-1,1)              !back to time domain, separately
+     call wsjt_fft_compat(cyw,nfft,1,-1,1)              !Transform weak and strong Y
+     call wsjt_fft_compat(cys,nfft,1,-1,1)              !back to time domain, separately
   endif
 
   if(nwindow.eq.2) then

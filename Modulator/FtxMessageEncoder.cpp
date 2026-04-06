@@ -1,4 +1,5 @@
 #include "FtxMessageEncoder.hpp"
+#include "Detector/FtxQ65Core.hpp"
 #include "FtxFst4LdpcData.hpp"
 #include "LegacyJtEncoder.hpp"
 
@@ -17,7 +18,6 @@ extern "C"
 short crc13 (unsigned char const * data, int length);
 short crc14 (unsigned char const * data, int length);
 std::uint32_t nhash (void const* key, size_t length, std::uint32_t initval);
-void q65_enc_ (int x[], int y[]);
 void legacy_pack77_reset_context_c ();
 void legacy_pack77_pack_c (char const msg0[37], int* i3, int* n3,
                            char c77[77], char msgsent[37], bool* success, int received);
@@ -312,7 +312,7 @@ bool encode_q65_message_cpp (QByteArray const& fixed_message, QByteArray* msgsen
     {
       payload_raw[i] = (*payload_out)[static_cast<size_t> (i)];
     }
-  q65_enc_ (payload_raw, codeword_raw);
+  decodium::q65::encode_payload_symbols (payload_raw, codeword_raw);
   for (int i = 0; i < kQ65CodewordSymbols; ++i)
     {
       (*codeword_out)[static_cast<size_t> (i)] = codeword_raw[i];

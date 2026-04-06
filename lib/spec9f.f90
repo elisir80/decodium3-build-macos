@@ -16,7 +16,7 @@ subroutine spec9f(id2,npts,nsps,s1,jz,nq)
      if(ib.gt.npts) exit
      x(1:nh)=id2(ia:ib)
      x(nh+1:)=0.
-     call four2a(x,nfft,1,-1,0)           !r2c
+     call wsjt_fft_compat(x,nfft,1,-1,0)           !r2c
      k=mod(j-1,340)+1
      do i=1,NQ
         s1(i,j)=1.e-10*(real(c(i))**2 + aimag(c(i))**2)

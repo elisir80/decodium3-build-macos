@@ -82,7 +82,7 @@ subroutine downsam9(id2,npts8,nsps8,newdat,nspsd,fpk,c2)
      if(i.gt.nh2) j=j-NFFT2
      c2(i)=fac*c1(j)
   enddo
-  call four2a(c2,NFFT2,1,1,1)              !FFT back to time domain
+  call wsjt_fft_compat(c2,NFFT2,1,1,1)              !FFT back to time domain
 
   return
 end subroutine downsam9

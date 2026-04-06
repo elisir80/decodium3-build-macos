@@ -75,7 +75,7 @@ subroutine hspec(id2,k,nutc0,ntrpdepth,nrxfreq,ntol,bmsk144,             &
         green(jh)=20.0*log10(rms)
         dbNoGain=20.0*log10(rms2);
      endif
-     call four2a(x,nfft,1,-1,0)                   !Real-to-complex FFT
+     call wsjt_fft_compat(x,nfft,1,-1,0)                   !Real-to-complex FFT
      df=12000.0/nfft
      fac=(1.0/nfft)**2
      do i=1,64
