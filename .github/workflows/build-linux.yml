@@ -77,9 +77,6 @@ jobs:
             -DWSJT_SKIP_MANPAGES=ON \
             -DWSJT_BUILD_UTILS=OFF
 
-      - name: Build Fortran library (sequential for module dependencies)
-        run: make -C build-linux -j1 wsjt_fort_omp
-
       - name: Build applications
         run: make -C build-linux -j$(nproc) wsjtx jt9 wsprd message_aggregator
 

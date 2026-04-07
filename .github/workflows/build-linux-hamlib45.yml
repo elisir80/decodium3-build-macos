@@ -72,9 +72,6 @@ jobs:
             -DWSJT_SKIP_MANPAGES=ON \
             -DWSJT_BUILD_UTILS=OFF
 
-      - name: Build Fortran library
-        run: make -C build-appimage -j1 wsjt_fort_omp
-
       - name: Build applications
         run: make -C build-appimage -j"$(nproc)" wsjtx jt9 wsprd message_aggregator
 
