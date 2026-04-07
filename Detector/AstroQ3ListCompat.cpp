@@ -68,6 +68,21 @@ namespace
     return field;
   }
 
+  QByteArray fitted_text_field(char const* text, int width, bool right_aligned)
+  {
+    QByteArray field {text ? text : ""};
+    if (field.size () > width)
+      {
+        field = right_aligned ? field.right (width) : field.left (width);
+      }
+    if (field.size () < width)
+      {
+        QByteArray const pad (width - field.size (), ' ');
+        field = right_aligned ? pad + field : field + pad;
+      }
+    return field;
+  }
+
   std::int32_t read_i32le(char const* src)
   {
     unsigned char const* p = reinterpret_cast<unsigned char const*> (src);
@@ -243,11 +258,27 @@ namespace
   {
     QByteArray const call = fixed_field (entry.call, 6);
     QByteArray const grid = fixed_field (entry.grid, 4);
+    char temp[64] {};
+    QByteArray row (kRowSize - 1, ' ');
+
+    std::snprintf (temp, sizeof (temp), "%d", index);
+    row.replace (0, 2, fitted_text_field (temp, 2, true));
+    row[2] = '.';
+
+    std::snprintf (temp, sizeof (temp), "%d", static_cast<int> (entry.nfreq));
+    row.replace (3, 6, fitted_text_field (temp, 6, true));
+
+    row.replace (11, 6, call);
+    row.replace (19, 4, grid);
+
+    std::snprintf (temp, sizeof (temp), "%d", static_cast<int> (entry.moonel));
+    row.replace (23, 5, fitted_text_field (temp, 5, true));
+
+    std::snprintf (temp, sizeof (temp), "%.1f", age_hours);
+    row.replace (28, 7, fitted_text_field (temp, 7, true));
+
     std::memset (dst, 0, kRowSize);
-    std::snprintf (dst, kRowSize, "%2d.%6d  %-6.6s  %-4.4s%5d%7.1f",
-                   index, static_cast<int> (entry.nfreq),
-                   call.constData (), grid.constData (),
-                   static_cast<int> (entry.moonel), age_hours);
+    std::memcpy (dst, row.constData (), static_cast<std::size_t> (row.size ()));
   }
 }
 
