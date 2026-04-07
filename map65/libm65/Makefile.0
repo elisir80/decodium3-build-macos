@@ -20,7 +20,7 @@ CFLAGS = -I. -fbounds-check -DHAVE_STDLIB_H=1 -DHAVE_STDIO_H=1 \
 %.o: %.F90
 	${FC} ${FFLAGS} -c $<
 
-all:    packjt.o libm65.a m65 mapsim libastro.a
+all:    packjt.o libm65.a m65 mapsim
 
 OBJS1 = trimlist.o display.o getdphi.o pctile.o ccf65.o \
 	decode1a.o sort.o filbig.o fil6521.o afc65b.o \
@@ -31,9 +31,7 @@ OBJS1 = trimlist.o display.o getdphi.o pctile.o ccf65.o \
 	deg2grid.o getpfx1.o k2grid.o ftrsd2.o graycode65.o \
 	wrapkarn.o nchar.o init_rs.o encode_rs.o decode_rs.o \
 	wsjt_fft_compat.o rfile3a.o grid2deg.o pfxdump.o dpol.o sync64.o spec64.o \
-	astro.o tm2.o sun.o moondop.o coord.o tmoonsub.o \
-	geocentric.o moon2.o toxyz.o dot.o dcoord.o f77_wisdom.o \
-	gen65.o chkmsg.o astrosub.o astro0.o recvpkt.o symspec.o \
+	coord.o f77_wisdom.o gen65.o chkmsg.o recvpkt.o symspec.o \
 	iqcal.o iqfix.o timf2.o s3avg.o packjt.o badmsg.o fmtmsg.o \
 	qracodes.o qra64.o smo.o averms.o lorentzian.o npfwht.o pdmath.o \
 	qra13_64_64_irr_e.o fchisq0.o genqra64a.o ptt_unix.o
@@ -70,14 +68,6 @@ m65: $(OBJS3) libm65.a
 	$(CXX) -o m65 $(OBJS3) libm65.a -lfftw3f -lQt5Core -lfftw3f -lgfortran
 	cp m65 ../../map65_install
 
-OBJS7 = astrosub.o astro0.o astro.o tm2.o grid2deg.o sun.o moondop.o \
-	coord.o dot.o moon2.o tmoonsub.o toxyz.o geocentric.o \
-	dcoord.o
-
-libastro.a: $(OBJS7)
-	ar cr libastro.a $(OBJS7)
-	ranlib libastro.a
-
 OBJS6 = mapsim.o cgen65.o noisegen.o gran.o
 mapsim: $(OBJS6) libm65.a
 	$(FC) -o mapsim $(OBJS6) libm65.a
@@ -90,10 +80,6 @@ ipcomm.o: ipcomm.cpp
 
 sec_midn.o: sec_midn.f90
 	$(FC) -c -fno-second-underscore sec_midn.f90
-
-OBJS4 = tastro.o astro0.o libm65.a
-tastro: $(OBJS4)
-	$(FC) $(FFLAGS) -o tastro $(OBJS4) libm65.a 
 
 OBJS5 = t1.o timer.o libm65.a
 t1: $(OBJS5)

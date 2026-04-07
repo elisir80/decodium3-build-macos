@@ -21,7 +21,7 @@ CFLAGS = -I. -fbounds-check
 %.o: %.F90
 	${FC} ${FFLAGS} -c $<
 
-all:    packjt.o wavhdr.o libm65.a m65.exe mapsim.exe libastro.a
+all:    packjt.o wavhdr.o libm65.a m65.exe mapsim.exe
 
 OBJS1 = trimlist.o display.o getdphi.o pctile.o ccf65.o \
 	decode1a.o sort.o filbig.o fil6521.o afc65b.o \
@@ -32,9 +32,7 @@ OBJS1 = trimlist.o display.o getdphi.o pctile.o ccf65.o \
 	deg2grid.o getpfx1.o k2grid.o ftrsd2.o graycode65.o \
 	wrapkarn.o nchar.o init_rs.o encode_rs.o decode_rs.o \
 	wsjt_fft_compat.o rfile3a.o grid2deg.o pfxdump.o dpol.o sync64.o spec64.o \
-	astro.o tm2.o sun.o moondop.o coord.o tmoonsub.o \
-	geocentric.o moon2.o toxyz.o dot.o dcoord.o f77_wisdom.o \
-	gen65.o chkmsg.o ptt.o astrosub.o astro0.o recvpkt.o symspec.o \
+	coord.o f77_wisdom.o gen65.o chkmsg.o ptt.o recvpkt.o symspec.o \
 	iqcal.o iqfix.o timf2.o s3avg.o packjt.o badmsg.o fmtmsg.o \
 	qracodes.o qra64.o smo.o averms.o lorentzian.o npfwht.o pdmath.o \
 	qra13_64_64_irr_e.o fchisq0.o wavhdr.o
@@ -77,14 +75,6 @@ m65.exe: $(OBJS3) libm65.a
 #	cp m65.exe ../../map65_install
 	cp m65.exe /c/MAP65_2.9
 
-OBJS7 = astrosub.o astro0.o astro.o tm2.o grid2deg.o sun.o moondop.o \
-	coord.o dot.o moon2.o tmoonsub.o toxyz.o geocentric.o \
-	dcoord.o
-
-libastro.a: $(OBJS7)
-	ar cr libastro.a $(OBJS7)
-	ranlib libastro.a
-
 OBJS6 = mapsim.o cgen65.o noisegen.o gran.o
 mapsim.exe: $(OBJS6) libm65.a
 	$(FC) -o mapsim.exe $(OBJS6) libm65.a
@@ -104,16 +94,9 @@ sec_midn.o: sec_midn.f90
 #symspec.o: ../symspec.f90
 #	$(FC) -c $(FFLAGS) -o symspec.o ../symspec.f90
 
-OBJS4 = tastro.o astro0.o libm65.a
-tastro.exe: $(OBJS4)
-	$(FC) $(FFLAGS) -o tastro.exe $(OBJS4) libm65.a 
-
 OBJS5 = t1.o timer.o libm65.a
 t1.exe: $(OBJS5)
 	$(FC) $(FFLAGS) -o t1.exe $(OBJS5) libm65.a 
-
-#astro0.o: ../astro0.f90
-#	$(FC) -c $(FFLAGS) -o astro0.o ../astro0.f90
 
 init_rs.o: init_rs.c
 	$(CC) -c -DBIGSYM=1 -o init_rs.o init_rs.c

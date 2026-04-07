@@ -29,9 +29,7 @@ OBJS1 = trimlist.o display.o getdphi.o pctile.o ccf65.o \
 	deg2grid.o packtext.o getpfx1.o packcall.o k2grid.o packgrid.o \
 	wrapkarn.o nchar.o init_rs.o encode_rs.o decode_rs.o \
 	wsjt_fft_compat.o rfile3a.o grid2deg.o pfxdump.o dpol.o \
-	astro.o tm2.o sun.o moondop.o coord.o tmoonsub.o \
-	geocentric.o moon2.o toxyz.o dot.o dcoord.o f77_wisdom.o \
-	gen65.o chkmsg.o ptt_unix.o astrosub.o astro0.o recvpkt.o \
+	coord.o f77_wisdom.o gen65.o chkmsg.o ptt_unix.o recvpkt.o \
 	symspec.o iqcal.o iqfix.o timf2.o s3avg.o
 
 libm65.a: $(OBJS1)
@@ -72,10 +70,6 @@ extract.o: extract.F
 
 sec_midn.o: sec_midn.f90
 	$(FC) -c -fno-second-underscore sec_midn.f90
-
-OBJS4 = tastro.o astro0.o libm65.a
-tastro: $(OBJS4)
-	$(FC) $(FFLAGS) -o tastro $(OBJS4) libm65.a 
 
 OBJS5 = t1.o timer.o libm65.a
 t1: $(OBJS5)

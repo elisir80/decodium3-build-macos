@@ -1,5 +1,79 @@
 # Changelog / Registro Modifiche
 
+## [1.6.2] - 2026-04-07
+
+### English
+
+Release focused on hardening multicast/TCI/audio startup reliability in the field, removing the final active cross-platform CMake Fortran backend, and continuing the maintained cleanup of obsolete Fortran sources from the repository tree.
+
+#### Added
+
+- Added protocol-aware multicast interface normalization plus default-route fallback for UDP multicast delivery.
+- Added startup audio-device refresh/retry logic to recover from transient null-device enumeration at launch.
+- Added the final maintained native C++ `qmap/libqmap` backend and new native astronomy/ephemeris support on the active app path.
+
+#### Changed
+
+- `qmap/libqmap` is now fully native C++, so the active macOS/Linux CMake app surface no longer depends on a cross-platform Fortran backend.
+- The maintained astronomy/ephemeris path now runs through native C++ implementations instead of the old active Fortran chain.
+- `map65/libm65` remains a Windows-only CMake subtree; macOS/Linux builds no longer pull that branch into the active build surface.
+- Additional obsolete or archival Fortran sources were removed from the maintained tree across WSPR/JT/QSO50 and related legacy utility paths.
+- Local version metadata, workflow defaults, readmes, docs, changelog, release notes, repository description, and GitHub release body are aligned to semantic version `1.6.2`.
+
+#### Fixed
+
+- Fixed multicast delivery regressions where group addresses such as `224.1.1.1` could fail while direct host addresses still worked.
+- Fixed TCI startup regressions against asynchronous SunSDR / ExpertSDR3 style radios that reported ready/power state after the initial connection attempt.
+- Fixed intermittent startup-audio regressions when CAT was disconnected and cached Qt audio devices briefly resolved to null.
+
+### Italiano
+
+Release focalizzata nel rafforzare l'affidabilita' sul campo di multicast/TCI/audio startup, nel rimuovere l'ultimo backend Fortran CMake attivo cross-platform e nel proseguire la pulizia mantenuta dei sorgenti Fortran obsoleti dal tree repository.
+
+#### Aggiunto
+
+- Aggiunta normalizzazione protocol-aware delle interfacce multicast con fallback sulla route di default per la consegna UDP multicast.
+- Aggiunta logica di refresh/retry dei device audio allo startup per recuperare le enumerazioni transitorie nulle all'avvio.
+- Aggiunto il backend finale mantenuto `qmap/libqmap` in C++ nativo e il supporto nativo astronomia/effemeridi sul path attivo dell'app.
+
+#### Modificato
+
+- `qmap/libqmap` e' ora completamente nativo C++, quindi la superficie app CMake attiva macOS/Linux non dipende piu' da un backend Fortran cross-platform.
+- Il path mantenuto astronomia/effemeridi gira ora su implementazioni C++ native invece che sulla vecchia catena Fortran attiva.
+- `map65/libm65` resta un subtree CMake solo Windows; le build macOS/Linux non tirano piu' quel ramo nella superficie build attiva.
+- Rimossi dal tree mantenuto ulteriori sorgenti Fortran obsoleti o archivistici in area WSPR/JT/QSO50 e utility legacy correlate.
+- Metadati versione locali, default workflow, readme, documentazione, changelog, note release, descrizione repository e body GitHub sono allineati alla semver `1.6.2`.
+
+#### Corretto
+
+- Corrette regressioni multicast per cui indirizzi di gruppo come `224.1.1.1` potevano fallire mentre gli indirizzi host diretti continuavano a funzionare.
+- Corrette regressioni startup TCI con radio asincrone stile SunSDR / ExpertSDR3 che pubblicavano ready/power dopo il tentativo iniziale di connessione.
+- Corrette regressioni audio intermittenti all'avvio quando il CAT era scollegato e i device audio Qt in cache tornavano temporaneamente nulli.
+
+### Espanol
+
+Release centrada en reforzar la fiabilidad en campo de multicast/TCI/audio al arranque, eliminar el ultimo backend Fortran CMake activo cross-platform y continuar la limpieza mantenida de fuentes Fortran obsoletas del arbol del repositorio.
+
+#### Anadido
+
+- Anadida normalizacion protocol-aware de interfaces multicast con fallback a la ruta por defecto para la entrega UDP multicast.
+- Anadida logica de refresh/retry de dispositivos de audio al arranque para recuperar enumeraciones transitorias nulas.
+- Anadido el backend final mantenido `qmap/libqmap` en C++ nativo y el soporte nativo de astronomia/efemerides en el camino activo de la app.
+
+#### Cambios
+
+- `qmap/libqmap` es ahora completamente nativo C++, por lo que la superficie app CMake activa macOS/Linux ya no depende de un backend Fortran cross-platform.
+- El camino mantenido de astronomia/efemerides corre ahora sobre implementaciones C++ nativas en vez de la vieja cadena Fortran activa.
+- `map65/libm65` sigue siendo un subtree CMake solo Windows; las builds macOS/Linux ya no arrastran ese ramo a la superficie de build activa.
+- Eliminadas fuentes Fortran obsoletas o archivisticas adicionales en WSPR/JT/QSO50 y utilidades legacy relacionadas.
+- Metadatos locales de version, defaults de workflow, readmes, documentacion, changelog, notas release, descripcion del repositorio y body GitHub quedan alineados con la semver `1.6.2`.
+
+#### Corregido
+
+- Corregidas regresiones multicast por las que direcciones de grupo como `224.1.1.1` podian fallar mientras las direcciones host directas seguian funcionando.
+- Corregidas regresiones de arranque TCI con radios asincronas tipo SunSDR / ExpertSDR3 que publicaban ready/power despues del intento inicial de conexion.
+- Corregidas regresiones de audio intermitente al arranque cuando CAT estaba desconectado y los dispositivos de audio Qt en cache se resolvian temporalmente como nulos.
+
 ## [1.6.1] - 2026-04-06
 
 ### English

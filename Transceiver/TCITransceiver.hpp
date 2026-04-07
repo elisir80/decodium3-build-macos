@@ -215,6 +215,7 @@ private:
   QString frequency_to_string (Frequency) const;
   Frequency string_to_frequency (QString) const;
   QString mode_to_command (QString) const;
+  void finish_startup_if_ready ();
   std::unique_ptr<TransceiverBase> wrapped_; // may be null
   void arm_wait_timer (QTimer * timer, int ms, char const * context);
   void ensure_socket_worker ();
@@ -247,6 +248,7 @@ private:
   int nIqBytes;
   bool inConnected;
   bool tci_Ready;
+  bool startup_pending_;
   bool ESDR3;
   bool HPSDR;
   bool tx_top_;

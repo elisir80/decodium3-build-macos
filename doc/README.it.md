@@ -1,26 +1,26 @@
-# Note di Documentazione (Italiano) - 1.6.1
+# Note di Documentazione (Italiano) - 1.6.2
 
-- Release corrente: `1.6.1`
-- Ciclo aggiornamento: `1.6.0 -> 1.6.1`
+- Release corrente: `1.6.2`
+- Ciclo aggiornamento: `1.6.1 -> 1.6.2`
 
-## Cambi Tecnici Principali (`1.6.0 -> 1.6.1`)
+## Cambi Tecnici Principali (`1.6.1 -> 1.6.2`)
 
-- I path runtime attivi JT4, JT9 e JT65 sono ora mantenuti sul decode stack nativo C++.
-- I path runtime attivi Q65 e WSPR sono Fortran-free, ed Echo gira ora sul runtime/tool path nativo C++.
-- La superficie runtime mantenuta non porta piu' lo storico naming FFT `four2a` ne' i relativi residui di cleanup ABI legacy.
-- Rimossi sorgenti Fortran obsoleti da `lib/`, `qmap/libqmap/`, `map65/libm65/` e dal vecchio tree tool Echo.
-- Aggiunti fix Linux di build/startup per `mainwindow.cpp`, inizializzazione differita client, `QSocketNotifier`, teardown logging Qt e linkage GNU ld dei compare tool.
-- Il packaging release macOS genera ora `.icns` tramite helper Python deterministico.
-- Metadati versione, default workflow, documenti release e note GitHub sono allineati a `1.6.1`.
+- La consegna UDP multicast e' piu' robusta per i workflow LAN logger grazie a migliore risoluzione interfacce, filtro protocollo e fallback sulla route di default.
+- Lo startup TCI ora tollera radio asincrone stile SunSDR / ExpertSDR3 che pubblicano ready/power in ritardo.
+- Il recupero audio all'avvio ora ritenta dopo refresh della cache device audio Qt quando il CAT e' scollegato o l'enumerazione corre in race con la UI.
+- `qmap/libqmap` e' stato migrato completamente a C++ nativo, rimuovendo l'ultimo backend Fortran CMake attivo cross-platform.
+- Il path astronomia/effemeridi attivo e' stato migrato a C++ nativo e la vecchia catena astronomica Fortran attiva e' stata rimossa dal build mantenuto.
+- Rimossi ulteriori sorgenti Fortran obsoleti e archivi WSPR/JT/QSO50 dal tree mantenuto, mentre `map65/libm65` resta solo Windows in CMake.
+- Metadati versione, default workflow, documenti release e note GitHub sono allineati a `1.6.2`.
 
 ## Artifact Release
 
-- `decodium3-ft2-1.6.1-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-1.6.1-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-1.6.1-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-1.6.1-macos-monterey-x86_64.dmg` *(best effort / sperimentale, se generato)*
-- `decodium3-ft2-1.6.1-linux-x86_64.AppImage`
-- `decodium3-ft2-1.6.1-linux-aarch64.AppImage`
+- `decodium3-ft2-1.6.2-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-1.6.2-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-1.6.2-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-1.6.2-macos-monterey-x86_64.dmg` *(best effort / sperimentale, se generato)*
+- `decodium3-ft2-1.6.2-linux-x86_64.AppImage`
+- `decodium3-ft2-1.6.2-linux-aarch64.AppImage`
 
 ## Requisiti Minimi Linux
 
@@ -53,5 +53,5 @@ cd squashfs-root
 ## File Correlati
 
 - [README.it.md](../README.it.md)
-- [RELEASE_NOTES_1.6.1.md](../RELEASE_NOTES_1.6.1.md)
-- [doc/GITHUB_RELEASE_BODY_1.6.1.md](./GITHUB_RELEASE_BODY_1.6.1.md)
+- [RELEASE_NOTES_1.6.2.md](../RELEASE_NOTES_1.6.2.md)
+- [doc/GITHUB_RELEASE_BODY_1.6.2.md](./GITHUB_RELEASE_BODY_1.6.2.md)

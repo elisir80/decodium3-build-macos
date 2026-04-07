@@ -14,12 +14,6 @@ VERSION = 0.1
 TEMPLATE = app
 DEFINES = QT5
 
-F90 = gfortran
-gfortran.output = ${QMAKE_FILE_BASE}.o
-gfortran.commands = $$F90 -c -O2 -o ${QMAKE_FILE_OUT} ${QMAKE_FILE_NAME}
-gfortran.input = F90_SOURCES
-QMAKE_EXTRA_COMPILERS += gfortran
-
 win32 {
 DEFINES = WIN32
 }
@@ -41,4 +35,3 @@ HEADERS  += mainwindow.h plotter.h soundin.h \
 
 FORMS    += mainwindow.ui about.ui devsetup.ui widegraph.ui \
     astro.ui txtune.ui
-

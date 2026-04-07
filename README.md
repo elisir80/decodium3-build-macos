@@ -1,23 +1,24 @@
-# Decodium - Fork 9H1SR 1.6.1
+# Decodium - Fork 9H1SR 1.6.2
 
-This repository contains the maintained macOS and Linux AppImage fork of Decodium, focused on FT2/FT4 operator workflow reliability, full native C++ promotion of the maintained legacy JT runtime, Linux/macOS stability, and reproducible macOS/Linux release engineering.
+This repository contains the maintained macOS and Linux AppImage fork of Decodium, focused on FT2/FT4 operator workflow reliability, multicast/TCI interoperability, aggressive native C++ migration of the maintained runtime, and reproducible macOS/Linux release engineering.
 
 - Upstream base: `iu8lmc/Decodium-3.0-Codename-Raptor`
-- Current fork release: `1.6.1`
-- Update cycle: `1.6.0 -> 1.6.1`
+- Current fork release: `1.6.2`
+- Update cycle: `1.6.1 -> 1.6.2`
 - Upstream sync baseline: `2603182239`
 - App bundle/executable on macOS: `ft2.app` / `ft2`
 - Licence: GPLv3
 
-## Release Highlights (`1.6.0 -> 1.6.1`)
+## Release Highlights (`1.6.1 -> 1.6.2`)
 
-- completed the maintained native C++ migration of the active legacy JT runtime, covering JT4, JT9, and JT65 decode paths and removing the remaining active-path Fortran decoder dependencies.
-- promoted Q65 and WSPR active runtime paths to Fortran-free native implementations and finished the Echo runtime/tool migration to native C++.
-- removed the remaining active-path legacy ABI naming from the maintained app/runtime surface, including the historical FFT `four2a` compatibility naming, while cleaning obsolete Fortran sources from `lib/`, `qmap/libqmap/`, and `map65/libm65/`.
-- fixed Linux build and startup regressions involving `mainwindow.cpp`, deferred network-client initialization, `QSocketNotifier`, Qt logging teardown, and GNU ld linkage in legacy compare/sim targets.
-- fixed macOS release packaging by replacing the fragile `iconutil` path with deterministic `.icns` generation, removing the `Invalid Iconset` blocker.
-- kept `build-arm-output/` excluded from source staging and git tracking, while retaining the Linux ARM AppImage publication path on Debian Trixie ARM64.
-- aligned local version metadata, workflow defaults, readmes, docs, changelog, release notes, GitHub release body, and repository description to semantic version `1.6.1`.
+- hardened UDP multicast delivery for LAN log-integration workflows by improving interface resolution, protocol-aware multicast interface filtering, and default-route fallback when forced-interface sends fail.
+- improved TCI startup behavior for SunSDR / ExpertSDR3 style asynchronous radios by avoiding premature "TCI SDR is not switched on" failures before the ready/power state arrives.
+- improved intermittent startup audio recovery when CAT is absent or the cached Qt audio device list briefly resolves to null at launch.
+- finished the maintained `qmap/libqmap` migration to native C++ and removed the last active CMake Fortran backend from the cross-platform macOS/Linux application surface.
+- completed the astronomy/ephemeris migration used by the active app path and removed the old active CMake Fortran astronomy chain.
+- cleaned additional obsolete Fortran and archival WSPR/JT/QSO50 sources from the maintained tree while keeping `map65/libm65` gated to Windows-only CMake builds.
+- kept `build-arm-output/` excluded permanently from git tracking and source staging while preserving the Debian Trixie ARM64 AppImage publication path.
+- aligned local version metadata, workflow defaults, readmes, docs, changelog, release notes, repository description, GitHub tag, and release body to semantic version `1.6.2`.
 
 ## Release Targets
 
@@ -30,22 +31,22 @@ This repository contains the maintained macOS and Linux AppImage fork of Decodiu
 
 ## Release Assets
 
-- `decodium3-ft2-1.6.1-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-1.6.1-macos-tahoe-arm64.zip`
-- `decodium3-ft2-1.6.1-macos-tahoe-arm64-sha256.txt`
-- `decodium3-ft2-1.6.1-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-1.6.1-macos-sequoia-arm64.zip`
-- `decodium3-ft2-1.6.1-macos-sequoia-arm64-sha256.txt`
-- `decodium3-ft2-1.6.1-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-1.6.1-macos-sequoia-x86_64.zip`
-- `decodium3-ft2-1.6.1-macos-sequoia-x86_64-sha256.txt`
-- `decodium3-ft2-1.6.1-macos-monterey-x86_64.dmg` *(best effort/experimental, if generated)*
-- `decodium3-ft2-1.6.1-macos-monterey-x86_64.zip` *(best effort/experimental, if generated)*
-- `decodium3-ft2-1.6.1-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, if generated)*
-- `decodium3-ft2-1.6.1-linux-x86_64.AppImage`
-- `decodium3-ft2-1.6.1-linux-x86_64.AppImage.sha256.txt`
-- `decodium3-ft2-1.6.1-linux-aarch64.AppImage`
-- `decodium3-ft2-1.6.1-linux-aarch64.AppImage.sha256.txt`
+- `decodium3-ft2-1.6.2-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-1.6.2-macos-tahoe-arm64.zip`
+- `decodium3-ft2-1.6.2-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-1.6.2-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-1.6.2-macos-sequoia-arm64.zip`
+- `decodium3-ft2-1.6.2-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-1.6.2-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-1.6.2-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-1.6.2-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-1.6.2-macos-monterey-x86_64.dmg` *(best effort/experimental, if generated)*
+- `decodium3-ft2-1.6.2-macos-monterey-x86_64.zip` *(best effort/experimental, if generated)*
+- `decodium3-ft2-1.6.2-macos-monterey-x86_64-sha256.txt` *(best effort/experimental, if generated)*
+- `decodium3-ft2-1.6.2-linux-x86_64.AppImage`
+- `decodium3-ft2-1.6.2-linux-x86_64.AppImage.sha256.txt`
+- `decodium3-ft2-1.6.2-linux-aarch64.AppImage`
+- `decodium3-ft2-1.6.2-linux-aarch64.AppImage.sha256.txt`
 
 No `.pkg` installers are produced in this fork release line.
 
@@ -68,7 +69,7 @@ Software:
 - `libfuse2` / FUSE2 support if you want to mount the AppImage directly
 - ALSA, PulseAudio, or PipeWire audio stack
 - access permissions for serial/USB devices (`dialout`, `uucp`, or distro equivalent) when CAT or external radios are used
-- network access recommended for NTP, PSK Reporter, DX Cluster, updater, and online station workflows
+- network access recommended for NTP, PSK Reporter, multicast logging, DX Cluster, updater, and online station workflows
 
 ## Linux Local Build Note
 
@@ -98,11 +99,9 @@ If macOS blocks startup, run:
 sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 ```
 
-To avoid issues caused by the AppImage read-only filesystem, it is recommended to start Decodium by extracting the AppImage first and then running the program from the extracted directory.
-
 Per evitare problemi dovuti al filesystem in sola lettura delle AppImage, si consiglia di avviare Decodium estraendo prima l'AppImage e poi eseguendo il programma dalla cartella estratta.
 
-Run the following commands in a terminal:
+Eseguire i seguenti comandi nel terminale:
 
 ```bash
 chmod +x /path/to/Decodium.AppImage
@@ -116,9 +115,9 @@ cd squashfs-root
 - English README: [README.en-GB.md](README.en-GB.md)
 - Italian README: [README.it.md](README.it.md)
 - Spanish README: [README.es.md](README.es.md)
-- Release notes (EN/IT/ES): [RELEASE_NOTES_1.6.1.md](RELEASE_NOTES_1.6.1.md)
+- Release notes (EN/IT/ES): [RELEASE_NOTES_1.6.2.md](RELEASE_NOTES_1.6.2.md)
 - Changelog (EN/IT/ES): [CHANGELOG.md](CHANGELOG.md)
-- GitHub release body (EN/IT/ES): [doc/GITHUB_RELEASE_BODY_1.6.1.md](doc/GITHUB_RELEASE_BODY_1.6.1.md)
+- GitHub release body (EN/IT/ES): [doc/GITHUB_RELEASE_BODY_1.6.2.md](doc/GITHUB_RELEASE_BODY_1.6.2.md)
 - Docs index (EN): [doc/README.en-GB.md](doc/README.en-GB.md)
 - Docs index (IT): [doc/README.it.md](doc/README.it.md)
 - Docs index (ES): [doc/README.es.md](doc/README.es.md)

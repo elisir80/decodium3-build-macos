@@ -7,10 +7,10 @@ program wsprcode
   parameter (NSYM=162)
   parameter (MAXSYM=176)
   character*22 msg,msg2
-  integer*1 data0(7)
-  integer*1 data1(7)
-  integer*1 dat(NSYM)
-  integer*1 softsym(NSYM)
+  integer*1 data0(13)
+  integer*1 data1(13)
+  integer*1 dat(206)
+  integer*1 softsym(206)
 
 ! Define the sync vector:
   integer*1 sync(NSYM)
@@ -101,7 +101,7 @@ program wsprcode
   write(*,1002) data0
 1002 format(/'Source-encoded message (50 bits, hex):',7z3.2)
 
-  call encode232(data0,nbytes,dat,MAXSYM)     !Convolutional encoding
+  call encode232_wspr(data0,nbytes,dat,MAXSYM)!Convolutional encoding
   call inter_mept(dat,1)                      !Interleaving
 
   write(*,1004)
@@ -121,7 +121,7 @@ program wsprcode
   softsym=-dat                                !Simulate soft symbols
 
 ! Call the sequential (Fano algorithm) decoder
-  call fano232(softsym,nbits,mettab,ndelta,limit,data1,ncycles,metric,nerr)
+  call fano232_wspr(softsym,nbits,mettab,ndelta,limit,data1,ncycles,metric,nerr)
   call wqdecode(data1,msg2,ntype1)         
 
   write(*,1020) ntype1

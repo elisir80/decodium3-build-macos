@@ -35,18 +35,11 @@
 #include "Detector/FT2DecodeWorker.hpp"
 #include "Detector/FT4DecodeWorker.hpp"
 #include "Detector/FT8DecodeWorker.hpp"
+#include "Detector/LegacyDspIoHelpers.hpp"
 #include "Detector/LegacyJtDecodeWorker.hpp"
 #include "Detector/MSK144DecodeWorker.hpp"
 #include "Detector/Q65DecodeWorker.hpp"
 #include "revision_utils.hpp"
-
-extern "C"
-{
-  void symspec_ (dec_data_t* shared_data, int* k, double* trperiod, int* nsps,
-                 int* ingain, signed char* low_sidelobes, int* nminw,
-                 float* pxdb, float* spectrum, float* df3, int* ihsym,
-                 int* npts8, float* pxdbmax, float* npct);
-}
 
 namespace
 {
@@ -295,7 +288,6 @@ namespace
         std::copy_n (audio.constBegin (), copyCount, shared->d2);
       }
 
-    signed char lowSidelobes = 0;
     int ingain = 0;
     int nminw = 1;
     int nsps = kJt9Nsps;
@@ -305,7 +297,6 @@ namespace
     int ihsym = 0;
     int npts8 = 0;
     float pxdbmax = 0.0f;
-    float npct = 0.0f;
     int nhsym = 0;
     int nhsym0 = -999;
     int const npts = input_sample_count (9, trPeriod);
@@ -313,9 +304,9 @@ namespace
     for (int block = 1; block <= npts / kJt9KStep; ++block)
       {
         int k = block * kJt9KStep;
-        symspec_ (shared.get (), &k, &trPeriod, &nsps,
-                  &ingain, &lowSidelobes, &nminw, &pxdb, spectrum.data (),
-                  &df3, &ihsym, &npts8, &pxdbmax, &npct);
+        decodium::legacy::symspec_update (shared.get (), k, nsps, ingain,
+                                          false, nminw, &pxdb, spectrum.data (),
+                                          &df3, &ihsym, &npts8, &pxdbmax);
         nhsym = (k - 2048) / kJt9KStep;
         if (nhsym >= 1 && nhsym != nhsym0)
           {

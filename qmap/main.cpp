@@ -11,8 +11,6 @@
 #include "mainwindow.h"
 
 extern "C" {
-  void _gfortran_set_args(int argc, char *argv[]);
-  void _gfortran_set_convert(int conv);
   void ftninit_(void);
   void fftbig_(float dd[], int* nfft);
 }
@@ -21,9 +19,6 @@ int main(int argc, char *argv[])
 {
   QApplication a {argc, argv};
 
-// Initialize libgfortran:
-  _gfortran_set_args(argc, argv);
-  _gfortran_set_convert(0);
   ftninit_();
 
   // Override programs executable basename as application name.

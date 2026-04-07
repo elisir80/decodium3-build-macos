@@ -45,7 +45,6 @@ contains
 
   subroutine C_init_timer (context, callback) bind(C)
     use, intrinsic :: iso_c_binding, only: c_ptr, c_funptr, c_f_procpointer
-    use iso_c_utilities, only: c_to_f_string
     use timer_module, only: timer
     implicit none
     type(c_ptr), intent(in) :: context

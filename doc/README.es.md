@@ -1,26 +1,26 @@
-# Notas de Documentacion (Espanol) - 1.6.1
+# Notas de Documentacion (Espanol) - 1.6.2
 
-- Release actual: `1.6.1`
-- Ciclo de actualizacion: `1.6.0 -> 1.6.1`
+- Release actual: `1.6.2`
+- Ciclo de actualizacion: `1.6.1 -> 1.6.2`
 
-## Cambios Tecnicos Principales (`1.6.0 -> 1.6.1`)
+## Cambios Tecnicos Principales (`1.6.1 -> 1.6.2`)
 
-- Los caminos runtime activos JT4, JT9 y JT65 se mantienen ahora sobre el stack decode nativo C++.
-- Los caminos runtime activos Q65 y WSPR son Fortran-free, y Echo funciona ahora sobre el runtime/tool path nativo C++.
-- La superficie runtime mantenida ya no lleva el historico naming FFT `four2a` ni los residuos relacionados del cleanup ABI legacy.
-- Eliminadas fuentes Fortran obsoletas de `lib/`, `qmap/libqmap/`, `map65/libm65/` y del viejo arbol de herramientas Echo.
-- Anadidos fixes Linux de build/startup para `mainwindow.cpp`, inicializacion diferida de clientes, `QSocketNotifier`, teardown del logging Qt y enlace GNU ld de herramientas compare.
-- El packaging release macOS genera ahora `.icns` mediante un helper Python determinista.
-- Metadatos de version, defaults de workflow, documentos release y notas GitHub quedan alineados a `1.6.1`.
+- La entrega UDP multicast es mas robusta para workflows LAN logger gracias a mejor resolucion de interfaces, filtrado por protocolo y fallback a la ruta por defecto.
+- El arranque TCI ahora tolera radios asincronas tipo SunSDR / ExpertSDR3 que publican ready/power con retraso.
+- La recuperacion de audio al arranque ahora reintenta tras refrescar la cache de dispositivos de audio Qt cuando CAT esta desconectado o la enumeracion compite con la UI.
+- `qmap/libqmap` ha sido migrado completamente a C++ nativo, eliminando el ultimo backend Fortran CMake activo cross-platform.
+- El camino activo de astronomia/efemerides ha sido migrado a C++ nativo y la vieja cadena astronomica Fortran activa se ha eliminado del build mantenido.
+- Se han eliminado fuentes Fortran obsoletas adicionales y arboles archivisticos WSPR/JT/QSO50, mientras `map65/libm65` sigue siendo solo Windows en CMake.
+- Metadatos de version, defaults de workflow, documentos release y notas GitHub quedan alineados a `1.6.2`.
 
 ## Artefactos Release
 
-- `decodium3-ft2-1.6.1-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-1.6.1-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-1.6.1-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-1.6.1-macos-monterey-x86_64.dmg` *(best effort / experimental, si se genera)*
-- `decodium3-ft2-1.6.1-linux-x86_64.AppImage`
-- `decodium3-ft2-1.6.1-linux-aarch64.AppImage`
+- `decodium3-ft2-1.6.2-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-1.6.2-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-1.6.2-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-1.6.2-macos-monterey-x86_64.dmg` *(best effort / experimental, si se genera)*
+- `decodium3-ft2-1.6.2-linux-x86_64.AppImage`
+- `decodium3-ft2-1.6.2-linux-aarch64.AppImage`
 
 ## Requisitos Minimos Linux
 
@@ -53,5 +53,5 @@ cd squashfs-root
 ## Archivos Relacionados
 
 - [README.es.md](../README.es.md)
-- [RELEASE_NOTES_1.6.1.md](../RELEASE_NOTES_1.6.1.md)
-- [doc/GITHUB_RELEASE_BODY_1.6.1.md](./GITHUB_RELEASE_BODY_1.6.1.md)
+- [RELEASE_NOTES_1.6.2.md](../RELEASE_NOTES_1.6.2.md)
+- [doc/GITHUB_RELEASE_BODY_1.6.2.md](./GITHUB_RELEASE_BODY_1.6.2.md)

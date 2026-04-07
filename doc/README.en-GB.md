@@ -1,26 +1,26 @@
-# Documentation Notes (English) - 1.6.1
+# Documentation Notes (English) - 1.6.2
 
-- Current release: `1.6.1`
-- Update cycle: `1.6.0 -> 1.6.1`
+- Current release: `1.6.2`
+- Update cycle: `1.6.1 -> 1.6.2`
 
-## Key Technical Changes (`1.6.0 -> 1.6.1`)
+## Key Technical Changes (`1.6.1 -> 1.6.2`)
 
-- JT4, JT9, and JT65 active runtime paths are now maintained on the native C++ decode stack.
-- Q65 and WSPR active runtime paths are Fortran-free, and Echo now runs through the native C++ runtime/tool path.
-- The active maintained runtime surface no longer carries the historical FFT `four2a` naming or the related legacy ABI cleanup residues.
-- Obsolete Fortran sources were removed from `lib/`, `qmap/libqmap/`, `map65/libm65/`, and the old Echo tooling tree.
-- Linux build/startup fixes were added for `mainwindow.cpp`, deferred client initialization, `QSocketNotifier`, Qt logging teardown, and GNU ld compare-tool linkage.
-- macOS release packaging now generates `.icns` through a deterministic Python helper.
-- Version metadata, workflow defaults, release docs, and GitHub release notes are aligned to `1.6.1`.
+- UDP multicast delivery is more robust for LAN logger workflows thanks to better interface resolution, protocol filtering, and default-route fallback.
+- TCI startup is now tolerant of asynchronous ready/power reporting from SunSDR / ExpertSDR3 style radios.
+- Startup audio recovery now retries after refreshing cached Qt audio devices when CAT is disconnected or device enumeration races the UI.
+- `qmap/libqmap` has been migrated fully to native C++, removing the last active cross-platform CMake Fortran backend.
+- The active astronomy/ephemeris path has been migrated to native C++ and the old active Fortran astronomy chain has been removed from the maintained build.
+- Additional obsolete Fortran and archival WSPR/JT/QSO50 sources were removed from the maintained tree, while `map65/libm65` remains Windows-only in CMake.
+- Version metadata, workflow defaults, release docs, and GitHub release notes are aligned to `1.6.2`.
 
 ## Release Assets
 
-- `decodium3-ft2-1.6.1-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-1.6.1-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-1.6.1-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-1.6.1-macos-monterey-x86_64.dmg` *(best effort / experimental, if generated)*
-- `decodium3-ft2-1.6.1-linux-x86_64.AppImage`
-- `decodium3-ft2-1.6.1-linux-aarch64.AppImage`
+- `decodium3-ft2-1.6.2-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-1.6.2-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-1.6.2-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-1.6.2-macos-monterey-x86_64.dmg` *(best effort / experimental, if generated)*
+- `decodium3-ft2-1.6.2-linux-x86_64.AppImage`
+- `decodium3-ft2-1.6.2-linux-aarch64.AppImage`
 
 ## Linux Minimum Requirements
 
@@ -39,7 +39,7 @@ macOS quarantine workaround:
 sudo xattr -r -d com.apple.quarantine /Applications/ft2.app
 ```
 
-To avoid issues caused by the AppImage read-only filesystem, it is recommended to start Decodium by extracting the AppImage first and then running the program from the extracted directory.
+Per evitare problemi dovuti al filesystem in sola lettura delle AppImage, si consiglia di avviare Decodium estraendo prima l'AppImage e poi eseguendo il programma dalla cartella estratta.
 
 Run the following commands in a terminal:
 
@@ -53,5 +53,5 @@ cd squashfs-root
 ## Related Files
 
 - [README.md](../README.md)
-- [RELEASE_NOTES_1.6.1.md](../RELEASE_NOTES_1.6.1.md)
-- [doc/GITHUB_RELEASE_BODY_1.6.1.md](./GITHUB_RELEASE_BODY_1.6.1.md)
+- [RELEASE_NOTES_1.6.2.md](../RELEASE_NOTES_1.6.2.md)
+- [doc/GITHUB_RELEASE_BODY_1.6.2.md](./GITHUB_RELEASE_BODY_1.6.2.md)

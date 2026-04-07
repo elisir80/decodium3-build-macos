@@ -118,31 +118,91 @@ bool is_usable_multicast_interface (QNetworkInterface const& net_if)
   return (is_up && can_multicast) || is_loopback;
 }
 
+bool interface_supports_protocol (QNetworkInterface const& net_if, QAbstractSocket::NetworkLayerProtocol protocol)
+{
+  if (!net_if.isValid ())
+    {
+      return false;
+    }
+
+  if (protocol == QAbstractSocket::UnknownNetworkLayerProtocol)
+    {
+      return true;
+    }
+
+  for (auto const& entry : net_if.addressEntries ())
+    {
+      auto const address = entry.ip ();
+      if ((protocol == QAbstractSocket::IPv4Protocol && address.protocol () == QAbstractSocket::IPv4Protocol)
+          || (protocol == QAbstractSocket::IPv6Protocol && address.protocol () == QAbstractSocket::IPv6Protocol))
+        {
+          return true;
+        }
+    }
+
+  return false;
+}
+
 bool is_loopback_interface (QNetworkInterface const& net_if)
 {
   return net_if.flags ().testFlag (QNetworkInterface::IsLoopBack);
 }
 
-void normalize_multicast_interfaces (std::vector<QNetworkInterface> * interfaces)
+QNetworkInterface resolve_interface_identifier (QString const& identifier)
+{
+  auto const trimmed = identifier.trimmed ();
+  if (trimmed.isEmpty ())
+    {
+      return {};
+    }
+
+  auto by_name = QNetworkInterface::interfaceFromName (trimmed);
+  if (by_name.isValid ())
+    {
+      return by_name;
+    }
+
+  bool ok {false};
+  auto const maybe_index = trimmed.toInt (&ok);
+  if (ok)
+    {
+      auto by_index = QNetworkInterface::interfaceFromIndex (maybe_index);
+      if (by_index.isValid ())
+        {
+          return by_index;
+        }
+    }
+
+  for (auto const& net_if : QNetworkInterface::allInterfaces ())
+    {
+      if (0 == QString::compare (net_if.humanReadableName (), trimmed, Qt::CaseInsensitive)
+          || 0 == QString::compare (net_if.name (), trimmed, Qt::CaseInsensitive))
+        {
+          return net_if;
+        }
+    }
+
+  return {};
+}
+
+void normalize_multicast_interfaces (std::vector<QNetworkInterface> * interfaces,
+                                     QAbstractSocket::NetworkLayerProtocol protocol)
 {
   std::vector<QNetworkInterface> filtered;
   QSet<QString> seen;
   bool has_non_loopback {false};
-  bool has_loopback {false};
 
   auto append_if_usable = [&] (QNetworkInterface const& net_if) {
-      if (!is_usable_multicast_interface (net_if) || seen.contains (net_if.name ()))
+      if (!is_usable_multicast_interface (net_if)
+          || !interface_supports_protocol (net_if, protocol)
+          || seen.contains (net_if.name ()))
         {
           return;
         }
 
       filtered.push_back (net_if);
       seen.insert (net_if.name ());
-      if (is_loopback_interface (net_if))
-        {
-          has_loopback = true;
-        }
-      else
+      if (!is_loopback_interface (net_if))
         {
           has_non_loopback = true;
         }
@@ -172,7 +232,7 @@ void normalize_multicast_interfaces (std::vector<QNetworkInterface> * interfaces
     {
       for (auto const& net_if : QNetworkInterface::allInterfaces ())
         {
-          if (is_loopback_interface (net_if))
+          if (is_loopback_interface (net_if) && interface_supports_protocol (net_if, protocol))
             {
               append_if_usable (net_if);
               break;
@@ -294,11 +354,15 @@ void MessageClient::impl::set_server (QString const& server_name, QStringList co
   network_interfaces_.clear ();
   for (auto const& net_if_name : network_interface_names)
     {
-      network_interfaces_.push_back (QNetworkInterface::interfaceFromName (net_if_name));
+      auto const net_if = resolve_interface_identifier (net_if_name);
+      if (net_if.isValid ())
+        {
+          network_interfaces_.push_back (net_if);
+        }
     }
   if (is_multicast_address (server_))
     {
-      normalize_multicast_interfaces (&network_interfaces_);
+      normalize_multicast_interfaces (&network_interfaces_, server_.protocol ());
     }
   warned_untrusted_sender_ = false;
   warned_broadcast_control_ = false;
@@ -337,7 +401,7 @@ void MessageClient::impl::host_info_results (QHostInfo host_info)
     }
   if (is_multicast_address (server_))
     {
-      normalize_multicast_interfaces (&network_interfaces_);
+      normalize_multicast_interfaces (&network_interfaces_, server_.protocol ());
     }
   rebuild_trusted_senders ();
   start ();
@@ -914,13 +978,55 @@ void MessageClient::impl::send_message (QByteArray const& message, bool queue_if
             {
               if (is_multicast_address (server_))
                 {
-                  // send datagram on each selected network interface
-                  std::for_each (network_interfaces_.begin (), network_interfaces_.end ()
-                                 , [&] (QNetworkInterface const& net_if) {
-                                     setMulticastInterface (net_if);
-                                     // qDebug () << "Multicast UDP datagram sent to:" << server_ << "port:" << server_port_ << "on:" << multicastInterface ().humanReadableName ();
-                                     writeDatagram (wire_message, server_, server_port_);
-                                   });
+                  bool sent {false};
+                  QString last_error;
+
+                  auto send_on_interface = [&] (QNetworkInterface const& net_if) {
+                      setMulticastInterface (net_if);
+                      auto const bytes_written = writeDatagram (wire_message, server_, server_port_);
+                      if (bytes_written == wire_message.size ())
+                        {
+                          sent = true;
+                          TRACE_UDP ("Multicast UDP datagram sent to:" << server_.toString ()
+                                     << "port:" << server_port_ << "on:" << net_if.name ());
+                        }
+                      else
+                        {
+                          last_error = QString {"%1 [%2]"}
+                                       .arg (errorString ())
+                                       .arg (net_if.name ());
+                        }
+                    };
+
+                  for (auto const& net_if : network_interfaces_)
+                    {
+                      send_on_interface (net_if);
+                    }
+
+                  if (!sent)
+                    {
+                      setMulticastInterface (QNetworkInterface {});
+                      auto const bytes_written = writeDatagram (wire_message, server_, server_port_);
+                      if (bytes_written == wire_message.size ())
+                        {
+                          sent = true;
+                          TRACE_UDP ("Multicast UDP datagram sent via default route to:"
+                                     << server_.toString () << "port:" << server_port_);
+                        }
+                      else
+                        {
+                          last_error = errorString ();
+                        }
+                    }
+
+                  if (!sent)
+                    {
+                      Q_EMIT self_->error (
+                        QString {"Unable to send multicast UDP datagram to %1:%2 (%3)"}
+                          .arg (server_.toString ())
+                          .arg (server_port_)
+                          .arg (last_error.isEmpty () ? QStringLiteral ("unknown error") : last_error));
+                    }
                 }
               else
                 {

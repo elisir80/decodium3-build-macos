@@ -480,7 +480,6 @@ extern "C" {
 
   void rm_q3list_(char* callsign, FCL len);
 
-  void jpl_setup_(char* fname, FCL len);
 }
 QList<FoxVerifier *> m_verifications;
 int itone[MAX_NUM_SYMBOLS];   //Audio tones for all Tx symbols
@@ -3342,21 +3341,7 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
     // Startup robustness: replicate the reliable Preferences->OK reopen path
     // so RX audio comes up even when the initial CoreAudio bind races startup.
     QTimer::singleShot (1500, this, [this, startup_monitor_requested] {
-      if (m_tci_audio || m_transmitting || !m_valid) {
-        return;
-      }
-
-      if (startup_monitor_requested && !m_monitoring) {
-        debugToFile (QStringLiteral ("audioStart   forcing startup monitor activation"));
-        on_monitorButton_clicked (true);
-        return;
-      }
-
-      debugToFile (QStringLiteral ("audioStart   forcing startup audio reopen"));
-      restartConfiguredAudioStreams (false);
-      if (m_monitoring) {
-        armAudioInputHealthChecks (QDateTime::currentMSecsSinceEpoch ());
-      }
+      runStartupAudioRecovery (startup_monitor_requested);
     });
   }
 
@@ -3516,9 +3501,6 @@ MainWindow::MainWindow(QDir const& temp_directory, bool multiple,
   if (ui->actionRemove_after_30days->isChecked ()) {
     remove_old_files(m_config.save_directory().absolutePath(), 30); // remove saved audio files after 30 days
   }
-
-  QString jpleph = m_config.data_dir().absoluteFilePath("JPLEPH");
-  jpl_setup_(const_cast<char *>(jpleph.toLocal8Bit().constData()),256);
 
   //avt 9/24/25
   m_logbookRead = !QFile::exists(m_config.writeable_data_dir ().absoluteFilePath (FULL_LOG_FNAME));   //if it exists, log book being read now
@@ -6026,8 +6008,15 @@ void MainWindow::restartConfiguredAudioStreams (bool resume_monitor)
       return;
     }
 
-  auto const& input_device = m_config.audio_input_device ();
-  auto const& output_device = m_config.audio_output_device ();
+  auto input_device = m_config.audio_input_device ();
+  auto output_device = m_config.audio_output_device ();
+  if (input_device.isNull () || output_device.isNull ())
+    {
+      debugToFile (QStringLiteral ("audioRest   refreshing cached audio devices"));
+      m_config.refresh_audio_devices ();
+      input_device = m_config.audio_input_device ();
+      output_device = m_config.audio_output_device ();
+    }
   debugToFile (QString {"audioRest   resume:%1 mon:%2 in:%3 out:%4"}
                  .arg (resume_monitor)
                  .arg (m_monitoring)
@@ -6062,6 +6051,55 @@ void MainWindow::restartConfiguredAudioStreams (bool resume_monitor)
   else
     {
       debugToFile (QStringLiteral ("audioRest   no output device configured"));
+    }
+}
+
+void MainWindow::runStartupAudioRecovery (bool startup_monitor_requested, int attempt)
+{
+  static constexpr int max_attempts {10};
+  static constexpr int retry_delay_ms {2000};
+
+  if (m_tci_audio || m_transmitting || !m_valid)
+    {
+      return;
+    }
+
+  if (m_config.audio_input_device ().isNull () || m_config.audio_output_device ().isNull ())
+    {
+      debugToFile (QString {"audioStart   refreshing cached devices attempt:%1/%2"}
+                     .arg (attempt + 1)
+                     .arg (max_attempts));
+      m_config.refresh_audio_devices ();
+    }
+
+  bool const missing_input = m_config.audio_input_device ().isNull ();
+  bool const missing_output = m_config.audio_output_device ().isNull ();
+
+  if (startup_monitor_requested && !m_monitoring)
+    {
+      debugToFile (QStringLiteral ("audioStart   forcing startup monitor activation"));
+      on_monitorButton_clicked (true);
+    }
+  else
+    {
+      debugToFile (QStringLiteral ("audioStart   forcing startup audio reopen"));
+      restartConfiguredAudioStreams (false);
+      if (m_monitoring)
+        {
+          armAudioInputHealthChecks (QDateTime::currentMSecsSinceEpoch ());
+        }
+    }
+
+  if ((missing_input || missing_output) && attempt + 1 < max_attempts)
+    {
+      debugToFile (QString {"audioStart   devices still unavailable in:%1 out:%2 retry:%3/%4"}
+                     .arg (missing_input)
+                     .arg (missing_output)
+                     .arg (attempt + 1)
+                     .arg (max_attempts));
+      QTimer::singleShot (retry_delay_ms, this, [this, startup_monitor_requested, attempt] {
+        runStartupAudioRecovery (startup_monitor_requested, attempt + 1);
+      });
     }
 }
 

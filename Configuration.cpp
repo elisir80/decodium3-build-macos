@@ -1245,6 +1245,16 @@ bool Configuration::is_transceiver_online () const
   return m_->rig_active_;
 }
 
+void Configuration::refresh_audio_devices ()
+{
+  SettingsGroup g {m_->settings_, "Configuration"};
+  m_->find_audio_devices ();
+  m_->audio_input_device_ = m_->next_audio_input_device_;
+  m_->audio_input_channel_ = m_->next_audio_input_channel_;
+  m_->audio_output_device_ = m_->next_audio_output_device_;
+  m_->audio_output_channel_ = m_->next_audio_output_channel_;
+}
+
 bool Configuration::is_dummy_rig () const
 {
   return m_->rig_is_dummy_;

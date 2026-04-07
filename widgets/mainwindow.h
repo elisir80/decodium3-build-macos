@@ -212,6 +212,7 @@ private:
   bool eventFilter(QObject *, QEvent *) override;
   void restartConfiguredAudioStreams (bool resume_monitor);
   void armAudioInputHealthChecks (qint64 baseline_ms);
+  void runStartupAudioRecovery (bool startup_monitor_requested, int attempt = 0);
   void showQSYMessage(QString message);
   void handleDoubleClickOnCall (Qt::KeyboardModifiers modifiers, bool fromBandActivityWindow);
   bool singleDecodeColumnFlowEnabled () const { return false; }

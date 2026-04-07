@@ -1,12 +1,13 @@
 set (libm65_FSRCS
 # Modules come first:
+  ${CMAKE_SOURCE_DIR}/lib/timer_module.f90
+  ${CMAKE_SOURCE_DIR}/lib/timer_impl.f90
+  ${CMAKE_SOURCE_DIR}/lib/packjt.f90
+  ${CMAKE_SOURCE_DIR}/lib/gen65.f90
   wideband_sync.f90
 
 # Non-module Fortran routines:
   afc65b.f90
-  astro.f90
-  astro0.f90
-  astrosub.f90
   averms.f90
   badmsg.f90
   ccf2.f90
@@ -15,7 +16,6 @@ set (libm65_FSRCS
   chkhist.f90
   chkmsg.f90
   coord.f90
-  dcoord.f90
   decode0.f90
   decode1a.f90
   decode65b.f90
@@ -23,7 +23,6 @@ set (libm65_FSRCS
   deg2grid.f90
   demod64a.f90
   display.f90
-  dot.f90
   dpol.f90
   encode65.f90
   extract.f90
@@ -35,7 +34,6 @@ set (libm65_FSRCS
   ftninit.f90
   ftnquit.f90
   gen65.f90
-  geocentric.f90
   getdphi.f90
   getpfx1.f90
   getpfx2.f90
@@ -43,7 +41,6 @@ set (libm65_FSRCS
   graycode65.f90
   grid2deg.f90
   grid2k.f90
-  indexx.f90
   interleave63.f90
   iqcal.f90
   iqfix.f90
@@ -51,8 +48,6 @@ set (libm65_FSRCS
   k2grid.f90
   lorentzian.f90
   map65a.f90
-  moon2.f90
-  moondop.f90
   nchar.f90
   noisegen.f90
   packjt.f90
@@ -67,12 +62,9 @@ set (libm65_FSRCS
   shell.f90
   sleep_msec.f90
   smo.f90
-  sun.f90
   symspec.f90
 #  timer.f90
   timf2.f90
-  tm2.f90
-  toxyz.f90
   trimlist.f90
   twkfreq.f90
   twkfreq_xy.f90
@@ -94,7 +86,6 @@ set (libm65_CSRCS
   ftrsd2.c
 #  gran.c
   igray.c
-  tmoonsub.c
   usleep.c
   wrapkarn.c
 )

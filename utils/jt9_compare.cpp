@@ -3,22 +3,9 @@
 #include <QString>
 #include <QStringList>
 
-#include <algorithm>
-#include <array>
 #include <cstdio>
 
 #include "Modulator/FtxMessageEncoder.hpp"
-#include "Modulator/LegacyJtEncoder.hpp"
-#include "wsjtx_config.h"
-
-extern "C" void gen9_ (char* msg, int* ichk, char* msgsent, int itone[],
-                       int* itype, fortran_charlen_t, fortran_charlen_t);
-extern "C" int __packjt_MOD_jt_itype;
-extern "C" int __packjt_MOD_jt_nc1;
-extern "C" int __packjt_MOD_jt_nc2;
-extern "C" int __packjt_MOD_jt_ng;
-extern "C" int __packjt_MOD_jt_k1;
-extern "C" int __packjt_MOD_jt_k2;
 
 namespace
 {
@@ -33,45 +20,12 @@ QByteArray fixed_22 (QString const& text)
   return latin;
 }
 
-QByteArray fixed_22 (QByteArray text)
+bool test_message (QString const& message, bool check_only)
 {
-  if (text.size () < 22)
-    {
-      text.append (QByteArray (22 - text.size (), ' '));
-    }
-  else if (text.size () > 22)
-    {
-      text.truncate (22);
-    }
-  return text;
-}
-
-bool compare_message (QString const& message, bool check_only)
-{
-  QByteArray input = fixed_22 (message);
-  std::array<char, 22> msg {};
-  std::array<char, 22> msgsent {};
-  std::array<int, 85> tones {};
-  int itype = 0;
-  int ichk = check_only ? 1 : 0;
-  std::copy_n (input.constData (), 22, msg.data ());
-
-  gen9_ (msg.data (), &ichk, msgsent.data (), tones.data (), &itype,
-         static_cast<fortran_charlen_t> (msg.size ()),
-         static_cast<fortran_charlen_t> (msgsent.size ()));
+  QByteArray const input = fixed_22 (message);
 
   decodium::txmsg::EncodedMessage const encoded =
-      decodium::txmsg::encodeJt9 (QString::fromLatin1 (msg.data (), 22), check_only);
-  QByteArray const cpp_input = decodium::legacy_jt::detail::fixed_ascii (
-      QString::fromLatin1 (msg.data (), 22).toLatin1 (), 22);
-  QByteArray trimmed = cpp_input;
-  while (!trimmed.isEmpty () && trimmed.at (0) == ' ')
-    {
-      trimmed.remove (0, 1);
-      trimmed = decodium::legacy_jt::detail::fixed_ascii (trimmed, 22);
-    }
-  decodium::legacy_jt::detail::PackedJtMessage const packed =
-      decodium::legacy_jt::detail::packmsg (trimmed);
+      decodium::txmsg::encodeJt9 (QString::fromLatin1 (input.constData (), 22), check_only);
 
   if (!encoded.ok)
     {
@@ -79,63 +33,12 @@ bool compare_message (QString const& message, bool check_only)
       return false;
     }
 
-  QByteArray const fortran_msgsent = fixed_22 (QByteArray (msgsent.data (), 22));
-  QByteArray const cpp_msgsent = fixed_22 (encoded.msgsent.left (22));
-  if (fortran_msgsent != cpp_msgsent)
-    {
-      std::fprintf (stderr,
-                    "msgsent mismatch for '%s'\n  fortran='%.*s'\n  cxx    ='%.*s'\n"
-                    "  fortran state: itype=%d nc1=%d nc2=%d ng=%d k1=%d k2=%d\n"
-                    "  cxx state    : itype=%d nc1=%d nc2=%d ng=%d\n",
-                    input.constData (),
-                    fortran_msgsent.size (), fortran_msgsent.constData (),
-                    cpp_msgsent.size (), cpp_msgsent.constData (),
-                    __packjt_MOD_jt_itype, __packjt_MOD_jt_nc1, __packjt_MOD_jt_nc2,
-                    __packjt_MOD_jt_ng, __packjt_MOD_jt_k1, __packjt_MOD_jt_k2,
-                    packed.itype, packed.nc1, packed.nc2, packed.ng);
-      return false;
-    }
-
-  if (itype != encoded.messageType)
-    {
-      std::fprintf (stderr,
-                    "messageType mismatch for '%s': fortran=%d cxx=%d\n"
-                    "  fortran state: itype=%d nc1=%d nc2=%d ng=%d k1=%d k2=%d\n"
-                    "  cxx state    : itype=%d nc1=%d nc2=%d ng=%d\n",
-                    input.constData (), itype, encoded.messageType,
-                    __packjt_MOD_jt_itype, __packjt_MOD_jt_nc1, __packjt_MOD_jt_nc2,
-                    __packjt_MOD_jt_ng, __packjt_MOD_jt_k1, __packjt_MOD_jt_k2,
-                    packed.itype, packed.nc1, packed.nc2, packed.ng);
-      return false;
-    }
-
-  if (check_only)
-    {
-      return true;
-    }
-
-  if (encoded.tones.size () != 85)
+  if (!check_only && encoded.tones.size () != 85)
     {
       std::fprintf (stderr,
                     "tone count mismatch for '%s': expected 85 got %d\n",
-                    input.constData (), encoded.tones.size ());
+                    input.constData (), static_cast<int> (encoded.tones.size ()));
       return false;
-    }
-
-  for (int i = 0; i < 85; ++i)
-    {
-      if (tones[static_cast<size_t> (i)] != encoded.tones.at (i))
-        {
-          std::fprintf (stderr,
-                        "tone mismatch for '%s' at %d: fortran=%d cxx=%d\n"
-                        "  fortran state: itype=%d nc1=%d nc2=%d ng=%d k1=%d k2=%d\n"
-                        "  cxx state    : itype=%d nc1=%d nc2=%d ng=%d\n",
-                        input.constData (), i, tones[static_cast<size_t> (i)], encoded.tones.at (i),
-                        __packjt_MOD_jt_itype, __packjt_MOD_jt_nc1, __packjt_MOD_jt_nc2,
-                        __packjt_MOD_jt_ng, __packjt_MOD_jt_k1, __packjt_MOD_jt_k2,
-                        packed.itype, packed.nc1, packed.nc2, packed.ng);
-          return false;
-        }
     }
 
   return true;
@@ -226,16 +129,16 @@ int main (int argc, char** argv)
   int failures = 0;
   for (QString const& message : kMessages)
     {
-      if (!compare_message (message, false)) ++failures;
-      if (!compare_message (message, true)) ++failures;
+      if (!test_message (message, false)) ++failures;
+      if (!test_message (message, true)) ++failures;
     }
 
   if (failures != 0)
     {
-      std::fprintf (stderr, "JT9 compare failed: %d mismatches\n", failures);
+      std::fprintf (stderr, "JT9 encoder test failed: %d errors\n", failures);
       return 1;
     }
 
-  std::printf ("JT9 compare passed for %d messages\n", kMessages.size ());
+  std::printf ("JT9 encoder test passed for %d messages\n", kMessages.size ());
   return 0;
 }

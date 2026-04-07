@@ -1,18 +1,18 @@
-# Decodium (Fork macOS/Linux) - 1.6.1
+# Decodium (Fork macOS/Linux) - 1.6.2
 
-- Release stabile corrente: `1.6.1`
-- Ciclo aggiornamento: `1.6.0 -> 1.6.1`
+- Release stabile corrente: `1.6.2`
+- Ciclo aggiornamento: `1.6.1 -> 1.6.2`
 
-## Novita' 1.6.1 (`1.6.0 -> 1.6.1`)
+## Novita' 1.6.2 (`1.6.1 -> 1.6.2`)
 
-- completata la migrazione nativa C++ mantenuta del runtime JT legacy attivo, coprendo i path decode JT4, JT9 e JT65.
-- promossi a implementazioni native Fortran-free i path runtime attivi Q65 e WSPR e completata la migrazione a C++ nativo del runtime/tool path Echo.
-- rimosso dalla superficie app/runtime mantenuta il naming legacy ABI residuo del path attivo, incluso lo storico naming FFT `four2a`.
-- ripuliti sorgenti Fortran obsoleti e file di compatibilita' da `lib/`, `qmap/libqmap/`, `map65/libm65/` e dal vecchio path tool Echo.
-- corrette regressioni Linux di build/startup in `mainwindow.cpp`, nell'inizializzazione differita dei client di rete, nella gestione `QSocketNotifier`, nel teardown logging Qt e nel link GNU ld dei target compare/sim.
-- corretto il blocco packaging macOS `Invalid Iconset` generando il file `.icns` con un helper Python deterministico.
+- irrobustito l'invio UDP multicast per integrazioni logger LAN, migliorando la risoluzione delle interfacce multicast e aggiungendo il fallback sulla route di default quando l'invio forzato per interfaccia fallisce.
+- migliorato lo startup TCI per radio asincrone stile SunSDR / ExpertSDR3, cosi' Decodium non fallisce piu' troppo presto mentre aspetta stato ready/power.
+- migliorato il recupero audio intermittente all'avvio quando il CAT e' scollegato o la cache dei device audio Qt torna temporaneamente nulla.
+- completata la migrazione nativa C++ mantenuta di `qmap/libqmap` e rimosso l'ultimo backend Fortran CMake attivo cross-platform.
+- completata la migrazione astronomia/effemeridi usata dal path applicativo mantenuto e rimossa dal build CMake la vecchia catena astronomica Fortran attiva.
+- ripuliti dal tree mantenuto ulteriori sorgenti Fortran obsoleti e archivi WSPR/JT/QSO50, mantenendo `map65/libm65` confinato alle sole build CMake Windows.
 - mantenuta l'esclusione permanente di `build-arm-output/` dallo staging sorgenti e dal tracking git.
-- allineati metadati versione locali, default workflow, documentazione release e note GitHub alla semver `1.6.1`.
+- allineati metadati versione locali, default workflow, documenti release e note GitHub alla semver `1.6.2`.
 
 ## Target Release
 
@@ -23,24 +23,24 @@
 - Linux x86_64 AppImage
 - Linux aarch64 AppImage *(baseline Debian Trixie)*
 
-## Artifact Release
+## Asset Release
 
-- `decodium3-ft2-1.6.1-macos-tahoe-arm64.dmg`
-- `decodium3-ft2-1.6.1-macos-tahoe-arm64.zip`
-- `decodium3-ft2-1.6.1-macos-tahoe-arm64-sha256.txt`
-- `decodium3-ft2-1.6.1-macos-sequoia-arm64.dmg`
-- `decodium3-ft2-1.6.1-macos-sequoia-arm64.zip`
-- `decodium3-ft2-1.6.1-macos-sequoia-arm64-sha256.txt`
-- `decodium3-ft2-1.6.1-macos-sequoia-x86_64.dmg`
-- `decodium3-ft2-1.6.1-macos-sequoia-x86_64.zip`
-- `decodium3-ft2-1.6.1-macos-sequoia-x86_64-sha256.txt`
-- `decodium3-ft2-1.6.1-macos-monterey-x86_64.dmg` *(best effort/sperimentale, se generato)*
-- `decodium3-ft2-1.6.1-macos-monterey-x86_64.zip` *(best effort/sperimentale, se generato)*
-- `decodium3-ft2-1.6.1-macos-monterey-x86_64-sha256.txt` *(best effort/sperimentale, se generato)*
-- `decodium3-ft2-1.6.1-linux-x86_64.AppImage`
-- `decodium3-ft2-1.6.1-linux-x86_64.AppImage.sha256.txt`
-- `decodium3-ft2-1.6.1-linux-aarch64.AppImage`
-- `decodium3-ft2-1.6.1-linux-aarch64.AppImage.sha256.txt`
+- `decodium3-ft2-1.6.2-macos-tahoe-arm64.dmg`
+- `decodium3-ft2-1.6.2-macos-tahoe-arm64.zip`
+- `decodium3-ft2-1.6.2-macos-tahoe-arm64-sha256.txt`
+- `decodium3-ft2-1.6.2-macos-sequoia-arm64.dmg`
+- `decodium3-ft2-1.6.2-macos-sequoia-arm64.zip`
+- `decodium3-ft2-1.6.2-macos-sequoia-arm64-sha256.txt`
+- `decodium3-ft2-1.6.2-macos-sequoia-x86_64.dmg`
+- `decodium3-ft2-1.6.2-macos-sequoia-x86_64.zip`
+- `decodium3-ft2-1.6.2-macos-sequoia-x86_64-sha256.txt`
+- `decodium3-ft2-1.6.2-macos-monterey-x86_64.dmg` *(best effort/sperimentale, se generato)*
+- `decodium3-ft2-1.6.2-macos-monterey-x86_64.zip` *(best effort/sperimentale, se generato)*
+- `decodium3-ft2-1.6.2-macos-monterey-x86_64-sha256.txt` *(best effort/sperimentale, se generato)*
+- `decodium3-ft2-1.6.2-linux-x86_64.AppImage`
+- `decodium3-ft2-1.6.2-linux-x86_64.AppImage.sha256.txt`
+- `decodium3-ft2-1.6.2-linux-aarch64.AppImage`
+- `decodium3-ft2-1.6.2-linux-aarch64.AppImage.sha256.txt`
 
 ## Requisiti Minimi Linux
 
@@ -59,7 +59,7 @@ Software:
 - AppImage Linux `aarch64`: `glibc >= 2.38` *(baseline Debian Trixie)*
 - `libfuse2` / FUSE2 per montare direttamente l'AppImage
 - ALSA, PulseAudio o PipeWire
-- permessi di accesso seriale/USB per CAT o dispositivi esterni
+- permessi seriale/USB richiesti da CAT e radio esterne
 
 ## Guida Avvio
 
@@ -85,5 +85,5 @@ cd squashfs-root
 - [README.md](README.md)
 - [README.en-GB.md](README.en-GB.md)
 - [README.es.md](README.es.md)
-- [RELEASE_NOTES_1.6.1.md](RELEASE_NOTES_1.6.1.md)
-- [doc/GITHUB_RELEASE_BODY_1.6.1.md](doc/GITHUB_RELEASE_BODY_1.6.1.md)
+- [RELEASE_NOTES_1.6.2.md](RELEASE_NOTES_1.6.2.md)
+- [doc/GITHUB_RELEASE_BODY_1.6.2.md](doc/GITHUB_RELEASE_BODY_1.6.2.md)

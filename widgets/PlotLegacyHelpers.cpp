@@ -178,3 +178,13 @@ void clear_saved_waterfall ()
 
 }
 }
+
+extern "C" void flat4_ (float spectrum[], int* npts0, int* nflatten)
+{
+  if (!npts0 || !nflatten)
+    {
+      return;
+    }
+
+  decodium::plot::flat4_inplace (spectrum, *npts0, *nflatten);
+}

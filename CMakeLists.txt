@@ -319,6 +319,7 @@ set (wsjtx_CXXSRCS
   Network/PSKReporter.cpp
   Modulator/Modulator.cpp
   Detector/Detector.cpp
+  Detector/Fil4Filter.cpp
   Detector/FT2DecodeWorker.cpp
   Detector/FT4DecodeWorker.cpp
   Detector/FT8DecodeWorker.cpp
@@ -406,7 +407,12 @@ set (wsjt_CXXSRCS
   Detector/SfoxFt8Remove.cpp
   Detector/FtxSync.cpp
   Detector/FtxTweak.cpp
+  Detector/AstroCompat.cpp
+  Detector/AstroQ3ListCompat.cpp
   Detector/FtxVarSyncTemplates.cpp
+  Detector/Conv232Compat.cpp
+  Detector/IndexSortCompat.cpp
+  Modulator/WsprLegacyCompat.cpp
   ${wsjt_fox_CXXSRCS}
   )
 # deal with a GCC v6 UB error message
@@ -418,143 +424,8 @@ set_source_files_properties (
 
 # Windows-specific helper sources intentionally excluded in this fork.
 
-set (wsjt_FSRCS
-  # put module sources first in the hope that they get rebuilt before use
-  lib/types.f90
-  lib/C_interface_module.f90
-  lib/shmem.f90
-  lib/crc.f90
-  lib/fftw3mod.f90
-  lib/hashing.f90
-  lib/iso_c_utilities.f90
-  lib/jt4.f90
-  lib/get_q3list.f90
-  lib/options.f90
-  lib/packjt.f90
-  lib/normalizebmet.f90
-  lib/readwav.f90
-  lib/wsjtx_wav_catalog.f90
-  lib/timer_C_wrapper.f90
-  lib/timer_impl.f90
-  lib/timer_module.f90
-  lib/wavhdr.f90
-
-  # remaining non-module sources
-  lib/addit.f90
-  lib/ana932.f90
-  lib/analytic.f90
-  lib/astro.f90
-  lib/astrosub.f90
-  lib/astro0.f90
-  lib/averms.f90
-  lib/azdist.f90
-  lib/bpdecode40.f90
-  lib/bpdecode128_90.f90
-  lib/baddata.f90
-  # JT9 legacy decode routines live in wsjt_fort_legacy_jt.
-  lib/cablog.f90
-  lib/calibrate.f90
-  lib/ccf65.f90
-  lib/chkcall.f90
-  lib/chkhist.f90
-  lib/chkmsg.f90
-  lib/chkss2.f90
-  lib/coord.f90
-  lib/db.f90
-  lib/decode4.f90
-  lib/env_module.f90
-  lib/deep4.f90
-  lib/deg2grid.f90
-  lib/degrade_snr.f90
-  lib/encode232.f90
-  lib/encode4.f90
-  lib/encode_128_90.f90
-  lib/entail.f90
-  lib/ephem.f90
-  lib/extract4.f90
-  lib/extractmessage77.f90
-  lib/fano232.f90
-  lib/fchisq.f90
-  lib/fil3.f90
-  lib/fil3c.f90
-  lib/fil4.f90
-  lib/fitcal.f90
-  lib/flat1.f90
-  lib/flat1a.f90
-  lib/flat1b.f90
-  lib/flat2.f90
-  lib/flat4.f90
-  lib/flat65.f90
-  lib/fmtmsg.f90
-  lib/fspread_lorentz.f90
-#  lib/ft8/foxgen_wrap.f90
-  lib/freqcal.f90
-  lib/gen4.f90
-  lib/gen65.f90
-  lib/gen9.f90
-  lib/gen_cw_wave.f90
-  lib/genwave.f90
-  lib/genwspr.f90
-  lib/geodist.f90
-  lib/getlags.f90
-  lib/getmet4.f90
-  lib/gfsk_pulse.f90
-  lib/graycode.f90
-  lib/graycode65.f90
-  lib/grayline.f90
-  lib/grid2deg.f90
-  lib/hash.f90
-  lib/hspec.f90
-  lib/indexx.f90
-  lib/init_random_seed.f90
-  lib/interleave4.f90
-  lib/interleave63.f90
-  lib/interleave9.f90
-  lib/inter_wspr.f90
-  lib/jplsubs.f
-  lib/libration.f90
-  lib/lpf1.f90
-  lib/mixlpf.f90
-  lib/makepings.f90
-  lib/moondopjpl.f90
-  lib/morse.f90
-  lib/move.f90
-  lib/nuttal_window.f90
-  lib/77bit/my_hash.f90
-  lib/osd128_90.f90
-  lib/peakup.f90
-  lib/plotsave.f90
-  lib/platanh.f90
-  lib/pltanh.f90
-  lib/prog_args.f90
-  lib/ps4.f90
-  lib/refspectrum.f90
-  lib/savec2.f90
-  lib/sec0.f90
-  lib/sec_midn.f90
-  lib/slasubs.f
-  lib/sleep_msec.f90
-  lib/slope.f90
-  lib/smo.f90
-  lib/sun.f90
-  lib/symspec.f90
-  lib/symspec2.f90
-  lib/sync4.f90
-  lib/timf2.f90
-  lib/tweak1.f90
-  lib/twkfreq.f90
-  lib/update_recent_calls.f90
-  lib/wav11.f90
-  lib/wav12.f90
-  lib/xcor4.f90
-  lib/wqdecode.f90
-  lib/wqencode.f90
-  lib/wspr_downsample.f90
-  lib/zplot9.f90
-  )
-
-# temporary workaround for a gfortran v7.3 ICE on Fedora 27 64-bit
-set_source_files_properties (lib/slasubs.f PROPERTIES COMPILE_FLAGS -O2)
+# wsjt_FSRCS is intentionally empty: all Fortran has been migrated to C++
+# or moved to the consumers that actually need it (e.g. packjt.f90 → m65impl)
 
 set (ka9q_CSRCS
   lib/ftrsd/decode_rs.c
@@ -576,6 +447,42 @@ set (qra_CSRCS
 
 set (wsjt_CSRCS
   ${ka9q_CSRCS}
+  lib/db.c
+  lib/graycode.c
+  lib/hash.c
+  lib/move.c
+  lib/nuttal_window.c
+  lib/peakup.c
+  lib/averms.c
+  lib/azdist.c
+  lib/c0com.c
+  lib/chkcall.c
+  lib/coord.c
+  lib/degrade_snr.c
+  lib/geodist.c
+  lib/morse.c
+  lib/genwave.c
+  lib/getmet4.c
+  lib/chkhist.c
+  lib/chkmsg.c
+  lib/chkss2.c
+  lib/deg2grid.c
+  lib/entail.c
+  lib/flat1.c
+  lib/fmtmsg.c
+  lib/grid2deg.c
+  lib/interleave4.c
+  lib/interleave63.c
+  lib/interleave9.c
+  lib/getlags.c
+  lib/grayline.c
+  lib/twkfreq.c
+  lib/platanh.c
+  lib/plotsave.c
+  lib/sec0.c
+  lib/sleep_msec.c
+  lib/slope.c
+  lib/smo.c
   lib/sgran.c
   lib/golay24_table.c
   lib/gran.c
@@ -1110,35 +1017,16 @@ endif ()
 # build a library of package functionality (without and optionally with OpenMP support)
 add_library (wsjt_cxx STATIC ${wsjt_CSRCS} ${wsjt_CXXSRCS})
 target_include_directories (wsjt_cxx PRIVATE ${FFTW3_INCLUDE_DIRS})
-target_link_libraries (wsjt_cxx ${LIBM_LIBRARIES} Boost::log_setup ${FFTW3_LIBRARIES} ${LIBM_LIBRARIES})
+target_link_libraries (wsjt_cxx Qt5::Core ${LIBM_LIBRARIES} Boost::log_setup ${FFTW3_LIBRARIES} ${LIBM_LIBRARIES})
 
-# build an OpenMP variant of the Fortran library routines
-add_library (wsjt_fort STATIC ${wsjt_FSRCS})
-target_link_libraries (wsjt_fort  ${FFTW3_LIBRARIES})
-if (${OPENMP_FOUND} OR APPLE)
-  add_library (wsjt_fort_omp STATIC ${wsjt_FSRCS})
-  target_link_libraries (wsjt_fort_omp  ${FFTW3_LIBRARIES})
-  if (OpenMP_C_FLAGS AND NOT APPLE)
-    set_target_properties (wsjt_fort_omp
-      PROPERTIES
-      COMPILE_FLAGS "${OpenMP_C_FLAGS}"
-      )
-  endif ()
-  set_target_properties (wsjt_fort_omp
-    PROPERTIES
-    Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/fortran_modules_omp
-    )
-  file (MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/fortran_modules_omp)
-  if (APPLE)
-    # On  Mac  we don't  have  working  OpenMP  support in  the  C/C++
-    # compilers so  we have to manually  set the correct flags  to get
-    # OpenMP support in jt9.
-    target_compile_options (wsjt_fort_omp
-      PRIVATE
-      $<$<COMPILE_LANGUAGE:Fortran>:-fopenmp>   # assumes GNU style Fortran compiler
-      )
-  endif (APPLE)
-endif (${OPENMP_FOUND} OR APPLE)
+# wsjt_fort is now a pure interface library: all Fortran has been migrated to C++.
+# Targets that still name wsjt_fort in their link step receive its transitive
+# dependencies (FFTW3, wsjt_qt, wsjt_cxx) automatically.
+add_library (wsjt_fort INTERFACE)
+target_link_libraries (wsjt_fort INTERFACE ${FFTW3_LIBRARIES})
+# wsjt_fort_omp was the OpenMP-compiled Fortran variant; with no Fortran sources
+# it is just an alias so existing link lines that name it continue to work.
+add_library (wsjt_fort_omp ALIAS wsjt_fort)
 
 function (link_wsjtx_cycle_group target)
   if (APPLE OR WIN32)
@@ -1150,17 +1038,6 @@ endfunction ()
 
 if(WSJT_BUILD_UTILS) 
 
-add_executable (jt4sim lib/jt4sim.f90)
-target_link_libraries (jt4sim wsjt_fort wsjt_cxx)
-
-add_executable (jt65sim lib/jt65sim.f90)
-target_link_libraries (jt65sim wsjt_fort wsjt_cxx)
-
-add_executable (sumsim lib/sumsim.f90)
-target_link_libraries (sumsim wsjt_fort wsjt_cxx)
-
-add_executable (cablog lib/cablog.f90)
-target_link_libraries (cablog)
 
 add_executable (q65sim utils/q65sim.cpp)
 link_wsjtx_cycle_group (q65sim wsjt_qt wsjt_cxx wsjt_fort)
@@ -1175,9 +1052,6 @@ add_executable (testEchoCall
   utils/EchoToolSupport.cpp)
 link_wsjtx_cycle_group (testEchoCall wsjt_qt wsjt_cxx wsjt_fort)
 
-add_executable (cwsim lib/cwsim.f90)
-target_link_libraries (cwsim wsjt_fort wsjt_cxx)
-
 add_executable (q65code utils/q65code.cpp)
 link_wsjtx_cycle_group (q65code wsjt_qt wsjt_cxx wsjt_fort)
 
@@ -1190,17 +1064,11 @@ link_wsjtx_cycle_group (q65_ftn_test wsjt_qt wsjt_cxx wsjt_fort)
 add_executable (q65params utils/q65params.cpp)
 target_link_libraries (q65params wsjt_qt wsjt_cxx)
 
-add_executable (jt49sim lib/jt49sim.f90)
-target_link_libraries (jt49sim wsjt_fort wsjt_cxx)
-
 add_executable (rtty_spec utils/rtty_spec.cpp)
 link_wsjtx_cycle_group (rtty_spec wsjt_qt wsjt_cxx wsjt_fort)
 
-add_executable (jt65code lib/jt65code.f90)
-target_link_libraries (jt65code wsjt_fort wsjt_cxx)
-
 add_executable (jt65_compare utils/jt65_compare.cpp)
-link_wsjtx_cycle_group (jt65_compare wsjt_qt wsjt_cxx wsjt_fort)
+link_wsjtx_cycle_group (jt65_compare wsjt_qt wsjt_cxx)
 
 add_executable (jt65_symspec_compare utils/jt65_symspec_compare.cpp)
 link_wsjtx_cycle_group (jt65_symspec_compare wsjt_qt wsjt_cxx wsjt_fort)
@@ -1225,9 +1093,6 @@ add_executable (jt65_decode65a_compare
   utils/jt65_decode65a_compare.cpp)
 link_wsjtx_cycle_group (jt65_decode65a_compare wsjt_qt wsjt_cxx wsjt_fort)
 
-add_executable (jt9code lib/jt9code.f90)
-target_link_libraries (jt9code wsjt_fort wsjt_cxx)
-
 add_executable (jt9_compare utils/jt9_compare.cpp)
 link_wsjtx_cycle_group (jt9_compare wsjt_qt wsjt_cxx wsjt_fort)
 
@@ -1235,18 +1100,15 @@ add_executable (jt4_compare utils/jt4_compare.cpp)
 link_wsjtx_cycle_group (jt4_compare wsjt_qt wsjt_cxx wsjt_fort)
 
 add_executable (wspr_compare utils/wspr_compare.cpp)
-link_wsjtx_cycle_group (wspr_compare wsjt_qt wsjt_cxx wsjt_fort)
+link_wsjtx_cycle_group (wspr_compare wsjt_qt wsjt_cxx)
 
 add_executable (plot_compare utils/plot_compare.cpp)
 link_wsjtx_cycle_group (plot_compare wsjt_qt wsjt_cxx wsjt_fort)
 
 add_executable (indexx_compare utils/indexx_compare.cpp)
-link_wsjtx_cycle_group (indexx_compare wsjt_qt wsjt_cxx wsjt_fort)
+link_wsjtx_cycle_group (indexx_compare wsjt_qt wsjt_cxx)
 
 
-add_executable (wsprcode lib/wsprcode/wsprcode.f90 lib/wsprcode/nhash.c)
-target_link_libraries (wsprcode wsjt_fort wsjt_cxx)
-	       
 add_executable (encode77 utils/encode77.cpp)
 link_wsjtx_cycle_group (encode77 wsjt_qt wsjt_cxx wsjt_fort)
 
@@ -1258,9 +1120,6 @@ link_wsjtx_cycle_group (hash22calc wsjt_qt wsjt_cxx wsjt_fort)
 
 add_executable (wsprsim ${wsprsim_CSRCS})
 target_link_libraries (wsprsim ${LIBM_LIBRARIES})
-
-add_executable (jt4code lib/jt4code.f90)
-target_link_libraries (jt4code wsjt_fort wsjt_cxx)
 
 add_executable (msk144code utils/msk144code.cpp)
 link_wsjtx_cycle_group (msk144code wsjt_qt wsjt_cxx wsjt_fort)
@@ -1313,15 +1172,6 @@ target_link_libraries (ldpcsim240_74 wsjt_qt wsjt_cxx wsjt_fort)
 
 endif(WSJT_BUILD_UTILS)
 
-if(WSJT_BUILD_UTILS)
-
-add_executable (fmtave lib/fmtave.f90)
-
-add_executable (fcal lib/fcal.f90)
-
-add_executable (fmeasure lib/fmeasure.f90)
-
-endif(WSJT_BUILD_UTILS)
 
 # build the wsprd WSPR mode decoder driver
 generate_version_info (wsprd_VERSION_RESOURCES
@@ -1473,15 +1323,9 @@ if (WIN32)
   target_link_libraries (wsjt_qt Qt5::AxContainer Qt5::AxBase)
 endif (WIN32)
 
-# Several legacy Fortran utilities now resolve migrated compatibility exports
-# from both the Qt-side encoder code and the shared C++ DSP/Q65 helpers.
-# Export both transitively so tools that still link only wsjt_fort continue to
-# resolve the native replacements when WSJT_BUILD_UTILS is enabled.
-target_link_libraries (wsjt_fort wsjt_qt wsjt_cxx)
-
-if (TARGET wsjt_fort_omp)
-  target_link_libraries (wsjt_fort_omp wsjt_qt wsjt_cxx)
-endif ()
+# wsjt_fort is an INTERFACE library: propagate wsjt_qt and wsjt_cxx transitively
+# so that targets linking wsjt_fort continue to resolve all migrated C++ symbols.
+target_link_libraries (wsjt_fort INTERFACE wsjt_qt wsjt_cxx)
 # build a library of package Qt functionality used in Fortran utilities
 add_library (fort_qt STATIC ${fort_qt_CXXSRCS})
 target_link_libraries (fort_qt Qt5::Core)
@@ -1555,20 +1399,15 @@ set_target_properties (wsjtx PROPERTIES
   )
 
 target_include_directories (wsjtx PRIVATE ${FFTW3_INCLUDE_DIRS})
-set (_wsjtx_fort_target wsjt_fort)
-if ((NOT ${OPENMP_FOUND}) OR APPLE)
-  set (_wsjtx_fort_target wsjt_fort)
-else ()
-  set (_wsjtx_fort_target wsjt_fort_omp)
+# wsjt_fort is now an INTERFACE library (no Fortran sources); wsjt_fort_omp is
+# an alias of it. Always link wsjt_fort — OpenMP C flags for jt9 are set below.
+if (${OPENMP_FOUND} AND NOT APPLE)
   if (OpenMP_C_FLAGS)
     set_target_properties (wsjtx PROPERTIES
       COMPILE_FLAGS "${OpenMP_C_FLAGS}"
       LINK_FLAGS "${OpenMP_C_FLAGS}"
       )
   endif ()
-  set_target_properties (wsjtx PROPERTIES
-    Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/fortran_modules_omp
-    )
   if (WIN32)
     set_target_properties (wsjtx PROPERTIES
       LINK_FLAGS -Wl,--stack,0x1000000,--heap,0x20000000
@@ -1576,7 +1415,7 @@ else ()
   endif ()
 endif ()
 target_link_libraries (wsjtx Qt5::SerialPort wsjt_qtmm ${FFTW3_LIBRARIES} ${LIBM_LIBRARIES})
-link_wsjtx_cycle_group (wsjtx wsjt_qt wsjt_cxx ${_wsjtx_fort_target})
+link_wsjtx_cycle_group (wsjtx wsjt_qt wsjt_cxx wsjt_fort)
 
 if (APPLE)
   add_custom_command (TARGET wsjtx POST_BUILD
@@ -1693,12 +1532,6 @@ install (TARGETS jt9 wsprd
   BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime
   )
 
-if(WSJT_BUILD_UTILS)
-install (TARGETS fmtave fcal fmeasure
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime
-  BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime
-  )
-endif(WSJT_BUILD_UTILS)
 
 install (PROGRAMS
   ${RIGCTL_EXE}

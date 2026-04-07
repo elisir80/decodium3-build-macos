@@ -1,4 +1,5 @@
 #include "Transceiver/TCITransceiver.hpp"
+#include "Detector/Fil4Filter.hpp"
 
 #include <QRegularExpression>
 #include <QLocale>
@@ -365,9 +366,6 @@ private:
   QWebSocket * socket_ {nullptr};
 };
 
-extern "C" {
-  void   fil4_(qint16*, qint32*, qint16*, qint32*, short int*);
-}
 extern dec_data dec_data;
 
 extern float gran();		// Noise generator (for tests only)
@@ -453,6 +451,7 @@ TCITransceiver::TCITransceiver (logger_type * logger, std::unique_ptr<Transceive
 {
   m_samplesPerFFT = 6912 / 2;
   tci_Ready = false;
+  startup_pending_ = false;
   trxA = 0;
   trxB = 0;
   cntIQ = 0;
@@ -585,6 +584,7 @@ void TCITransceiver::onConnected()
 {
   inConnected = true;
   CAT_TRACE ("TCITransceiver entered TCI onConnected and inConnected==true\n");
+  finish_startup_if_ready ();
 }
 
 void TCITransceiver::onDisconnected()
@@ -657,6 +657,39 @@ void TCITransceiver::process_pending_tci_frames()
     }
 }
 
+void TCITransceiver::finish_startup_if_ready ()
+{
+  if (!startup_pending_ || !inConnected || !_power_ || !error_.isEmpty ())
+    {
+      return;
+    }
+
+  startup_pending_ = false;
+  tci_Ready = true;
+  CAT_TRACE ("TCITransceiver async startup handshake complete\n");
+
+  if (rx_ == "1" && !rx2_)
+    {
+      rx2_enable (true);
+    }
+
+  if (tci_audio_)
+    {
+      stream_audio (true);
+      arm_wait_timer (tci_timer6_, 500, "startup/audio-on");
+    }
+
+  if (ESDR3)
+    {
+      sendTextMessage (CmdRxSensorsEnable + SmDP + (do_snr_ ? "true" : "false") + SmCM + "500" + SmTZ);
+      sendTextMessage (CmdTxSensorsEnable + SmDP + (do_pwr_ ? "true" : "false") + SmCM + "500" + SmTZ);
+    }
+  else if (do_snr_)
+    {
+      sendTextMessage (CmdSmeter + SmDP + rx_ + SmCM + "0" + SmTZ);
+    }
+}
+
 int TCITransceiver::do_start ()
 {
   if (tci_audio_) QThread::currentThread()->setPriority(QThread::HighPriority);
@@ -713,6 +746,26 @@ int TCITransceiver::do_start ()
     tci_timer6_ -> setSingleShot(true);
     connect(this, &TCITransceiver::tci_done6, this, [this]() {
       if (tci_timer6_ && tci_timer6_->isActive()) tci_timer6_->stop();
+    });
+    connect(tci_timer6_, &QTimer::timeout, this, [this]() {
+      if (!startup_pending_ || !error_.isEmpty())
+        {
+          return;
+        }
+
+      tci_Ready = false;
+      if (!inConnected)
+        {
+          error_ = tr ("TCI could not be opened");
+        }
+      else if (!_power_)
+        {
+          error_ = tr ("TCI SDR is not switched on");
+        }
+      else
+        {
+          error_ = tr ("TCI startup timed out");
+        }
     });
   }
   if (!tci_timer7_) {
@@ -776,48 +829,27 @@ int TCITransceiver::do_start ()
   requested_stream_audio_ = false;
   stream_audio_ = false;
   _power_ = false;
+  startup_pending_ = true;
   CAT_TRACE ("TCITransceiver entered TCI do_start and url " + url_.toString() + " rig_power:" + QString::number(rig_power_) + " rig_power_off:" + QString::number(rig_power_off_) + " tci_audio:" + QString::number(tci_audio_) + " do_snr:" + QString::number(do_snr_) + " do_pwr:" + QString::number(do_pwr_) + '\n');
   Q_EMIT request_socket_open (url_);
   tci_done6();
-  arm_wait_timer (tci_timer6_, 2000, "startup/open");
+  arm_wait_timer (tci_timer6_, 3000, "startup/ready");
   busy_split_ = true;
   const QString cmd = CmdSplitEnable + SmDP + "false" + SmTZ;
   sendTextMessage(cmd);
   arm_wait_timer (tci_timer5_, 500, "startup/split-off");
   if (error_.isEmpty()) {
-    tci_Ready = true;
     if (!_power_) {
       if (rig_power_) {
         rig_power(true);
-        arm_wait_timer (tci_timer6_, 1000, "startup/power-on");
-      } else {
-        tci_Ready = false;
-        throw error {tr ("TCI SDR is not switched on")};
       }
     }
-    if (rx_ == "1" && !rx2_) {
-      rx2_enable (true);
-    }
-    if (tci_audio_) {
-      stream_audio (true);
-      arm_wait_timer (tci_timer6_, 500, "startup/audio-on");
-    }
-    if (ESDR3) {
-      const QString cmd = CmdRxSensorsEnable + SmDP + (do_snr_ ? "true" : "false") + SmCM + "500" +  SmTZ;
-      sendTextMessage(cmd);
-    } else if (do_snr_) {
-      const QString cmd = CmdSmeter + SmDP + rx_ + SmCM + "0" +  SmTZ;
-      sendTextMessage(cmd);
-    }
+    finish_startup_if_ready ();
 //    if (!requested_rx_frequency_.isEmpty()) do_frequency(string_to_frequency (requested_rx_frequency_),get_mode(true),false);
 //    if (!requested_other_frequency_.isEmpty()) do_tx_frequency(string_to_frequency (requested_other_frequency_),get_mode(true),false);
 //    else if (requested_split_ != split_) {rig_split();}
 
     do_poll ();
-    if (ESDR3) {
-      const QString cmd = CmdTxSensorsEnable + SmDP + (do_pwr_ ? "true" : "false") + SmCM + "500" +  SmTZ;
-      sendTextMessage(cmd);
-    }
     if (stream_audio_) do_audio(true);
 
     CAT_TRACE ("TCITransceiver started\n");
@@ -836,6 +868,7 @@ void TCITransceiver::do_stop ()
 {
   CAT_TRACE ("TCITransceiver TCI close\n");
   //printf ("TCI close\n");
+  startup_pending_ = false;
   if (stream_audio_ && tci_Ready && inConnected && _power_) {
     stream_audio (false);
     arm_wait_timer (tci_timer1_, 500, "stop/audio-off");
@@ -1108,6 +1141,7 @@ void TCITransceiver::onMessageReceived(const QString &str)
       case Cmd_Start:
         printf("%s CmdStart : %s\n",QDateTime::QDateTime::currentDateTimeUtc().toString("hh:mm:ss.zzz").toStdString().c_str(),args.join("|").toStdString().c_str());
         _power_ = true;
+        finish_startup_if_ready ();
         printf ("cmdstart done1\n");
         if (tci_Ready) {
           tci_done7(); //was tci_done1 (do_frequency)
@@ -1144,6 +1178,7 @@ void TCITransceiver::onMessageReceived(const QString &str)
         break;
       case Cmd_Ready:
         printf("%s CmdReady : %s\n",QDateTime::QDateTime::currentDateTimeUtc().toString("hh:mm:ss.zzz").toStdString().c_str(),args.join("|").toStdString().c_str());
+        finish_startup_if_ready ();
         tci_done7(); //was tci_done1 (do_frequency)
         break;
 
@@ -1326,8 +1361,8 @@ quint32 TCITransceiver::writeAudioData (float * data, qint32 maxSize)
                   int const boundedKin = qBound (0, dec_data.params.kin, kMaxKin);
                   if (boundedKin <= (kMaxKin - framesAfterDownSample))
                     {
-                      fil4_ (&m_buffer[0], &framesToProcess, &dec_data.d2[boundedKin],
-                             &framesAfterDownSample, &dec_data.d2[boundedKin]);
+                      fil4_cpp (&m_buffer[0], framesToProcess, &dec_data.d2[boundedKin],
+                               framesAfterDownSample);
                       dec_data.params.kin = boundedKin + framesAfterDownSample;
                     }
                   else
@@ -1577,12 +1612,8 @@ void TCITransceiver::do_poll ()
   if (!error_.isEmpty()) {tci_Ready = false; throw error {error_};}
   if (!tci_Ready)
     {
-      // Non-blocking startup: wait for async websocket/radio handshake.
-      if (inConnected && _power_)
-        {
-          tci_Ready = true;
-        }
-      else
+      finish_startup_if_ready ();
+      if (!tci_Ready)
         {
           return;
         }
